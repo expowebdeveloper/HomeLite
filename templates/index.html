@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SARDO360 - PROPERTY INSIGHT</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=2.3">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-container">
+                <img src="/static/assets/logo.png" alt="SARDO360 Logo" id="app-logo" onerror="this.style.display='none'; document.getElementById('logo-text').style.display='block';">
+                <h1 id="logo-text" style="display:none;">SARDO360</h1>
+            </div>
+            <div class="stats-container">
+                <div class="stat-card">
+                    <span class="stat-label">Total Properties</span>
+                    <span class="stat-value" id="stat-total">--</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Avg Price</span>
+                    <span class="stat-value" id="stat-avg">--</span>
+                </div>
+                <div class="header-actions" style="margin-left: 20px;">
+                    <a href="{{ url_for('logout') }}" class="btn btn-secondary" style="text-decoration: none; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar Filters -->
+            <aside class="sidebar">
+                <div class="filter-group">
+                    <h3><i class="fas fa-filter"></i> Filters</h3>
+                </div>
+                
+                <div class="filter-section">
+                    <label>Price Range (€)</label>
+                    <div class="input-row">
+                        <input type="number" id="filter-min-price" placeholder="Min" min="0">
+                        <span>-</span>
+                        <input type="number" id="filter-max-price" placeholder="Max" min="0">
+                    </div>
+                </div>
+
+                <div class="filter-section">
+                    <label>Location</label>
+                    <select id="filter-locations" multiple class="multi-select">
+                        <!-- Populated via JS -->
+                    </select>
+                    <small>Hold Ctrl/Cmd to select multiple</small>
+                </div>
+
+                <div class="filter-section">
+                    <label>Property Type</label>
+                    <select id="filter-type">
+                        <option value="">Any Type</option>
+                        <!-- Populated via JS -->
+                    </select>
+                </div>
+
+                <div class="filter-section">
+                    <label>Bedrooms</label>
+                    <div class="input-row">
+                        <input type="number" id="filter-min-beds" placeholder="Min" min="0">
+                        <span>-</span>
+                        <input type="number" id="filter-max-beds" placeholder="Max" min="0">
+                    </div>
+                </div>
+
+                <div class="filter-section">
+                    <label>Bathrooms</label>
+                    <div class="input-row">
+                        <input type="number" id="filter-min-baths" placeholder="Min" min="0">
+                        <span>-</span>
+                        <input type="number" id="filter-max-baths" placeholder="Max" min="0">
+                    </div>
+                </div>
+
+                <div class="filter-actions">
+                    <button id="btn-search" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
+                    <button id="btn-clear" class="btn btn-secondary"><i class="fas fa-trash-alt"></i> Clear</button>
+                </div>
+
+                <hr class="divider">
+                
+                <div class="export-section">
+                    <h3><i class="fas fa-file-export"></i> Export</h3>
+                    <label>Client Name</label>
+                    <input type="text" id="export-client" value="Smith" placeholder="e.g. Smith">
+                    <div class="export-buttons">
+                        <button id="btn-export-pdf" class="btn btn-danger" disabled><i class="fas fa-file-pdf"></i> PDF</button>
+                        <button id="btn-export-excel" class="btn btn-success" disabled><i class="fas fa-file-excel"></i> Excel</button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Grid Area -->
+            <section class="main-area">
+                <div class="header-controls">
+                    <div class="select-all-wrapper">
+                        <input type="checkbox" id="select-all">
+                        <label for="select-all">Select All Properties</label>
+                    </div>
+                    <div class="view-toggle">
+                        <button id="btn-view-table" class="btn-view active"><i class="fas fa-list"></i> Table</button>
+                        <button id="btn-view-grid" class="btn-view"><i class="fas fa-th-large"></i> Grid</button>
+                    </div>
+                    <div class="results-info">
+                        <span id="results-count">0 Properties Found</span>
+                    </div>
+                </div>
+                
+                <!-- The Grid -->
+                <div class="property-grid d-none" id="properties-grid">
+                    <!-- Populated via JS -->
+                </div>
+
+                <!-- The Table (Hidden by default) -->
+                <div class="table-area" id="table-area">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Select</th>
+                                    <th>Price</th>
+                                    <th>Location</th>
+                                    <th>Type</th>
+                                    <th>Beds</th>
+                                    <th>Baths</th>
+                                    <th>Build (m²)</th>
+                                    <th>Plot (m²)</th>
+                                    <th>Source</th>
+                                    <th>Reference</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-body">
+                                <!-- Populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Pagination Controls -->
+                <div class="pagination-controls" id="pagination-controls">
+                    <div class="items-per-page">
+                        <label for="per-page-select">Items per page:</label>
+                        <select id="per-page-select">
+                            <option value="10" selected>10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="All">All</option>
+                        </select>
+                    </div>
+                    <div class="pagination-center">
+                        <div class="pagination-buttons" id="pagination-buttons">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+                    <div class="pagination-info" id="pagination-info">
+                        Showing 0 to 0 of 0 properties
+                    </div>
+                </div>
+            </section>
+
+            <!-- Preview Panel (Hidden in grid mode) -->
+            <aside class="preview-panel" id="preview-panel">
+                <h3><i class="fas fa-eye"></i> Quick Preview</h3>
+                <div class="image-wrapper" id="preview-image-container">
+                    <div class="no-image-placeholder">
+                        <i class="fas fa-image"></i>
+                        <p>Hover a property</p>
+                    </div>
+                </div>
+                <div class="preview-details" id="preview-details">
+                    <!-- Details will be populated here -->
+                </div>
+            </aside>
+        </div>
+        
+        <!-- Status Bar -->
+        <footer class="status-bar">
+            <span id="status-text">Ready</span>
+        </footer>
+    </div>
+    
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display:none;">
+        <div class="spinner"></div>
+        <p id="loading-text">Loading...</p>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Property Modal Details (Instead of right panel) -->
+    <div id="property-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js?v=2.4"></script>
+</body>
+</html>
