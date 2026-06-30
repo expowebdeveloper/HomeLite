@@ -669,7 +669,7 @@ class PropertyApp:
                 from PIL import Image, ImageTk
                 
                 # Try to load the header image
-                image_path = "logo.png"
+                image_path = "static/images/logo.png"
                 if os.path.exists(image_path):
                     # Load and resize the image
                     original_image = Image.open(image_path)

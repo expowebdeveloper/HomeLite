@@ -293,7 +293,7 @@ class PDFGenerator:
         elements = []
         
         # Add SARDO logo image at the top with adjusted dimensions
-        logo_path = "Sardo.png"  # Logo file as specified
+        logo_path = "static/images/Sardo.png"  # Logo file as specified
         if os.path.exists(logo_path):
             try:
                 logo = Image(logo_path, width=3.2*inch, height=2*inch)  # Wider, shorter
