@@ -457,9 +457,9 @@ tbody tr.selected-row {
 }
 
 tbody td {
-    padding: 14px 16px;
+    padding: 18px 20px;
     border-bottom: 1px solid var(--border-color);
-    font-size: 0.95rem;
+    font-size: 1rem;
     color: var(--text-primary);
     white-space: nowrap;
 }
@@ -623,8 +623,6 @@ tbody td {
     position: relative;
     display: flex;
     flex-direction: column;
-    min-height: 400px; /* Guarantee a minimum height */
-    height: 100%;      /* Take full height of grid row */
 }
 
 .property-card:hover {
@@ -1198,6 +1196,8 @@ th.sortable.active-desc .sort-icon::before {
 @media screen and (min-width: 1400px) {
     /* Mimic the user's preferred "67% Zoom" feeling by scaling down the UI */
     .app-container {
-        zoom: 0.67;
+        zoom: 0.8; /* Adjusted from 0.67 to make it less compact */
+        height: calc(100vh / 0.8); /* Fix viewport height when zoomed */
+        padding-bottom: 40px;
     }
 }

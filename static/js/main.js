@@ -158,10 +158,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             card.addEventListener('click', () => {
-                // Clicking the card anywhere toggles selection
-                const checkbox = card.querySelector('.card-checkbox');
-                checkbox.checked = !checkbox.checked;
-                checkbox.dispatchEvent(new Event('change'));
+                // Clicking the card opens the details modal
+                showModal(prop);
             });
 
             // Checkbox logic
