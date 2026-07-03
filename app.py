@@ -48,6 +48,21 @@ def load_user(user_id):
         pass
     return None
 
+def format_price_value(value):
+    """Format a property price for display in Excel.
+
+    Non-positive or missing prices (-1 sentinel, 0, None) mean the price is
+    not published, so we show 'P.O.A.' (Price on Application).
+    """
+    if value is None or value == '' or value == 'N/A' or value == 'None':
+        return 'P.O.A.'
+    try:
+        float_value = float(value)
+        return f"€{float_value:,.0f}" if float_value > 0 else 'P.O.A.'
+    except (ValueError, TypeError):
+        return 'P.O.A.'
+
+
 def format_area_value(value):
     """Format area values for display in Excel"""
     if value is None or value == '' or value == 'N/A' or value == 'None':
@@ -161,7 +176,7 @@ def search_properties():
     total_count = result.get('total_count', 0)
     
     properties = assign_sardo_references(properties)
-    
+
     # Resolve S3 urls and clean data
     for prop in properties:
         # Pre-generate presigned url for the image if it exists
@@ -209,8 +224,11 @@ def export_pdf():
         
     properties = assign_sardo_references(properties)
 
-    # Calculate stats for the selected properties
-    prices = [p.get('property_price', 0) for p in properties if p.get('property_price')]
+    # Calculate stats for the selected properties.
+    # Only count real, positive prices — properties with no published price
+    # (-1 sentinel, 0, None) are P.O.A. and must be excluded from min/avg/median.
+    prices = [p['property_price'] for p in properties
+              if p.get('property_price') is not None and p.get('property_price') > 0]
     total_properties = len(properties)
     avg_price = sum(prices) / len(prices) if prices else 0
     median_price = sorted(prices)[len(prices)//2] if prices else 0
@@ -261,7 +279,7 @@ def export_excel():
         display_reference = title if is_waratah and title and title.strip() else reference
         
         row = {
-            'Price': prop.get('property_price'),
+            'Price': format_price_value(prop.get('property_price')),
             'Location': prop.get('location', 'N/A'),
             'Type': prop.get('property_type', 'N/A'),
             'Beds': prop.get('num_beds'),
@@ -317,4 +335,4 @@ def export_excel():
     return send_file(output, as_attachment=True, download_name=default_filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5002)

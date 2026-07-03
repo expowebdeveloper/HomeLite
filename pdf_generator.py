@@ -293,7 +293,7 @@ class PDFGenerator:
         elements = []
         
         # Add SARDO logo image at the top with adjusted dimensions
-        logo_path = "static/images/Sardo.png"  # Logo file as specified
+        logo_path = "Sardo.png"  # Logo file as specified
         if os.path.exists(logo_path):
             try:
                 logo = Image(logo_path, width=3.2*inch, height=2*inch)  # Wider, shorter
@@ -485,19 +485,23 @@ class PDFGenerator:
             self._temp_files = []
     
     def _format_price_value(self, value):
-        """Format price values for display in PDF"""
+        """Format price values for display in PDF.
+
+        Non-positive or missing prices (-1 sentinel, 0, None) mean the price is
+        not published, so we show 'P.O.A.' (Price on Application).
+        """
         if value is None or value == '' or value == 'N/A' or value == 'None':
-            return '—'
-        
+            return 'P.O.A.'
+
         try:
             # Convert to float and format
             float_value = float(value)
             if float_value > 0:
                 return f"€{float_value:,.0f}"
             else:
-                return '—'
+                return 'P.O.A.'
         except (ValueError, TypeError):
-            return '—'
+            return 'P.O.A.'
     
     def _format_area_value(self, value):
         """Format area values for display in PDF"""
