@@ -6,6 +6,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentPage = 1;
     let itemsPerPage = 10;
     let totalPropertiesCount = 0;
+    let currentSortBy = 'created_at';
+    let currentSortDir = 'DESC';
     
     // DOM Elements
     const statTotal = document.getElementById('stat-total');
@@ -25,6 +27,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const formatCurrency = (value) => {
         if (!value) return 'N/A';
         return new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value);
+    };
+
+    // Utility: Format a property price for display.
+    // Non-positive or missing prices (-1 sentinel, 0, null/undefined/empty)
+    // mean the price is not published, so we show "P.O.A." (Price on Application).
+    const formatPrice = (value) => {
+        if (value === null || value === undefined || value === '' || Number(value) <= 0) {
+            return 'P.O.A.';
+        }
+        return formatCurrency(value);
     };
 
     // Utility: Show Loading
@@ -54,6 +66,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalBody = document.getElementById('modal-body');
     const closeModal = document.querySelector('.close-modal');
 
+    const gridSortContainer = document.getElementById('grid-sort-container');
+
     // View Toggle Logic
     const setViewMode = (mode) => {
         currentViewMode = mode;
@@ -63,12 +77,14 @@ document.addEventListener('DOMContentLoaded', () => {
             propertiesGrid.classList.remove('d-none');
             tableArea.classList.add('d-none');
             previewPanel.classList.add('d-none');
+            if (gridSortContainer) gridSortContainer.classList.remove('d-none');
         } else {
             btnViewTable.classList.add('active');
             btnViewGrid.classList.remove('active');
             tableArea.classList.remove('d-none');
             propertiesGrid.classList.add('d-none');
             previewPanel.classList.remove('d-none');
+            if (gridSortContainer) gridSortContainer.classList.add('d-none');
         }
     };
 
@@ -102,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Price formatted
-            const price = prop.property_price ? formatCurrency(prop.property_price) : 'Price on Request';
+            const price = formatPrice(prop.property_price);
             
             // Image handling
             const imgHtml = prop.image_url 
@@ -124,9 +140,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span title="Bathrooms"><i class="fas fa-bath"></i> ${prop.num_baths || '-'}</span>
                         <span title="Build Area"><i class="fas fa-ruler-combined"></i> ${prop.living_area ? parseFloat(prop.living_area).toFixed(0) + ' m²' : '-'}</span>
                     </div>
-                    <div class="card-footer">
-                        <span class="card-source">${prop.display_source || 'Unknown'}</span>
-                        <button class="btn-view-details">View Details</button>
+                    <div class="card-footer" style="flex-direction: column; align-items: stretch; gap: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span class="card-source">${prop.display_source || 'Unknown'}</span>
+                            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Ref: ${prop.sardo_reference || 'N/A'}</span>
+                        </div>
+                        <button class="btn-view-details" style="width: 100%;">View Details</button>
                     </div>
                 </div>
             `;
@@ -188,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             // Format values
-            const price = prop.property_price ? formatCurrency(prop.property_price) : 'N/A';
+            const price = formatPrice(prop.property_price);
             const livingArea = prop.living_area ? parseFloat(prop.living_area).toFixed(0) : '—';
             const landArea = prop.land_area ? parseFloat(prop.land_area).toFixed(0) : '—';
             
@@ -204,6 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${livingArea}</td>
                 <td>${landArea}</td>
                 <td><span class="source-badge">${prop.display_source || 'N/A'}</span></td>
+                <td>${prop.sardo_reference || 'N/A'}</td>
                 <td>${prop.property_url ? `<a href="${prop.property_url}" target="_blank" class="ref-link" onclick="event.stopPropagation();">${prop.display_reference || 'Link'}</a>` : (prop.display_reference || 'N/A')}</td>
             `;
 
@@ -244,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Show Right Sidebar Preview
     const showPreview = (prop) => {
-        const price = prop.property_price ? formatCurrency(prop.property_price) : 'N/A';
+        const price = formatPrice(prop.property_price);
         const imgHtml = prop.image_url 
                 ? `<img src="${prop.image_url}" alt="Property" onerror="this.src=''; this.onerror=null; this.parentElement.innerHTML='<div class=\\'no-image-placeholder\\'><i class=\\'fas fa-image-slash\\'></i><p>Image not found</p></div>';">`
                 : `<div class="no-image-placeholder"><i class="fas fa-image"></i><p>No image available</p></div>`;
@@ -274,12 +294,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Show Modal Details
     const showModal = (prop) => {
-        const price = prop.property_price ? formatCurrency(prop.property_price) : 'N/A';
+        const price = formatPrice(prop.property_price);
         const imgHtml = prop.image_url 
                 ? `<img src="${prop.image_url}" class="modal-main-img" alt="Property" onerror="this.src=''; this.onerror=null; this.parentElement.innerHTML='<div class=\\'no-image-placeholder\\'><i class=\\'fas fa-image-slash\\'></i></div>';">`
                 : `<div class="no-image-placeholder"><i class="fas fa-image"></i></div>`;
                 
-        const referenceHtml = prop.property_url 
+        const referenceHtml = prop.property_url
                 ? `<a href="${prop.property_url}" target="_blank" class="preview-link"><i class="fas fa-external-link-alt"></i> View Original Listing</a>`
                 : ``;
 
@@ -342,6 +362,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const maxBaths = document.getElementById('filter-max-baths').value;
         if (maxBaths) filters.max_baths = parseInt(maxBaths);
+        
+        filters.sort_by = currentSortBy;
+        filters.sort_dir = currentSortDir;
         
         return filters;
     };
@@ -674,6 +697,88 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         paginationButtons.appendChild(btnNext);
     };
+
+    // Location Search Logic
+    const locationSearch = document.getElementById('location-search');
+    if (locationSearch && filterLocations) {
+        locationSearch.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            const options = filterLocations.options;
+            for (let i = 0; i < options.length; i++) {
+                const opt = options[i];
+                if (opt.text.toLowerCase().includes(query)) {
+                    opt.style.display = '';
+                } else {
+                    opt.style.display = 'none';
+                }
+            }
+        });
+    }
+
+    // Grid Sort Dropdown Logic
+    if (gridSortContainer) {
+        const gridSortSelect = document.getElementById('grid-sort');
+        if (gridSortSelect) {
+            gridSortSelect.addEventListener('change', (e) => {
+                const parts = e.target.value.split('-');
+                if (parts.length === 2) {
+                    currentSortBy = parts[0];
+                    currentSortDir = parts[1];
+                    updateTableSortUI();
+                    currentPage = 1;
+                    fetchProperties(getFilters());
+                }
+            });
+        }
+    }
+
+    // Table Column Sorting Logic
+    const updateTableSortUI = () => {
+        document.querySelectorAll('th.sortable').forEach(th => {
+            th.classList.remove('active-asc', 'active-desc');
+            if (th.dataset.sort === currentSortBy) {
+                th.classList.add(currentSortDir === 'ASC' ? 'active-asc' : 'active-desc');
+            }
+        });
+    };
+
+    document.querySelectorAll('th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const sortBy = th.dataset.sort;
+            if (currentSortBy === sortBy) {
+                currentSortDir = currentSortDir === 'ASC' ? 'DESC' : 'ASC';
+            } else {
+                currentSortBy = sortBy;
+                currentSortDir = 'ASC';
+                if (sortBy === 'price' || sortBy === 'living_area' || sortBy === 'land_area' || sortBy === 'bedrooms' || sortBy === 'bathrooms') {
+                    currentSortDir = 'DESC'; // Default to DESC for high values first
+                }
+            }
+            updateTableSortUI();
+            
+            // Sync grid dropdown if it matches
+            const gridSortSelect = document.getElementById('grid-sort');
+            if (gridSortSelect) {
+                const val = `${currentSortBy}-${currentSortDir}`;
+                let found = false;
+                for(let i=0; i<gridSortSelect.options.length; i++) {
+                    if(gridSortSelect.options[i].value === val) {
+                        gridSortSelect.selectedIndex = i;
+                        found = true;
+                        break;
+                    }
+                }
+                if(!found) {
+                     gridSortSelect.selectedIndex = 0; // Default to first if custom sort not in dropdown
+                }
+            }
+
+            currentPage = 1;
+            fetchProperties(getFilters());
+        });
+    });
+
+    updateTableSortUI(); // initial state
 
     // Initialize
     loadMetadata();

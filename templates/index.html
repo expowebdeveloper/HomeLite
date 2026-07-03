@@ -14,7 +14,7 @@
         <!-- Header -->
         <header class="app-header">
             <div class="logo-container">
-                <img src="/static/images/logo.png" alt="SARDO360 Logo" id="app-logo" onerror="this.style.display='none'; document.getElementById('logo-text').style.display='block';">
+                <img src="/static/assets/logo.png" alt="SARDO360 Logo" id="app-logo" onerror="this.style.display='none'; document.getElementById('logo-text').style.display='block';">
                 <h1 id="logo-text" style="display:none;">SARDO360</h1>
             </div>
             <div class="stats-container">
@@ -53,6 +53,7 @@
 
                 <div class="filter-section">
                     <label>Location</label>
+                    <input type="text" id="location-search" placeholder="Search Location..." style="margin-bottom: 8px;">
                     <select id="filter-locations" multiple class="multi-select">
                         <!-- Populated via JS -->
                     </select>
@@ -108,7 +109,17 @@
                 <div class="header-controls">
                     <div class="select-all-wrapper">
                         <input type="checkbox" id="select-all">
-                        <label for="select-all">Select All Properties</label>
+                        <label for="select-all">Select All</label>
+                    </div>
+                    <div class="grid-sort-wrapper d-none" id="grid-sort-container">
+                        <label for="grid-sort" style="font-size: 0.9rem; font-weight: 600; color: var(--text-secondary);">Sort By:</label>
+                        <select id="grid-sort" style="padding: 6px 12px; width: auto; font-size: 0.9rem;">
+                            <option value="created_at-DESC">Newest</option>
+                            <option value="price-ASC">Price (Low to High)</option>
+                            <option value="price-DESC">Price (High to Low)</option>
+                            <option value="living_area-DESC">Build Area (Large to Small)</option>
+                            <option value="land_area-DESC">Plot Area (Large to Small)</option>
+                        </select>
                     </div>
                     <div class="view-toggle">
                         <button id="btn-view-table" class="btn-view active"><i class="fas fa-list"></i> Table</button>
@@ -131,14 +142,15 @@
                             <thead>
                                 <tr>
                                     <th>Select</th>
-                                    <th>Price</th>
-                                    <th>Location</th>
-                                    <th>Type</th>
-                                    <th>Beds</th>
-                                    <th>Baths</th>
-                                    <th>Build (m²)</th>
-                                    <th>Plot (m²)</th>
-                                    <th>Source</th>
+                                    <th class="sortable" data-sort="price">Price <i class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable" data-sort="location">Location <i class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable" data-sort="property_type">Type <i class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable" data-sort="bedrooms">Beds <i class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable" data-sort="bathrooms">Baths <i class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable" data-sort="living_area">Build (m²) <i class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable" data-sort="land_area">Plot (m²) <i class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable" data-sort="source">Source <i class="fas fa-sort sort-icon"></i></th>
+                                    <th>SARDO Ref</th>
                                     <th>Reference</th>
                                 </tr>
                             </thead>

@@ -1153,3 +1153,51 @@ tbody td {
     font-size: 0.9rem;
     color: var(--text-secondary);
 }
+
+/* Sorting Styles */
+th.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+th.sortable:hover {
+    color: var(--primary-color);
+    background-color: rgba(0,0,0,0.02);
+}
+th.sortable .sort-icon {
+    margin-left: 4px;
+    opacity: 0.4;
+    transition: var(--transition-fast);
+}
+th.sortable.active-asc .sort-icon,
+th.sortable.active-desc .sort-icon {
+    opacity: 1;
+    color: var(--accent-color);
+}
+th.sortable.active-asc .sort-icon::before {
+    content: "\f0de"; /* fa-sort-up */
+}
+th.sortable.active-desc .sort-icon::before {
+    content: "\f0dd"; /* fa-sort-down */
+}
+
+.grid-sort-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface-color);
+    padding: 6px 14px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+}
+.grid-sort-wrapper.d-none {
+    display: none !important;
+}
+
+/* 17" MacBook Pro and high-res screen responsive scaling */
+@media screen and (min-width: 1400px) {
+    /* Mimic the user's preferred "67% Zoom" feeling by scaling down the UI */
+    .app-container {
+        zoom: 0.67;
+    }
+}
