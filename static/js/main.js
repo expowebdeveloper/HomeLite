@@ -778,6 +778,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateTableSortUI(); // initial state
 
+    // Mobile Sidebar Toggle
+    const mobileFilterToggle = document.getElementById('mobile-filter-toggle');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+    const sidebarClose = document.getElementById('sidebar-close');
+
+    const openSidebar = () => {
+        if (sidebar) sidebar.classList.add('open');
+        if (sidebarOverlay) sidebarOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    };
+
+    const closeSidebar = () => {
+        if (sidebar) sidebar.classList.remove('open');
+        if (sidebarOverlay) sidebarOverlay.classList.remove('active');
+        document.body.style.overflow = '';
+    };
+
+    if (mobileFilterToggle) mobileFilterToggle.addEventListener('click', openSidebar);
+    if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
+    if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
+
+    // Close sidebar after search on mobile
+    const origBtnSearchClick = btnSearch.onclick;
+    btnSearch.addEventListener('click', () => {
+        if (window.innerWidth <= 1100) closeSidebar();
+    });
+
     // Initialize
     loadMetadata();
 });

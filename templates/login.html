@@ -130,6 +130,43 @@
             color: #64748b;
             line-height: 1.5;
         }
+
+        /* Responsive login */
+        @media (max-width: 480px) {
+            body {
+                padding: 16px;
+                height: auto;
+                min-height: 100vh;
+            }
+            .login-container {
+                padding: 32px 24px;
+                border-radius: 16px;
+                max-width: 100%;
+            }
+            .login-container h2 {
+                font-size: 20px;
+                margin-bottom: 20px;
+            }
+            .logo-container {
+                margin-bottom: 24px;
+            }
+            .logo-container img {
+                max-height: 35px;
+            }
+            .form-group input {
+                padding: 12px 14px;
+                font-size: 14px;
+            }
+            .btn-submit {
+                padding: 12px;
+                font-size: 15px;
+            }
+        }
+
+        /* Windows Phone */
+        @-ms-viewport {
+            width: device-width;
+        }
     </style>
 </head>
 <body>

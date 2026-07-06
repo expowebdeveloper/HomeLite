@@ -189,7 +189,7 @@ def search_properties():
         else:
             prop['image_url'] = None
             
-        # Format the source mapping (same logic as property_app.py)
+        # Format the source mapping
         original_source = prop.get('website_source', 'N/A')
         source = original_source
         if source and source != 'N/A':
