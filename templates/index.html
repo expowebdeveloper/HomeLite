@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SARDO360 - PROPERTY INSIGHT</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=2.3">
+    <link rel="stylesheet" href="/static/css/style.css?v=3.1">
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -36,8 +36,19 @@
 
         <!-- Main Content -->
         <div class="main-content">
+            <!-- Mobile Filter Toggle -->
+            <button class="mobile-filter-toggle" id="mobile-filter-toggle">
+                <i class="fas fa-sliders-h"></i> Filters & Export
+            </button>
+
+            <!-- Sidebar Overlay (mobile) -->
+            <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
             <!-- Sidebar Filters -->
-            <aside class="sidebar">
+            <aside class="sidebar" id="sidebar">
+                <button class="sidebar-close-btn" id="sidebar-close" style="display:none;">
+                    <i class="fas fa-times"></i> Close
+                </button>
                 <div class="filter-group">
                     <h3><i class="fas fa-filter"></i> Filters</h3>
                 </div>
@@ -222,6 +233,6 @@
         </div>
     </div>
 
-    <script src="/static/js/main.js?v=2.4"></script>
+    <script src="/static/js/main.js?v=3.0"></script>
 </body>
 </html>

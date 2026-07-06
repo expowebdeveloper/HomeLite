@@ -200,7 +200,7 @@ def main():
         insert_sample_data()
     
     print("\n🎉 Setup completed! You can now run the application with:")
-    print("   python run_app.py")
+    print("   python app.py")
 
 if __name__ == "__main__":
     main()
