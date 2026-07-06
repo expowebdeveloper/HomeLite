@@ -274,6 +274,9 @@ class DatabaseManager:
                 
             if db_sort_col == 'created_at':
                 query += f" ORDER BY {db_sort_col} {sort_dir}, price ASC"
+            elif db_sort_col == 'price':
+                # Push P.O.A. prices (-1, 0, NULL) to the bottom regardless of direction
+                query += f" ORDER BY CASE WHEN price IS NULL OR price <= 0 THEN 1 ELSE 0 END ASC, price {sort_dir}, created_at DESC"
             else:
                 # Push nulls to the bottom regardless of direction
                 query += f" ORDER BY {db_sort_col} {sort_dir} NULLS LAST, created_at DESC"
