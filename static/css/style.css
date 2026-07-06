@@ -635,6 +635,7 @@ tbody td {
     cursor: pointer;
     box-shadow: var(--shadow-sm);
     transition: var(--transition-fast);
+    height: 42px;
 }
 
 .card-image-container img {
@@ -1106,18 +1107,23 @@ tbody td {
 .mobile-filter-toggle {
     display: none;
     align-items: center;
-    gap: 8px;
-    padding: 10px 20px;
-    background: linear-gradient(135deg, var(--accent-color), #818cf8);
-    color: white;
-    border: none;
+    gap: 10px;
+    background: var(--surface-color);
+    padding: 10px 18px;
     border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    color: var(--text-primary);
     font-family: 'Outfit', sans-serif;
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: 1rem;
     cursor: pointer;
-    box-shadow: var(--shadow-sm);
-    width: 100%;
+    transition: var(--transition-fast);
+    height: 42px;
+}
+
+.mobile-filter-toggle:hover {
+    background: var(--surface-hover);
 }
 
 .sidebar-overlay {
@@ -1133,6 +1139,24 @@ tbody td {
 
 .sidebar-overlay.active {
     display: block;
+}
+
+.sidebar-close-btn {
+    display: none;
+    align-self: flex-end;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 15px;
+    padding: 5px 10px;
+    transition: var(--transition-fast);
+}
+
+.sidebar-close-btn:hover {
+    color: var(--danger-color);
 }
 
 /* ===== Responsive ===== */
@@ -1177,6 +1201,10 @@ tbody td {
         overflow: visible;
     }
 
+    .mobile-filter-toggle {
+        display: flex;
+    }
+
     .sidebar {
         display: none;
         width: 100%;
@@ -1193,6 +1221,15 @@ tbody td {
         background: rgba(255, 255, 255, 0.97);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
+    }
+
+    .sidebar.open {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .sidebar-close-btn {
+        display: flex;
     }
 
     .export-section {

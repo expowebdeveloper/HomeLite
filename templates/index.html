@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,12 +10,14 @@
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
+
 <body>
     <div class="app-container">
         <!-- Header -->
         <header class="app-header">
             <div class="logo-container">
-                <img src="/static/assets/logo.png" alt="SARDO360 Logo" id="app-logo" onerror="this.style.display='none'; document.getElementById('logo-text').style.display='block';">
+                <img src="/static/assets/logo.png" alt="SARDO360 Logo" id="app-logo"
+                    onerror="this.style.display='none'; document.getElementById('logo-text').style.display='block';">
                 <h1 id="logo-text" style="display:none;">SARDO360</h1>
             </div>
             <div class="stats-container">
@@ -27,7 +30,8 @@
                     <span class="stat-value" id="stat-avg">--</span>
                 </div>
                 <div class="header-actions" style="margin-left: 20px;">
-                    <a href="{{ url_for('logout') }}" class="btn btn-secondary" style="text-decoration: none; display: flex; align-items: center; gap: 8px;">
+                    <a href="{{ url_for('logout') }}" class="btn btn-secondary"
+                        style="text-decoration: none; display: flex; align-items: center; gap: 8px;">
                         <i class="fas fa-sign-out-alt"></i> Logout
                     </a>
                 </div>
@@ -36,23 +40,19 @@
 
         <!-- Main Content -->
         <div class="main-content">
-            <!-- Mobile Filter Toggle -->
-            <button class="mobile-filter-toggle" id="mobile-filter-toggle">
-                <i class="fas fa-sliders-h"></i> Filters & Export
-            </button>
 
             <!-- Sidebar Overlay (mobile) -->
             <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
             <!-- Sidebar Filters -->
             <aside class="sidebar" id="sidebar">
-                <button class="sidebar-close-btn" id="sidebar-close" style="display:none;">
+                <button class="sidebar-close-btn" id="sidebar-close">
                     <i class="fas fa-times"></i> Close
                 </button>
                 <div class="filter-group">
                     <h3><i class="fas fa-filter"></i> Filters</h3>
                 </div>
-                
+
                 <div class="filter-section">
                     <label>Price Range (€)</label>
                     <div class="input-row">
@@ -64,7 +64,8 @@
 
                 <div class="filter-section">
                     <label>Location</label>
-                    <input type="text" id="location-search" placeholder="Search Location..." style="margin-bottom: 8px;">
+                    <input type="text" id="location-search" placeholder="Search Location..."
+                        style="margin-bottom: 8px;">
                     <select id="filter-locations" multiple class="multi-select">
                         <!-- Populated via JS -->
                     </select>
@@ -103,14 +104,16 @@
                 </div>
 
                 <hr class="divider">
-                
+
                 <div class="export-section">
                     <h3><i class="fas fa-file-export"></i> Export</h3>
                     <label>Client Name</label>
                     <input type="text" id="export-client" value="Smith" placeholder="e.g. Smith">
                     <div class="export-buttons">
-                        <button id="btn-export-pdf" class="btn btn-danger" disabled><i class="fas fa-file-pdf"></i> PDF</button>
-                        <button id="btn-export-excel" class="btn btn-success" disabled><i class="fas fa-file-excel"></i> Excel</button>
+                        <button id="btn-export-pdf" class="btn btn-danger" disabled><i class="fas fa-file-pdf"></i>
+                            PDF</button>
+                        <button id="btn-export-excel" class="btn btn-success" disabled><i class="fas fa-file-excel"></i>
+                            Excel</button>
                     </div>
                 </div>
             </aside>
@@ -118,19 +121,15 @@
             <!-- Main Grid Area -->
             <section class="main-area">
                 <div class="header-controls">
-                    <div class="select-all-wrapper">
-                        <input type="checkbox" id="select-all">
-                        <label for="select-all">Select All</label>
-                    </div>
-                    <div class="grid-sort-wrapper d-none" id="grid-sort-container">
-                        <label for="grid-sort" style="font-size: 0.9rem; font-weight: 600; color: var(--text-secondary);">Sort By:</label>
-                        <select id="grid-sort" style="padding: 6px 12px; width: auto; font-size: 0.9rem;">
-                            <option value="created_at-DESC">Newest</option>
-                            <option value="price-ASC">Price (Low to High)</option>
-                            <option value="price-DESC">Price (High to Low)</option>
-                            <option value="living_area-DESC">Build Area (Large to Small)</option>
-                            <option value="land_area-DESC">Plot Area (Large to Small)</option>
-                        </select>
+                    <!-- Mobile Filter Toggle (styled like Select All) -->
+                    <div style="display: flex; align-items: stretch; gap: 15px;">
+                        <button class="mobile-filter-toggle" id="mobile-filter-toggle">
+                            <i class="fas fa-sliders-h"></i> Filters
+                        </button>
+                        <div class="select-all-wrapper">
+                            <input type="checkbox" id="select-all">
+                            <label for="select-all">Select All</label>
+                        </div>
                     </div>
                     <div class="view-toggle">
                         <button id="btn-view-table" class="btn-view active"><i class="fas fa-list"></i> Table</button>
@@ -140,7 +139,21 @@
                         <span id="results-count">0 Properties Found</span>
                     </div>
                 </div>
-                
+
+                <!-- Sort By Container for Grid View -->
+                <div class="grid-sort-wrapper d-none" id="grid-sort-container"
+                    style="align-self: flex-end; margin-bottom: 15px;">
+                    <label for="grid-sort"
+                        style="font-size: 0.9rem; font-weight: 600; color: var(--text-secondary);">Sort By:</label>
+                    <select id="grid-sort" style="padding: 6px 12px; width: auto; font-size: 0.9rem;">
+                        <option value="created_at-DESC">Newest</option>
+                        <option value="price-ASC">Price (Low to High)</option>
+                        <option value="price-DESC">Price (High to Low)</option>
+                        <option value="living_area-DESC">Build Area (Large to Small)</option>
+                        <option value="land_area-DESC">Plot Area (Large to Small)</option>
+                    </select>
+                </div>
+
                 <!-- The Grid -->
                 <div class="property-grid d-none" id="properties-grid">
                     <!-- Populated via JS -->
@@ -153,14 +166,22 @@
                             <thead>
                                 <tr>
                                     <th>Select</th>
-                                    <th class="sortable" data-sort="price">Price <i class="fas fa-sort sort-icon"></i></th>
-                                    <th class="sortable" data-sort="location">Location <i class="fas fa-sort sort-icon"></i></th>
-                                    <th class="sortable" data-sort="property_type">Type <i class="fas fa-sort sort-icon"></i></th>
-                                    <th class="sortable" data-sort="bedrooms">Beds <i class="fas fa-sort sort-icon"></i></th>
-                                    <th class="sortable" data-sort="bathrooms">Baths <i class="fas fa-sort sort-icon"></i></th>
-                                    <th class="sortable" data-sort="living_area">Build (m²) <i class="fas fa-sort sort-icon"></i></th>
-                                    <th class="sortable" data-sort="land_area">Plot (m²) <i class="fas fa-sort sort-icon"></i></th>
-                                    <th class="sortable" data-sort="source">Source <i class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable" data-sort="price">Price <i class="fas fa-sort sort-icon"></i>
+                                    </th>
+                                    <th class="sortable" data-sort="location">Location <i
+                                            class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable" data-sort="property_type">Type <i
+                                            class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable" data-sort="bedrooms">Beds <i class="fas fa-sort sort-icon"></i>
+                                    </th>
+                                    <th class="sortable" data-sort="bathrooms">Baths <i
+                                            class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable" data-sort="living_area">Build (m²) <i
+                                            class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable" data-sort="land_area">Plot (m²) <i
+                                            class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable" data-sort="source">Source <i class="fas fa-sort sort-icon"></i>
+                                    </th>
                                     <th>SARDO Ref</th>
                                     <th>Reference</th>
                                 </tr>
@@ -171,7 +192,7 @@
                         </table>
                     </div>
                 </div>
-                
+
                 <!-- Pagination Controls -->
                 <div class="pagination-controls" id="pagination-controls">
                     <div class="items-per-page">
@@ -209,13 +230,13 @@
                 </div>
             </aside>
         </div>
-        
+
         <!-- Status Bar -->
         <footer class="status-bar">
             <span id="status-text">Ready</span>
         </footer>
     </div>
-    
+
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay" style="display:none;">
         <div class="spinner"></div>
@@ -235,4 +256,5 @@
 
     <script src="/static/js/main.js?v=3.0"></script>
 </body>
+
 </html>

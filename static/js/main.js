@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let totalPropertiesCount = 0;
     let currentSortBy = 'created_at';
     let currentSortDir = 'DESC';
-    
+
     // DOM Elements
     const statTotal = document.getElementById('stat-total');
     const statAvg = document.getElementById('stat-avg');
@@ -43,12 +43,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const showLoading = (text = 'Loading...') => {
         document.getElementById('loading-text').innerText = text;
         loadingOverlay.style.display = 'flex';
-        if(statusText) statusText.innerText = text;
+        if (statusText) statusText.innerText = text;
     };
 
     const hideLoading = () => {
         loadingOverlay.style.display = 'none';
-        if(statusText) statusText.innerText = 'Ready';
+        if (statusText) statusText.innerText = 'Ready';
     };
 
     // DOM Elements specific to Views
@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const previewPanel = document.getElementById('preview-panel');
     const previewImageContainer = document.getElementById('preview-image-container');
     const previewDetails = document.getElementById('preview-details');
-    
+
     const btnViewGrid = document.getElementById('btn-view-grid');
     const btnViewTable = document.getElementById('btn-view-table');
 
@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
     closeModal.addEventListener('click', () => {
         propertyModal.style.display = 'none';
     });
-    
+
     window.addEventListener('click', (event) => {
         if (event.target == propertyModal) {
             propertyModal.style.display = 'none';
@@ -119,9 +119,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Price formatted
             const price = formatPrice(prop.property_price);
-            
+
             // Image handling
-            const imgHtml = prop.image_url 
+            const imgHtml = prop.image_url
                 ? `<img src="${prop.image_url}" alt="Property" onerror="this.src=''; this.onerror=null; this.parentElement.innerHTML='<div class=\\'no-image\\'><i class=\\'fas fa-image-slash\\'></i></div>';">`
                 : `<div class="no-image"><i class="fas fa-image"></i></div>`;
 
@@ -156,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.stopPropagation();
                 showModal(prop);
             });
-            
+
             card.addEventListener('click', () => {
                 // Clicking the card opens the details modal
                 showModal(prop);
@@ -176,9 +176,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 // Sync table row if it exists
                 const rowCb = tableBody.querySelector(`.row-checkbox[value="${prop.id}"]`);
-                if(rowCb) {
+                if (rowCb) {
                     rowCb.checked = e.target.checked;
-                    if(e.target.checked) rowCb.closest('tr').classList.add('selected-row');
+                    if (e.target.checked) rowCb.closest('tr').classList.add('selected-row');
                     else rowCb.closest('tr').classList.remove('selected-row');
                 }
                 updateExportButtons();
@@ -203,12 +203,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (selectedPropertyIds.has(prop.id.toString()) || selectedPropertyIds.has(prop.id)) {
                 row.classList.add('selected-row');
             }
-            
+
             // Format values
             const price = formatPrice(prop.property_price);
             const livingArea = prop.living_area ? parseFloat(prop.living_area).toFixed(0) : '—';
             const landArea = prop.land_area ? parseFloat(prop.land_area).toFixed(0) : '—';
-            
+
             row.innerHTML = `
                 <td onclick="event.stopPropagation();">
                     <input type="checkbox" class="row-checkbox" value="${prop.id}" ${selectedPropertyIds.has(prop.id.toString()) || selectedPropertyIds.has(prop.id) ? 'checked' : ''}>
@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 checkbox.checked = !checkbox.checked;
                 checkbox.dispatchEvent(new Event('change'));
             });
-            
+
             row.addEventListener('mouseenter', () => {
                 showPreview(prop);
             });
@@ -248,9 +248,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 // Sync grid card if it exists
                 const cardCb = propertiesGrid.querySelector(`.card-checkbox[value="${prop.id}"]`);
-                if(cardCb) {
+                if (cardCb) {
                     cardCb.checked = e.target.checked;
-                    if(e.target.checked) cardCb.closest('.property-card').classList.add('selected');
+                    if (e.target.checked) cardCb.closest('.property-card').classList.add('selected');
                     else cardCb.closest('.property-card').classList.remove('selected');
                 }
                 updateExportButtons();
@@ -263,12 +263,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Show Right Sidebar Preview
     const showPreview = (prop) => {
         const price = formatPrice(prop.property_price);
-        const imgHtml = prop.image_url 
-                ? `<img src="${prop.image_url}" alt="Property" onerror="this.src=''; this.onerror=null; this.parentElement.innerHTML='<div class=\\'no-image-placeholder\\'><i class=\\'fas fa-image-slash\\'></i><p>Image not found</p></div>';">`
-                : `<div class="no-image-placeholder"><i class="fas fa-image"></i><p>No image available</p></div>`;
+        const imgHtml = prop.image_url
+            ? `<img src="${prop.image_url}" alt="Property" onerror="this.src=''; this.onerror=null; this.parentElement.innerHTML='<div class=\\'no-image-placeholder\\'><i class=\\'fas fa-image-slash\\'></i><p>Image not found</p></div>';">`
+            : `<div class="no-image-placeholder"><i class="fas fa-image"></i><p>No image available</p></div>`;
 
         previewImageContainer.innerHTML = imgHtml;
-        
+
         previewDetails.innerHTML = `
             <h4 style="font-size: 1.1rem; color: var(--primary-color); margin-bottom: 10px; line-height: 1.3;">
                 ${prop.title && prop.title !== 'N/A' ? prop.title : (prop.property_type || 'Property')}
@@ -293,13 +293,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Show Modal Details
     const showModal = (prop) => {
         const price = formatPrice(prop.property_price);
-        const imgHtml = prop.image_url 
-                ? `<img src="${prop.image_url}" class="modal-main-img" alt="Property" onerror="this.src=''; this.onerror=null; this.parentElement.innerHTML='<div class=\\'no-image-placeholder\\'><i class=\\'fas fa-image-slash\\'></i></div>';">`
-                : `<div class="no-image-placeholder"><i class="fas fa-image"></i></div>`;
-                
+        const imgHtml = prop.image_url
+            ? `<img src="${prop.image_url}" class="modal-main-img" alt="Property" onerror="this.src=''; this.onerror=null; this.parentElement.innerHTML='<div class=\\'no-image-placeholder\\'><i class=\\'fas fa-image-slash\\'></i></div>';">`
+            : `<div class="no-image-placeholder"><i class="fas fa-image"></i></div>`;
+
         const referenceHtml = prop.property_url
-                ? `<a href="${prop.property_url}" target="_blank" class="preview-link"><i class="fas fa-external-link-alt"></i> View Original Listing</a>`
-                : ``;
+            ? `<a href="${prop.property_url}" target="_blank" class="preview-link"><i class="fas fa-external-link-alt"></i> View Original Listing</a>`
+            : ``;
 
         modalBody.innerHTML = `
             <div class="modal-grid">
@@ -336,34 +336,34 @@ document.addEventListener('DOMContentLoaded', () => {
     // Build Filters Object
     const getFilters = () => {
         const filters = {};
-        
+
         const minPrice = document.getElementById('filter-min-price').value;
         if (minPrice) filters.min_price = parseFloat(minPrice);
-        
+
         const maxPrice = document.getElementById('filter-max-price').value;
         if (maxPrice) filters.max_price = parseFloat(maxPrice);
-        
+
         const selectedLocations = Array.from(filterLocations.selectedOptions).map(opt => opt.value);
         if (selectedLocations.length > 0) filters.locations = selectedLocations;
-        
+
         const type = filterType.value;
         if (type) filters.property_type = type;
-        
+
         const minBeds = document.getElementById('filter-min-beds').value;
         if (minBeds) filters.min_beds = parseInt(minBeds);
-        
+
         const maxBeds = document.getElementById('filter-max-beds').value;
         if (maxBeds) filters.max_beds = parseInt(maxBeds);
-        
+
         const minBaths = document.getElementById('filter-min-baths').value;
         if (minBaths) filters.min_baths = parseInt(minBaths);
-        
+
         const maxBaths = document.getElementById('filter-max-baths').value;
         if (maxBaths) filters.max_baths = parseInt(maxBaths);
-        
+
         filters.sort_by = currentSortBy;
         filters.sort_dir = currentSortDir;
-        
+
         return filters;
     };
 
@@ -383,18 +383,18 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('filter-max-beds').value = '';
         document.getElementById('filter-min-baths').value = '';
         document.getElementById('filter-max-baths').value = '';
-        
+
         fetchProperties({});
     });
 
     selectAllCheckbox.addEventListener('change', (e) => {
         const isChecked = e.target.checked;
         const checkboxes = document.querySelectorAll('.card-checkbox, .row-checkbox');
-        
+
         checkboxes.forEach(cb => {
             cb.checked = isChecked;
         });
-        
+
         currentProperties.forEach(prop => {
             if (isChecked) {
                 selectedPropertyIds.add(prop.id.toString());
@@ -402,11 +402,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectedPropertyIds.clear();
             }
         });
-        
+
         // Update DOM classes
         document.querySelectorAll('.property-card').forEach(c => isChecked ? c.classList.add('selected') : c.classList.remove('selected'));
         document.querySelectorAll('tbody tr').forEach(r => isChecked ? r.classList.add('selected-row') : r.classList.remove('selected-row'));
-        
+
         updateExportButtons();
     });
 
@@ -421,24 +421,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const showToast = (message, type = 'success') => {
         const toastContainer = document.getElementById('toast-container');
         if (!toastContainer) return;
-        
+
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
-        
+
         const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
-        
+
         toast.innerHTML = `
             <i class="fas ${icon}"></i>
             <span class="toast-message">${message}</span>
         `;
-        
+
         toastContainer.appendChild(toast);
-        
+
         // Trigger reflow for animation
         setTimeout(() => {
             toast.classList.add('show');
         }, 10);
-        
+
         // Remove after 3 seconds
         setTimeout(() => {
             toast.classList.remove('show');
@@ -480,7 +480,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = url;
-            
+
             // Try to extract filename from Content-Disposition header
             let filename = `export.${filenameExtension}`;
             const disposition = response.headers.get('content-disposition');
@@ -491,12 +491,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     filename = matches[1].replace(/['"]/g, '');
                 }
             }
-            
+
             a.download = filename;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
-            
+
             hideLoading();
             statusText.innerText = `${filenameExtension.toUpperCase()} Exported Successfully`;
             showToast(`${filenameExtension.toUpperCase()} downloaded successfully!`, 'success');
@@ -517,7 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showLoading('Loading configuration...');
             const response = await fetch('/api/metadata');
             const data = await response.json();
-            
+
             // Populate Locations
             data.locations.forEach(loc => {
                 const option = document.createElement('option');
@@ -540,12 +540,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Document Title
             document.title = data.app_title || 'SARDO360';
-            
+
             // Initial Property Load
             fetchProperties({});
         } catch (error) {
             console.error('Error loading metadata:', error);
-            if(statusText) statusText.innerText = 'Error loading metadata';
+            if (statusText) statusText.innerText = 'Error loading metadata';
             hideLoading();
         }
     };
@@ -565,22 +565,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             currentProperties = data.properties;
             totalPropertiesCount = data.total_count;
-            
+
             // Clear selections
             selectedPropertyIds.clear();
             updateExportButtons();
             if (selectAllCheckbox) selectAllCheckbox.checked = false;
-            
+
             renderGrid();
             renderTable();
             renderPagination();
-            
+
             hideLoading();
-            if(statusText) statusText.innerText = `Found ${totalPropertiesCount} properties`;
-            if(resultsCount) resultsCount.innerText = `${totalPropertiesCount} Properties Found`;
+            if (statusText) statusText.innerText = `Found ${totalPropertiesCount} properties`;
+            if (resultsCount) resultsCount.innerText = `${totalPropertiesCount} Properties Found`;
         } catch (error) {
             console.error('Error fetching properties:', error);
-            if(statusText) statusText.innerText = 'Error fetching properties';
+            if (statusText) statusText.innerText = 'Error fetching properties';
             hideLoading();
         }
     };
@@ -600,9 +600,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const renderPagination = () => {
         if (!paginationButtons || !paginationInfo) return;
-        
+
         paginationButtons.innerHTML = '';
-        
+
         if (itemsPerPage === 'All' || itemsPerPage === 'all') {
             paginationInfo.innerText = `Showing all ${totalPropertiesCount} properties`;
             return;
@@ -610,7 +610,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const limit = parseInt(itemsPerPage);
         const totalPages = Math.ceil(totalPropertiesCount / limit);
-        
+
         if (totalPropertiesCount === 0) {
             paginationInfo.innerText = `Showing 0 to 0 of 0 properties`;
             return;
@@ -637,7 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const maxPagesToShow = 5;
         let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
         let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
-        
+
         if (endPage - startPage + 1 < maxPagesToShow) {
             startPage = Math.max(1, endPage - maxPagesToShow + 1);
         }
@@ -648,7 +648,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btnFirst.innerText = '1';
             btnFirst.addEventListener('click', () => { currentPage = 1; fetchProperties(getFilters()); });
             paginationButtons.appendChild(btnFirst);
-            
+
             if (startPage > 2) {
                 const ellipsis = document.createElement('span');
                 ellipsis.innerText = '...';
@@ -753,21 +753,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             updateTableSortUI();
-            
+
             // Sync grid dropdown if it matches
             const gridSortSelect = document.getElementById('grid-sort');
             if (gridSortSelect) {
                 const val = `${currentSortBy}-${currentSortDir}`;
                 let found = false;
-                for(let i=0; i<gridSortSelect.options.length; i++) {
-                    if(gridSortSelect.options[i].value === val) {
+                for (let i = 0; i < gridSortSelect.options.length; i++) {
+                    if (gridSortSelect.options[i].value === val) {
                         gridSortSelect.selectedIndex = i;
                         found = true;
                         break;
                     }
                 }
-                if(!found) {
-                     gridSortSelect.selectedIndex = 0; // Default to first if custom sort not in dropdown
+                if (!found) {
+                    gridSortSelect.selectedIndex = 0; // Default to first if custom sort not in dropdown
                 }
             }
 
