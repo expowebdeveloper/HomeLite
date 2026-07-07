@@ -5,7 +5,7 @@ import os
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash
 
-def create_user(username, password):
+def create_user(username, email, password):
     load_dotenv()
     
     db_params = {
@@ -27,6 +27,7 @@ def create_user(username, password):
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
                 username VARCHAR(50) UNIQUE NOT NULL,
+                email VARCHAR(120) UNIQUE,
                 password_hash VARCHAR(255) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
@@ -34,11 +35,11 @@ def create_user(username, password):
         
         # Insert user
         cursor.execute("""
-            INSERT INTO users (username, password_hash)
-            VALUES (%s, %s)
+            INSERT INTO users (username, email, password_hash)
+            VALUES (%s, %s, %s)
             ON CONFLICT (username) 
-            DO UPDATE SET password_hash = EXCLUDED.password_hash;
-        """, (username, password_hash))
+            DO UPDATE SET password_hash = EXCLUDED.password_hash, email = EXCLUDED.email;
+        """, (username, email, password_hash))
         
         conn.commit()
         print(f"✅ User '{username}' created/updated successfully!")
@@ -58,6 +59,12 @@ if __name__ == "__main__":
         print("Username cannot be empty!")
         sys.exit(1)
         
+    email = input("Enter email: ").strip()
+    
+    if not email or '@' not in email:
+        print("Please enter a valid email address!")
+        sys.exit(1)
+        
     password = getpass.getpass("Enter password: ")
     
     if not password:
@@ -70,4 +77,4 @@ if __name__ == "__main__":
         print("Passwords do not match!")
         sys.exit(1)
     
-    create_user(username, password)
+    create_user(username, email, password)

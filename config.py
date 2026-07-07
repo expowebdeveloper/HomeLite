@@ -17,13 +17,45 @@ class Config:
     DB_NAME = os.getenv('DB_NAME')
     DB_USER = os.getenv('DB_USER')
     DB_PASSWORD = os.getenv('DB_PASSWORD')
-    
+
+    # SMTP / Email Configuration
+    SMTP_HOST = os.getenv('SMTP_HOST', 'smtp.gmail.com')
+    SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
+    SMTP_USERNAME = os.getenv('SMTP_USERNAME')
+    SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
+    SMTP_USE_TLS = os.getenv('SMTP_USE_TLS', 'True').lower() in ('1', 'true', 'yes')
+    MAIL_FROM = os.getenv('MAIL_FROM') or os.getenv('SMTP_USERNAME')
+    MAIL_FROM_NAME = os.getenv('MAIL_FROM_NAME', 'SARDO360')
+
+    # Two-Factor Authentication (Email OTP)
+    # OTP_RECIPIENT is the production/superadmin inbox used when deployed.
+    OTP_RECIPIENT = os.getenv('OTP_RECIPIENT') or os.getenv('MAIL_FROM') or os.getenv('SMTP_USERNAME')
+    # OTP_TEST_RECIPIENT overrides the destination during testing. While set, all
+    # codes go here instead of OTP_RECIPIENT. Supports comma-separated addresses.
+    # Leave blank/remove on deployment so codes go to OTP_RECIPIENT (superadmin).
+    OTP_TEST_RECIPIENT = os.getenv('OTP_TEST_RECIPIENT', '')
+    OTP_LENGTH = int(os.getenv('OTP_LENGTH', '6'))
+    OTP_EXPIRY_SECONDS = int(os.getenv('OTP_EXPIRY_SECONDS', '300'))  # 5 minutes
+    OTP_MAX_ATTEMPTS = int(os.getenv('OTP_MAX_ATTEMPTS', '5'))
+    # Best-effort country lookup from IP (uses a free public API). Set to False to skip.
+    GEO_LOOKUP_ENABLED = os.getenv('GEO_LOOKUP_ENABLED', 'True').lower() in ('1', 'true', 'yes')
+
     # App Configuration
     APP_TITLE = "SARDO360 - PROPERTY INSIGHT"
     APP_WIDTH = 1500
     APP_HEIGHT = 900
     FLASK_SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'default-dev-key')
     SECRET_KEY = os.getenv('SECRET_KEY', 'default-dev-key')
+    FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    
+    # JWT Configuration
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', SECRET_KEY)
+    JWT_ACCESS_EXPIRY = int(os.getenv('JWT_ACCESS_EXPIRY', '900')) # 15 minutes
+    JWT_REFRESH_EXPIRY = int(os.getenv('JWT_REFRESH_EXPIRY', '604800')) # 7 days
+    
+    # MFA / TOTP Configuration (Fernet requires exactly 32 url-safe base64-encoded bytes)
+    # E.g. cryptography.fernet.Fernet.generate_key().decode('utf-8')
+    MFA_ENCRYPTION_KEY = os.getenv('MFA_ENCRYPTION_KEY', 'x_uJvYq82bW40P-ZfJ0o1W7aM8R3_59gXhT3iYf1cHg=')
     
     # Property Types
     PROPERTY_TYPES = [

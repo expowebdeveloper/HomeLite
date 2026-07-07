@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login History - SARDO360</title>
+    <!-- Use Inter font to perfectly match index.html -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=3.1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .badge-success { background: rgba(16, 185, 129, 0.1); color: #10B981; }
+        .badge-failed  { background: rgba(239, 68, 68, 0.1); color: #EF4444; }
+        .badge-neutral { background: rgba(100, 116, 139, 0.1); color: #64748B; }
+        
+        .mono-text {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        
+        .ua-text {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            max-width: 400px;
+            white-space: normal;
+            line-height: 1.4;
+        }
+        
+        /* Adjust layout to just center the table without a sidebar */
+        .login-history-content {
+            padding: 20px 40px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .page-title {
+            font-size: 20px;
+            color: var(--primary-color);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header perfectly matching the main UI -->
+        <header class="app-header">
+            <div class="logo-container">
+                <img src="/static/assets/logo.png" alt="SARDO360 Logo" id="app-logo"
+                    onerror="this.style.display='none'; document.getElementById('logo-text').style.display='block';">
+                <h1 id="logo-text" style="display:none;">SARDO360</h1>
+            </div>
+            <div class="stats-container">
+                <div class="header-actions" style="margin-left: 20px; display: flex; gap: 10px;">
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary" style="text-decoration: none; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <div class="login-history-content">
+                <div class="page-header">
+                    <h2 class="page-title"><i class="fas fa-shield-halved"></i> Login Activity Log</h2>
+                </div>
+
+                <div class="table-area" id="table-area">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date &amp; Time</th>
+                                    <th>User</th>
+                                    <th>Event</th>
+                                    <th>IP Address</th>
+                                    <th>Country</th>
+                                    <th>Device / Browser</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in history %}
+                                <tr>
+                                    <td class="mono-text">{{ row.created_at.strftime('%Y-%m-%d %H:%M:%S') if row.created_at else '—' }}</td>
+                                    <td style="font-weight: 600; color: var(--primary-color);">{{ row.username or '—' }}</td>
+                                    <td>
+                                        {% set ev = row.event_type %}
+                                        {% if ev in ['login_success', 'api_login_success'] %}
+                                            <span class="badge badge-success"><i class="fas fa-check-circle" style="margin-right: 4px;"></i>Login Success</span>
+                                        {% elif ev in ['login_failed', 'api_login_failed'] %}
+                                            <span class="badge badge-failed"><i class="fas fa-times-circle" style="margin-right: 4px;"></i>Login Failed</span>
+                                        {% elif ev in ['otp_failed', 'api_totp_failed'] %}
+                                            <span class="badge badge-failed"><i class="fas fa-shield-xmark" style="margin-right: 4px;"></i>OTP Failed</span>
+                                        {% elif ev in ['otp_sent', 'api_otp_sent'] %}
+                                            <span class="badge badge-neutral"><i class="fas fa-envelope" style="margin-right: 4px;"></i>OTP Sent</span>
+                                        {% elif ev in ['logout', 'Logout'] %}
+                                            <span class="badge badge-neutral"><i class="fas fa-right-from-bracket" style="margin-right: 4px;"></i>Logout</span>
+                                        {% else %}
+                                            <span class="badge badge-neutral">{{ ev }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="mono-text">{{ row.ip_address or '—' }}</td>
+                                    <td style="color: var(--text-secondary);">{{ row.country or '—' }}</td>
+                                    <td class="ua-text">{{ row.user_agent or '—' }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" style="padding: 60px; text-align: center; color: var(--text-secondary);">
+                                        <i class="fas fa-history" style="font-size: 36px; opacity: 0.3; margin-bottom: 15px; display: block;"></i>
+                                        No login activity recorded yet.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

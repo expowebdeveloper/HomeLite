@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication Portal - SARDO360</title>
+    <meta name="description" content="Securely access your SARDO360 property intelligence portal.">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=3.2">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 50%, #f0fdf4 100%);
+        }
+
+        .auth-container {
+            width: 100%;
+            max-width: 460px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .auth-panel {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 44px 40px;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.08);
+            display: none;
+            animation: fadeSlideUp 0.35s ease forwards;
+            width: 100%;
+        }
+
+        .auth-panel.active { display: block; }
+
+        @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0);    }
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+
+        .logo img {
+            height: 42px;
+            filter: brightness(0) drop-shadow(0 1px 2px rgba(0,0,0,.1));
+            opacity: 0.85;
+        }
+
+        .logo-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, var(--accent-color), var(--primary-color));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            font-size: 26px;
+            color: white;
+        }
+
+        h2 {
+            margin: 0 0 6px 0;
+            font-weight: 700;
+            font-size: 22px;
+            text-align: center;
+            color: var(--text-primary);
+        }
+
+        p.subtitle {
+            color: var(--text-secondary);
+            text-align: center;
+            margin: 0 0 28px 0;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 7px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .form-group input {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* Login mode toggle pills */
+        .login-mode-toggle {
+            display: flex;
+            background: #f3f4f6;
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 28px;
+            gap: 4px;
+        }
+
+        .login-mode-toggle button {
+            flex: 1;
+            padding: 9px 12px;
+            border: none;
+            border-radius: 9px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            background: transparent;
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+        }
+
+        .login-mode-toggle button.active {
+            background: white;
+            color: var(--primary-color);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        /* Action buttons area */
+        .btn-row {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        .btn-full {
+            width: 100%;
+            justify-content: center;
+            padding: 13px;
+            font-size: 15px;
+        }
+
+        /* OTP code input */
+        .otp-input {
+            text-align: center;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 8px;
+            padding: 16px;
+            border-radius: 12px;
+        }
+
+        /* Info badge */
+        .info-badge {
+            background: rgba(99, 102, 241, 0.08);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 13px;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-badge i { flex-shrink: 0; font-size: 15px; }
+
+        .error-msg, .success-msg {
+            padding: 12px 14px;
+            border-radius: 10px;
+            font-size: 13.5px;
+            margin-bottom: 18px;
+            display: none;
+            font-weight: 500;
+        }
+
+        .error-msg {
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            color: #dc2626;
+        }
+
+        .success-msg {
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            color: #059669;
+        }
+
+        .links {
+            margin-top: 24px;
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .links a {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s;
+        }
+
+        .links a:hover { color: var(--primary-color); }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 20px 0;
+            color: var(--text-muted, #9ca3af);
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border-color);
+        }
+
+        .trust-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+
+        .trust-row input { width: auto; }
+        .trust-row label { margin: 0; font-size: 13px; cursor: pointer; color: var(--text-secondary); }
+    </style>
+</head>
+<body>
+
+<div class="auth-container">
+
+    <!-- ===== LOGIN PANEL ===== -->
+    <div id="view-login" class="auth-panel active">
+        <div class="logo">
+            <img src="/static/assets/logo.png" alt="SARDO360" onerror="this.outerHTML='<h1 style=\'margin:0;font-size:28px;font-weight:800;color:var(--primary-color);\'>SARDO360</h1>'">
+        </div>
+        <h2>Welcome Back</h2>
+        <p class="subtitle">Choose how you'd like to sign in.</p>
+
+        <!-- Mode toggle: Standard / 2FA -->
+        <div class="login-mode-toggle" id="login-mode-toggle">
+            <button id="btn-mode-standard" class="active" onclick="setLoginMode('standard')">
+                <i class="fas fa-envelope" style="margin-right:6px;"></i>Email OTP
+            </button>
+            <button id="btn-mode-2fa" onclick="setLoginMode('2fa')">
+                <i class="fas fa-mobile-alt" style="margin-right:6px;"></i>Login with 2FA
+            </button>
+        </div>
+
+        <div id="login-error" class="error-msg"></div>
+        <div id="login-success" class="success-msg"></div>
+
+        <!-- Standard login fields -->
+        <div id="standard-fields">
+            <form id="form-login">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="login-identifier" required autocomplete="username" placeholder="Enter your email address">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="login-password" required autocomplete="current-password" placeholder="Enter password">
+                </div>
+                <div class="btn-row">
+                    <button type="submit" class="btn btn-primary btn-full" id="btn-login">
+                        <i class="fas fa-sign-in-alt"></i> Sign In &amp; Send OTP
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 2FA / Passwordless fields -->
+        <div id="twofa-fields" style="display:none;">
+            <div class="info-badge">
+                <i class="fas fa-info-circle"></i>
+                <span>Enter your email address. If you have the Authenticator App enabled, you'll be asked for your code — no password needed.</span>
+            </div>
+
+            <!-- Shown when 2FA is not enabled on this account -->
+            <div id="twofa-not-enabled" style="display:none; background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; padding: 16px 18px; margin-bottom: 18px;">
+                <div style="display:flex; gap:12px; align-items:flex-start;">
+                    <i class="fas fa-exclamation-triangle" style="color:#d97706; font-size:18px; margin-top:1px; flex-shrink:0;"></i>
+                    <div>
+                        <p style="margin:0 0 6px 0; font-weight:700; font-size:14px; color:#92400e;">Authenticator App Not Enabled</p>
+                        <p style="margin:0; font-size:13px; color:#92400e; line-height:1.5;">You haven't set up the Authenticator App for this account. Please log in using <strong>Email OTP</strong> first, then enable 2FA from your <strong>User Profile</strong> dropdown menu.</p>
+                        <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+                            <button type="button" class="btn btn-primary" style="padding:8px 14px; font-size:13px;" onclick="setLoginMode('standard')">
+                                <i class="fas fa-envelope"></i> Use Email OTP
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <form id="form-login-2fa">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="login-2fa-identifier" required autocomplete="username" placeholder="Enter your email address">
+                </div>
+                <div class="btn-row">
+                    <button type="submit" class="btn btn-primary btn-full" id="btn-login-2fa">
+                        <i class="fas fa-qrcode"></i> Continue with 2FA
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="links">
+            <a href="#" onclick="switchView('view-forgot-password')">Forgot password?</a>
+        </div>
+    </div>
+
+    <!-- ===== OTP VERIFICATION PANEL (after standard login) ===== -->
+    <div id="view-otp" class="auth-panel">
+        <div class="logo">
+            <div class="logo-icon"><i class="fas fa-envelope-open-text"></i></div>
+        </div>
+        <h2>Check Your Email</h2>
+        <p class="subtitle" id="otp-subtitle">We've sent a 6-digit code to your email address.</p>
+
+        <div id="otp-error" class="error-msg"></div>
+
+        <form id="form-otp">
+            <div class="form-group">
+                <input type="text" id="otp-code" class="otp-input" placeholder="000000"
+                       maxlength="6" inputmode="numeric" pattern="[0-9]{6}" required autocomplete="one-time-code">
+            </div>
+
+            <div class="trust-row">
+                <input type="checkbox" id="trust-device">
+                <label for="trust-device">Remember this device for 30 days</label>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full" id="btn-otp">
+                <i class="fas fa-check-circle"></i> Verify &amp; Sign In
+            </button>
+        </form>
+
+        <div class="links">
+            <a href="#" onclick="switchView('view-login')">← Back to Login</a>
+        </div>
+    </div>
+
+    <!-- ===== TOTP VERIFICATION PANEL (after 2FA login) ===== -->
+    <div id="view-totp" class="auth-panel">
+        <div class="logo">
+            <div class="logo-icon"><i class="fas fa-mobile-alt"></i></div>
+        </div>
+        <h2>Authenticator Code</h2>
+        <p class="subtitle">Open your Authenticator App and enter the 6-digit code.</p>
+
+        <div id="totp-error" class="error-msg"></div>
+
+        <form id="form-totp">
+            <div class="form-group">
+                <input type="text" id="totp-code" class="otp-input" placeholder="000000"
+                       maxlength="6" inputmode="numeric" pattern="[0-9]{6}" required autocomplete="one-time-code">
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full" id="btn-totp">
+                <i class="fas fa-unlock-alt"></i> Verify &amp; Sign In
+            </button>
+        </form>
+
+        <div class="links">
+            <a href="#" onclick="switchView('view-login')">← Back to Login</a>
+        </div>
+    </div>
+
+    <!-- ===== FORGOT PASSWORD PANEL ===== -->
+    <div id="view-forgot-password" class="auth-panel">
+        <h2>Reset Password</h2>
+        <p class="subtitle">Enter your email to receive a secure reset link.</p>
+
+        <div id="forgot-error" class="error-msg"></div>
+        <div id="forgot-success" class="success-msg"></div>
+
+        <form id="form-forgot">
+            <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" id="forgot-email" required placeholder="you@example.com">
+            </div>
+            <button type="submit" class="btn btn-primary btn-full" id="btn-forgot">
+                <i class="fas fa-paper-plane"></i> Send Reset Link
+            </button>
+        </form>
+
+        <div class="links">
+            <a href="#" onclick="switchView('view-login')">← Back to Login</a>
+        </div>
+    </div>
+
+    <!-- ===== RESET PASSWORD PANEL ===== -->
+    <div id="view-reset-password" class="auth-panel">
+        <h2>New Password</h2>
+        <p class="subtitle">Enter your new secure password.</p>
+
+        <div id="reset-error" class="error-msg"></div>
+        <div id="reset-success" class="success-msg"></div>
+
+        <form id="form-reset">
+            <div class="form-group">
+                <label>New Password</label>
+                <input type="password" id="reset-password-input" required placeholder="Minimum 8 characters">
+            </div>
+            <button type="submit" class="btn btn-primary btn-full" id="btn-reset">
+                <i class="fas fa-key"></i> Update Password
+            </button>
+        </form>
+
+        <div class="links">
+            <a href="#" onclick="switchView('view-login')">← Back to Login</a>
+        </div>
+    </div>
+
+</div><!-- end .auth-container -->
+
+<script>
+    // ---- State ----
+    let tempToken = '';
+    let loginMode = 'standard'; // 'standard' | '2fa'
+
+    // ---- Mode Toggle ----
+    function setLoginMode(mode) {
+        loginMode = mode;
+        document.getElementById('btn-mode-standard').classList.toggle('active', mode === 'standard');
+        document.getElementById('btn-mode-2fa').classList.toggle('active', mode === '2fa');
+        document.getElementById('standard-fields').style.display = mode === 'standard' ? 'block' : 'none';
+        document.getElementById('twofa-fields').style.display  = mode === '2fa'       ? 'block' : 'none';
+        document.getElementById('login-error').style.display = 'none';
+        // Always hide the "not enabled" notice when switching modes
+        document.getElementById('twofa-not-enabled').style.display = 'none';
+    }
+
+    // ---- Router ----
+    function initRouter() {
+        const path   = window.location.pathname;
+        const params = new URLSearchParams(window.location.search);
+        if      (path.includes('/forgot-password'))switchView('view-forgot-password');
+        else if (path.includes('/reset-password') && params.has('token')) {
+            window.resetToken = params.get('token');
+            switchView('view-reset-password');
+        }
+        else switchView('view-login');
+    }
+
+    function switchView(viewId) {
+        document.querySelectorAll('.auth-panel').forEach(p => p.classList.remove('active'));
+        document.getElementById(viewId).classList.add('active');
+        document.querySelectorAll('.error-msg, .success-msg').forEach(el => el.style.display = 'none');
+
+        // Don't change the URL for intermediate auth views — keeps tempToken alive
+        if (['view-otp', 'view-totp'].includes(viewId)) return;
+
+        let newPath = '/login';
+        if (viewId === 'view-forgot-password')newPath = '/forgot-password';
+        if (viewId === 'view-reset-password') newPath = window.location.pathname + window.location.search;
+        window.history.pushState({}, '', newPath);
+    }
+
+    function showMsg(id, msg, type = 'error') {
+        const el = document.getElementById(id);
+        el.textContent = msg;
+        el.style.display = 'block';
+        el.className = type === 'error' ? 'error-msg' : 'success-msg';
+    }
+
+    // ---- Finalize Login ----
+    async function finalizeLogin(accessToken, refreshToken, mfaSetupRequired) {
+        localStorage.setItem('access_token', accessToken);
+        localStorage.setItem('refresh_token', refreshToken);
+        try {
+            const res = await fetch('/api/auth/sync-cookie', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ access_token: accessToken, refresh_token: refreshToken })
+            });
+            if (res.ok) {
+                window.location.href = '/';
+            } else {
+                showMsg('login-error', 'Session sync failed. Please try again.');
+                switchView('view-login');
+            }
+        } catch {
+            showMsg('login-error', 'Connection error.');
+            switchView('view-login');
+        }
+    }
+
+    // ====================================================
+    // Flow 1: Standard Login → password verified → OTP email
+    // ====================================================
+    document.getElementById('form-login').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('btn-login');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Sending OTP...';
+
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    identifier: document.getElementById('login-identifier').value.trim(),
+                    password:   document.getElementById('login-password').value,
+                    device_token: localStorage.getItem('device_token'),
+                    trust_device: document.getElementById('trust-device').checked
+                })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                if (data.require_otp) {
+                    // Always-OTP flow: show OTP panel
+                    tempToken = data.temp_token;
+                    const maskedEmail = data.masked_email ? ` (${data.masked_email})` : '';
+                    document.getElementById('otp-subtitle').textContent =
+                        `A 6-digit code has been sent to your email${maskedEmail}. Enter it below.`;
+                    switchView('view-otp');
+                    document.getElementById('otp-code').focus();
+                } else if (data.access_token) {
+                    // Trusted device — logged in directly
+                    if (data.device_token) localStorage.setItem('device_token', data.device_token);
+                    await finalizeLogin(data.access_token, data.refresh_token, data.mfa_setup_required);
+                }
+            } else {
+                showMsg('login-error', data.error || 'Invalid credentials');
+            }
+        } catch {
+            showMsg('login-error', 'Network error. Please try again.');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In &amp; Send OTP';
+        }
+    });
+
+    // ====================================================
+    // Flow 1b: OTP verification
+    // ====================================================
+    document.getElementById('form-otp').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('btn-otp');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Verifying...';
+
+        try {
+            const res = await fetch('/api/auth/verify-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    temp_token:   tempToken,
+                    otp:          document.getElementById('otp-code').value.trim(),
+                    code:         document.getElementById('otp-code').value.trim(),
+                    trust_device: document.getElementById('trust-device').checked
+                })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                if (data.device_token) localStorage.setItem('device_token', data.device_token);
+                await finalizeLogin(data.access_token, data.refresh_token, data.mfa_setup_required);
+            } else {
+                showMsg('otp-error', data.error || 'Invalid or expired code');
+            }
+        } catch {
+            showMsg('otp-error', 'Network error. Please try again.');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check-circle"></i> Verify &amp; Sign In';
+        }
+    });
+
+    // ====================================================
+    // Flow 2: Passwordless 2FA Login → TOTP
+    // ====================================================
+    document.getElementById('form-login-2fa').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('btn-login-2fa');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Checking...';
+
+        try {
+            const res = await fetch('/api/auth/login-2fa', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    identifier: document.getElementById('login-2fa-identifier').value.trim()
+                })
+            });
+            const data = await res.json();
+
+            if (res.ok && data.require_totp) {
+                tempToken = data.temp_token;
+                // Hide any previous "not enabled" notice
+                document.getElementById('twofa-not-enabled').style.display = 'none';
+                switchView('view-totp');
+                document.getElementById('totp-code').focus();
+            } else if (res.status === 403) {
+                // 2FA not enabled on this account — show friendly inline notice
+                document.getElementById('twofa-not-enabled').style.display = 'block';
+                document.getElementById('login-error').style.display = 'none';
+            } else {
+                showMsg('login-error', data.error || 'Authenticator App not enabled for this account.');
+            }
+        } catch {
+            showMsg('login-error', 'Network error. Please try again.');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-qrcode"></i> Continue with 2FA';
+        }
+    });
+
+    // ====================================================
+    // Flow 2b: TOTP verification
+    // ====================================================
+    document.getElementById('form-totp').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('btn-totp');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Verifying...';
+
+        try {
+            const res = await fetch('/api/auth/verify-totp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    temp_token: tempToken,
+                    code:       document.getElementById('totp-code').value.trim()
+                })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                if (data.device_token) localStorage.setItem('device_token', data.device_token);
+                await finalizeLogin(data.access_token, data.refresh_token, data.mfa_setup_required);
+            } else {
+                showMsg('totp-error', data.error || 'Invalid or expired code');
+            }
+        } catch {
+            showMsg('totp-error', 'Network error. Please try again.');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-unlock-alt"></i> Verify &amp; Sign In';
+        }
+    });
+
+    // ====================================================
+    // Forgot Password
+    // ====================================================
+    document.getElementById('form-forgot').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('btn-forgot');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Sending...';
+
+        try {
+            const res = await fetch('/api/auth/forgot-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: document.getElementById('forgot-email').value.trim() })
+            });
+            const data = await res.json();
+            showMsg('forgot-success', data.message || 'If an account exists, a reset link has been sent.', 'success');
+        } catch {
+            showMsg('forgot-error', 'Network error. Please try again.');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Reset Link';
+        }
+    });
+
+    // ====================================================
+    // Reset Password
+    // ====================================================
+    document.getElementById('form-reset').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('btn-reset');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Updating...';
+
+        try {
+            const res = await fetch('/api/auth/reset-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    token:        window.resetToken,
+                    new_password: document.getElementById('reset-password-input').value
+                })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                showMsg('reset-success', 'Password updated! Redirecting to login…', 'success');
+                setTimeout(() => switchView('view-login'), 2000);
+            } else {
+                showMsg('reset-error', data.error || 'Failed to reset password');
+            }
+        } catch {
+            showMsg('reset-error', 'Network error. Please try again.');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-key"></i> Update Password';
+        }
+    });
+
+    initRouter();
+</script>
+</body>
+</html>

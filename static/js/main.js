@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let totalPropertiesCount = 0;
     let currentSortBy = 'created_at';
     let currentSortDir = 'DESC';
+    let refQuery = ''; // Client-side SARDO Ref / Reference filter over loaded results
 
     // DOM Elements
     const statTotal = document.getElementById('stat-total');
@@ -20,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnClear = document.getElementById('btn-clear');
     const btnExportPdf = document.getElementById('btn-export-pdf');
     const btnExportExcel = document.getElementById('btn-export-excel');
+    const filterRef = document.getElementById('filter-ref');
     const statusText = document.getElementById('status-text');
     const loadingOverlay = document.getElementById('loading-overlay');
 
@@ -102,15 +104,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Client-side SARDO Ref / Reference filter over the currently loaded results.
+    // Matches against the SARDO reference, the displayed reference, the raw
+    // reference and the title (Waratah listings show the title as the reference).
+    const getVisibleProperties = () => {
+        if (!refQuery) return currentProperties;
+        const q = refQuery.toLowerCase();
+        return currentProperties.filter(p =>
+            (p.sardo_reference || '').toLowerCase().includes(q) ||
+            (p.display_reference || '').toLowerCase().includes(q) ||
+            (p.reference || '').toLowerCase().includes(q) ||
+            (p.title || '').toLowerCase().includes(q)
+        );
+    };
+
     // Render Grid
     const renderGrid = () => {
         propertiesGrid.innerHTML = '';
-        if (currentProperties.length === 0) {
+        const visibleProperties = getVisibleProperties();
+        if (visibleProperties.length === 0) {
             propertiesGrid.innerHTML = '<div class="no-results">No properties found matching your criteria.</div>';
             return;
         }
 
-        currentProperties.forEach((prop, index) => {
+        visibleProperties.forEach((prop, index) => {
             const card = document.createElement('div');
             card.className = 'property-card';
             if (selectedPropertyIds.has(prop.id.toString()) || selectedPropertyIds.has(prop.id)) {
@@ -191,14 +208,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Render Table
     const renderTable = () => {
         tableBody.innerHTML = '';
-        if (currentProperties.length === 0) {
+        const visibleProperties = getVisibleProperties();
+        if (visibleProperties.length === 0) {
             const row = document.createElement('tr');
-            row.innerHTML = `<td colspan="10" style="text-align: center; padding: 30px;">No properties found matching your criteria.</td>`;
+            row.innerHTML = `<td colspan="11" style="text-align: center; padding: 30px;">No properties found matching your criteria.</td>`;
             tableBody.appendChild(row);
             return;
         }
 
-        currentProperties.forEach((prop, index) => {
+        visibleProperties.forEach((prop, index) => {
             const row = document.createElement('tr');
             if (selectedPropertyIds.has(prop.id.toString()) || selectedPropertyIds.has(prop.id)) {
                 row.classList.add('selected-row');
@@ -383,9 +401,30 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('filter-max-beds').value = '';
         document.getElementById('filter-min-baths').value = '';
         document.getElementById('filter-max-baths').value = '';
+        if (filterRef) filterRef.value = '';
+        refQuery = '';
 
         fetchProperties({});
     });
+
+    // Client-side SARDO Ref / Reference filter (operates on loaded results)
+    const updateResultsInfo = () => {
+        if (!resultsCount) return;
+        if (refQuery) {
+            resultsCount.innerText = `${getVisibleProperties().length} of ${totalPropertiesCount} shown`;
+        } else {
+            resultsCount.innerText = `${totalPropertiesCount} Properties Found`;
+        }
+    };
+
+    if (filterRef) {
+        filterRef.addEventListener('input', (e) => {
+            refQuery = e.target.value.trim();
+            renderGrid();
+            renderTable();
+            updateResultsInfo();
+        });
+    }
 
     selectAllCheckbox.addEventListener('change', (e) => {
         const isChecked = e.target.checked;
@@ -395,7 +434,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cb.checked = isChecked;
         });
 
-        currentProperties.forEach(prop => {
+        getVisibleProperties().forEach(prop => {
             if (isChecked) {
                 selectedPropertyIds.add(prop.id.toString());
             } else {
@@ -577,7 +616,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             hideLoading();
             if (statusText) statusText.innerText = `Found ${totalPropertiesCount} properties`;
-            if (resultsCount) resultsCount.innerText = `${totalPropertiesCount} Properties Found`;
+            updateResultsInfo();
         } catch (error) {
             console.error('Error fetching properties:', error);
             if (statusText) statusText.innerText = 'Error fetching properties';

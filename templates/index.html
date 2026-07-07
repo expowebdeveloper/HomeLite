@@ -15,7 +15,7 @@
     <div class="app-container">
         <!-- Header -->
         <header class="app-header">
-            <div class="logo-container">
+            <div class="logo-container" style="display: flex; align-items: center; gap: 30px;">
                 <img src="/static/assets/logo.png" alt="SARDO360 Logo" id="app-logo"
                     onerror="this.style.display='none'; document.getElementById('logo-text').style.display='block';">
                 <h1 id="logo-text" style="display:none;">SARDO360</h1>
@@ -29,11 +29,41 @@
                     <span class="stat-label">Avg Price</span>
                     <span class="stat-value" id="stat-avg">--</span>
                 </div>
-                <div class="header-actions" style="margin-left: 20px;">
-                    <a href="{{ url_for('logout') }}" class="btn btn-secondary"
-                        style="text-decoration: none; display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-sign-out-alt"></i> Logout
-                    </a>
+
+                <div class="user-profile-dropdown" style="position: relative; margin-left: 20px;">
+                    <button class="btn btn-secondary profile-toggle-btn" id="profileToggleBtn" onclick="toggleProfileMenu(event)" style="display: flex; align-items: center; gap: 8px; border-radius: 20px; padding: 6px 14px; cursor: pointer; background: white; border: 1px solid var(--border-color);">
+                        <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px;">
+                            {{ current_user.username[0]|upper if current_user.username else 'U' }}
+                        </div>
+                        <span style="font-weight: 600; color: var(--text-primary);">{{ current_user.username }}</span>
+                        <i class="fas fa-chevron-down" style="font-size: 12px; color: var(--text-secondary);"></i>
+                    </button>
+                    
+                    <div class="profile-dropdown-menu" id="profileDropdownMenu" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 8px; width: 260px; background: white; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 1000; overflow: hidden;">
+                        <div style="padding: 16px; border-bottom: 1px solid var(--border-color); background: #f8fafc;">
+                            <div style="font-weight: 700; color: var(--text-primary); font-size: 15px;">{{ current_user.username }}</div>
+                            <div style="color: var(--text-secondary); font-size: 13px; margin-top: 2px; word-break: break-all;">{{ current_user.email }}</div>
+                        </div>
+                        
+                        <div style="padding: 12px 16px; border-bottom: 1px solid var(--border-color);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <span style="font-weight: 600; font-size: 13px; color: var(--text-primary);"><i class="fas fa-shield-alt" style="color: var(--primary-color); margin-right: 6px;"></i> Authenticator App</span>
+                                <span id="mfa-status-badge" style="font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 600; background: #f1f5f9; color: #64748b;">Checking...</span>
+                            </div>
+                            <button id="btn-toggle-mfa" class="btn btn-secondary" style="width: 100%; justify-content: center; font-size: 13px; padding: 8px; display: none;" onclick="handleMfaToggle()">
+                                Loading...
+                            </button>
+                        </div>
+                        
+                        <div style="padding: 8px;">
+                            <a href="{{ url_for('login_history') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text-secondary); text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='var(--surface-hover)'; this.style.color='var(--primary-color)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
+                                <i class="fas fa-history" style="width: 16px; text-align: center;"></i> Login History
+                            </a>
+                            <a href="{{ url_for('logout') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: #dc2626; text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s; margin-top: 4px;" onmouseover="this.style.background='rgba(220,38,38,0.1)';" onmouseout="this.style.background='transparent';">
+                                <i class="fas fa-sign-out-alt" style="width: 16px; text-align: center;"></i> Logout
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </header>
@@ -51,6 +81,12 @@
                 </button>
                 <div class="filter-group">
                     <h3><i class="fas fa-filter"></i> Filters</h3>
+                </div>
+
+                <div class="filter-section">
+                    <label>SARDO Ref / Reference</label>
+                    <input type="text" id="filter-ref" placeholder="e.g. SARDO1105 or reference...">
+                    <small>Filters the loaded results as you type</small>
                 </div>
 
                 <div class="filter-section">
@@ -245,6 +281,21 @@
 
     <!-- Toast Notifications -->
     <div id="toast-container" class="toast-container"></div>
+    
+    <!-- Custom Confirm Modal -->
+    <div id="sardo-confirm-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); backdrop-filter:blur(4px); z-index:9999; align-items:center; justify-content:center;">
+        <div id="sardo-confirm-box" style="background:white; border-radius:12px; padding:24px; width:100%; max-width:380px; box-shadow:0 20px 40px rgba(0,0,0,0.2); transform:scale(0.9); opacity:0; transition:all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+                <div id="sardo-confirm-icon" style="width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px;"></div>
+                <h3 id="sardo-confirm-title" style="margin:0; font-size:18px; color:var(--text-primary);"></h3>
+            </div>
+            <p id="sardo-confirm-body" style="margin:0 0 24px 0; color:var(--text-secondary); font-size:14px; line-height:1.5;"></p>
+            <div style="display:flex; gap:12px; justify-content:flex-end;">
+                <button id="sardo-confirm-cancel" class="btn btn-secondary" style="padding:8px 16px;">Cancel</button>
+                <button id="sardo-confirm-ok" class="btn btn-primary" style="padding:8px 16px;">Confirm</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Property Modal Details (Instead of right panel) -->
     <div id="property-modal" class="modal-overlay" style="display:none;">
@@ -254,7 +305,238 @@
         </div>
     </div>
 
+    <!-- MFA Setup Modal -->
+    <div id="mfa-setup-modal" class="modal-overlay" style="display:none; z-index: 2000;">
+        <div class="modal-content" style="max-width: 400px; text-align: center; padding: 30px;">
+            <span class="close-modal" onclick="closeMfaModal()">&times;</span>
+            <h3 style="margin-bottom: 10px;">Setup Authenticator</h3>
+            <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 20px;">Scan this QR code with Google Authenticator or Authy.</p>
+            
+            <div style="background: white; padding: 15px; border-radius: 12px; display: inline-block; margin-bottom: 20px; border: 1px solid var(--border-color);">
+                <img id="mfa-qr-code" src="" alt="QR Code" style="max-width: 200px; display: block; margin: 0 auto;">
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <input type="text" id="mfa-verify-code" placeholder="000000" maxlength="6" style="border: 1px solid var(--border-color); padding: 10px 15px; border-radius: var(--border-radius-sm); font-size: 20px; letter-spacing: 4px; text-align: center; width: 150px;">
+            </div>
+            
+            <button class="btn btn-primary" onclick="verifyMfaSetup()" style="width: 100%; justify-content: center;">
+                Verify & Enable
+            </button>
+            
+            <div id="mfa-backup-codes-container" style="display: none; margin-top: 20px; text-align: left;">
+                <h4 style="margin-bottom: 10px; color: var(--success-color);"><i class="fas fa-check-circle"></i> Authenticator Enabled</h4>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 10px;">Save these backup codes in a secure place. They can be used to log in if you lose access to your device.</p>
+                <div id="mfa-backup-codes" style="background: #f8fafc; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 13px; letter-spacing: 1px; line-height: 1.6; border: 1px solid var(--border-color); word-break: break-all;"></div>
+                <button class="btn btn-secondary" onclick="closeMfaModal()" style="width: 100%; justify-content: center; margin-top: 15px;">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/main.js?v=3.0"></script>
+    <script>
+        // Simple Toast logic
+        function showToast(title, message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.style.cssText = 'background: white; border-radius: 8px; padding: 12px 16px; margin-top: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-left: 4px solid ' + (type==='success'?'#10b981':'#ef4444');
+            toast.innerHTML = `<div style="font-weight:bold;font-size:14px;color:var(--text-primary);margin-bottom:4px;">${title}</div><div style="font-size:13px;color:var(--text-secondary);">${message}</div>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // Custom Confirm logic
+        function sardoConfirm({ title, body, confirmText = 'Confirm', cancelText = 'Cancel', type = 'warning' }) {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('sardo-confirm-overlay');
+                const box = document.getElementById('sardo-confirm-box');
+                const titleEl = document.getElementById('sardo-confirm-title');
+                const bodyEl = document.getElementById('sardo-confirm-body');
+                const iconEl = document.getElementById('sardo-confirm-icon');
+                const btnOk = document.getElementById('sardo-confirm-ok');
+                const btnCancel = document.getElementById('sardo-confirm-cancel');
+
+                titleEl.textContent = title;
+                bodyEl.innerHTML = body;
+                btnOk.textContent = confirmText;
+                btnCancel.textContent = cancelText;
+
+                const colors = {
+                    danger:  { bg: '#fee2e2', color: '#ef4444', icon: 'fas fa-trash-alt' },
+                    warning: { bg: '#fef3c7', color: '#f59e0b', icon: 'fas fa-exclamation-triangle' },
+                    success: { bg: '#d1fae5', color: '#10b981', icon: 'fas fa-check' }
+                };
+                const theme = colors[type] || colors.warning;
+
+                iconEl.style.backgroundColor = theme.bg;
+                iconEl.style.color = theme.color;
+                iconEl.innerHTML = `<i class="${theme.icon}"></i>`;
+                
+                btnOk.style.backgroundColor = theme.color;
+                btnOk.style.borderColor = theme.color;
+                btnOk.style.color = 'white';
+
+                overlay.style.display = 'flex';
+                requestAnimationFrame(() => {
+                    box.style.transform = 'scale(1)';
+                    box.style.opacity = '1';
+                });
+
+                const cleanup = (result) => {
+                    box.style.transform = 'scale(0.9)';
+                    box.style.opacity = '0';
+                    setTimeout(() => {
+                        overlay.style.display = 'none';
+                        btnOk.removeEventListener('click', onOk);
+                        btnCancel.removeEventListener('click', onCancel);
+                        resolve(result);
+                    }, 200);
+                };
+
+                const onOk = () => cleanup(true);
+                const onCancel = () => cleanup(false);
+
+                btnOk.addEventListener('click', onOk);
+                btnCancel.addEventListener('click', onCancel);
+            });
+        }
+
+        // Profile Dropdown logic
+        function toggleProfileMenu(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('profileDropdownMenu');
+            const isVisible = menu.style.display === 'block';
+            menu.style.display = isVisible ? 'none' : 'block';
+            if (!isVisible) fetchMfaStatus();
+        }
+
+        document.addEventListener('click', function(e) {
+            const menu = document.getElementById('profileDropdownMenu');
+            const btn = document.getElementById('profileToggleBtn');
+            if (menu.style.display === 'block' && !menu.contains(e.target) && !btn.contains(e.target)) {
+                menu.style.display = 'none';
+            }
+        });
+
+        // MFA API logic
+        let mfaIsTotpEnabled = false;
+
+        async function fetchMfaStatus() {
+            try {
+                const token = localStorage.getItem('access_token');
+                const headers = {};
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+                
+                const res = await fetch('/api/auth/mfa/status', { headers });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    mfaIsTotpEnabled = data.totp_enabled;
+                    const badge = document.getElementById('mfa-status-badge');
+                    const btn = document.getElementById('btn-toggle-mfa');
+                    
+                    btn.style.display = 'flex';
+                    
+                    if (mfaIsTotpEnabled) {
+                        badge.textContent = 'Enabled';
+                        badge.style.color = '#059669';
+                        badge.style.background = 'rgba(16, 185, 129, 0.12)';
+                        btn.textContent = 'Disable 2FA';
+                        btn.className = 'btn btn-secondary';
+                        btn.style.color = '#dc2626';
+                    } else {
+                        badge.textContent = 'Disabled';
+                        badge.style.color = '#64748b';
+                        badge.style.background = '#f1f5f9';
+                        btn.textContent = 'Enable 2FA';
+                        btn.className = 'btn btn-primary';
+                        btn.style.color = '';
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to fetch MFA status', err);
+            }
+        }
+
+        async function handleMfaToggle() {
+            const token = localStorage.getItem('access_token');
+            const headers = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            if (mfaIsTotpEnabled) {
+                // Disable MFA
+                const confirmed = await sardoConfirm({
+                    title: 'Disable Authenticator App?',
+                    body: 'Your account will no longer require a TOTP code from Google Authenticator to log in.',
+                    confirmText: 'Disable 2FA',
+                    cancelText: 'Keep Enabled',
+                    type: 'danger'
+                });
+                
+                if (confirmed) {
+                    const res = await fetch('/api/auth/mfa/totp/disable', {
+                        method: 'POST',
+                        headers
+                    });
+                    if (res.ok) {
+                        showToast('Authenticator Disabled', '2FA has been removed from your account.', 'success');
+                        fetchMfaStatus();
+                    } else {
+                        showToast('Error', 'Failed to disable 2FA.', 'error');
+                    }
+                }
+            } else {
+                // Enable MFA (Show setup modal)
+                const res = await fetch('/api/auth/mfa/totp/setup', { headers });
+                const data = await res.json();
+                
+                if (res.ok && data.qr_code) {
+                    document.getElementById('mfa-qr-code').src = data.qr_code;
+                    document.getElementById('mfa-verify-code').value = '';
+                    document.getElementById('mfa-backup-codes-container').style.display = 'none';
+                    document.getElementById('mfa-setup-modal').style.display = 'flex';
+                }
+            }
+            
+            // Close dropdown
+            document.getElementById('profileDropdownMenu').style.display = 'none';
+        }
+
+        async function verifyMfaSetup() {
+            const token = localStorage.getItem('access_token');
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            
+            const code = document.getElementById('mfa-verify-code').value.trim();
+            if (!code) return;
+            
+            const res = await fetch('/api/auth/mfa/totp/verify-setup', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ code })
+            });
+            const data = await res.json();
+            
+            if (res.ok) {
+                showToast('Authenticator Enabled', 'Your account is now protected with 2FA.', 'success');
+                document.getElementById('mfa-backup-codes').innerHTML = data.backup_codes.join(' &nbsp; ');
+                document.getElementById('mfa-backup-codes-container').style.display = 'block';
+                fetchMfaStatus();
+            } else {
+                showToast('Invalid Code', data.error || 'The code you entered is incorrect.', 'error');
+            }
+        }
+
+        function closeMfaModal() {
+            document.getElementById('mfa-setup-modal').style.display = 'none';
+        }
+    </script>
 </body>
 
 </html>
