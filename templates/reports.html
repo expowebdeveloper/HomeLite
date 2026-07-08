@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status Reports - SARDO360</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=3.1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .reports-content {
+            padding: 20px 40px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 22px;
+            overflow-y: auto;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .page-title {
+            font-size: 20px;
+            color: var(--primary-color);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .range-bar {
+            display: flex;
+            align-items: flex-end;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .range-bar .field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .range-bar label {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .range-bar input {
+            padding: 8px 10px;
+            width: auto;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 14px;
+        }
+
+        .summary-card {
+            background: var(--card-bg, #fff);
+            border: 1px solid var(--border-color, #e2e8f0);
+            border-radius: 10px;
+            padding: 16px 18px;
+        }
+
+        .summary-card .label {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .summary-card .value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-top: 6px;
+        }
+
+        .section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin: 0 0 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .muted {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 400;
+        }
+
+        .num {
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+        }
+
+        .empty-cell {
+            padding: 40px;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="logo-container">
+                <img src="/static/assets/logo.png" alt="SARDO360 Logo" id="app-logo"
+                    onerror="this.style.display='none'; document.getElementById('logo-text').style.display='block';">
+                <h1 id="logo-text" style="display:none;">SARDO360</h1>
+            </div>
+            <div class="stats-container">
+                <div class="header-actions" style="margin-left: 20px; display: flex; gap: 10px;">
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary"
+                        style="text-decoration: none; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <div class="reports-content">
+                <div class="page-header">
+                    <h2 class="page-title"><i class="fas fa-chart-line"></i> Market Status Report</h2>
+                    <div class="range-bar">
+                        <div class="field">
+                            <label for="date-from">From</label>
+                            <input type="date" id="date-from">
+                        </div>
+                        <div class="field">
+                            <label for="date-to">To</label>
+                            <input type="date" id="date-to">
+                        </div>
+                        <button id="btn-apply" class="btn btn-primary"><i class="fas fa-filter"></i> Apply</button>
+                        <button id="btn-reset" class="btn btn-secondary"><i class="fas fa-rotate-left"></i> All time</button>
+                    </div>
+                </div>
+
+                <!-- Summary -->
+                <div>
+                    <h3 class="section-title">
+                        <i class="fas fa-gauge-high"></i> Current Stock
+                        <span class="muted">(always &ldquo;right now&rdquo;, not date-scoped)</span>
+                    </h3>
+                    <div class="summary-grid" id="summary-grid"></div>
+                </div>
+
+                <!-- Averages -->
+                <div>
+                    <h3 class="section-title"><i class="fas fa-hourglass-half"></i> Time on Market</h3>
+                    <div class="summary-grid" id="averages-grid"></div>
+                </div>
+
+                <!-- By agent -->
+                <div>
+                    <h3 class="section-title">
+                        <i class="fas fa-user-tie"></i> By Agent
+                        <span class="muted" id="range-note"></span>
+                    </h3>
+                    <div class="table-area">
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Agent</th>
+                                        <th class="num">Active Stock</th>
+                                        <th class="num">New Listings</th>
+                                        <th class="num">Reserved</th>
+                                        <th class="num">Under Offer</th>
+                                        <th class="num">Exclusive</th>
+                                        <th class="num">Sold</th>
+                                        <th class="num">Delisted</th>
+                                        <th class="num">&rarr; Sold</th>
+                                        <th class="num">&rarr; Delisted</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="agent-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent status changes -->
+                <div>
+                    <h3 class="section-title">
+                        <i class="fas fa-arrow-right-arrow-left"></i> Recent Status Changes
+                        <span class="muted">(written by the scraper)</span>
+                    </h3>
+                    <div class="table-area">
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Changed At</th>
+                                        <th>Agent</th>
+                                        <th>Location</th>
+                                        <th>Reference</th>
+                                        <th>From</th>
+                                        <th>To</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="changes-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scrape runs -->
+                <div>
+                    <h3 class="section-title"><i class="fas fa-robot"></i> Recent Scrape Runs</h3>
+                    <div class="table-area">
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Started</th>
+                                        <th>Source</th>
+                                        <th>Run Status</th>
+                                        <th class="num">Found</th>
+                                        <th class="num">New</th>
+                                        <th class="num">Updated</th>
+                                        <th class="num">Status Changes</th>
+                                        <th class="num">Delisted</th>
+                                        <th class="num">Errors</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="runs-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STATUS_ORDER = ['For Sale', 'New Listing', 'Reserved', 'Under Offer', 'Exclusive', 'Sold', 'Delisted', 'Unknown'];
+
+        const statusClass = (status) => 'status-badge status-' + String(status || 'Unknown')
+            .toLowerCase().replace(/\s+/g, '-');
+
+        const badge = (status) => status
+            ? `<span class="${statusClass(status)}">${status}</span>`
+            : '<span class="status-badge status-unknown">—</span>';
+
+        const fmtDate = (value) => {
+            if (!value) return '—';
+            const d = new Date(value);
+            return isNaN(d) ? value : d.toLocaleString();
+        };
+
+        const loadReport = async () => {
+            const from = document.getElementById('date-from').value;
+            const to = document.getElementById('date-to').value;
+            const params = new URLSearchParams();
+            if (from) params.set('date_from', from);
+            if (to) params.set('date_to', to);
+
+            const res = await fetch('/api/reports/status?' + params.toString());
+            if (!res.ok) {
+                document.getElementById('agent-body').innerHTML =
+                    '<tr><td colspan="10" class="empty-cell">Failed to load the report.</td></tr>';
+                return;
+            }
+            const data = await res.json();
+            render(data);
+        };
+
+        const render = (data) => {
+            // Range note
+            const note = (data.date_from || data.date_to)
+                ? `(movement figures scoped to ${data.date_from || 'start'} → ${data.date_to || 'now'})`
+                : '(movement figures: all time)';
+            document.getElementById('range-note').textContent = note;
+
+            // Summary: total + per-status counts
+            const byStatus = data.by_status || {};
+            const total = Object.values(byStatus).reduce((a, b) => a + b, 0);
+            const active = (data.by_source || []).reduce((a, r) => a + r.active_stock, 0);
+
+            let html = `
+                <div class="summary-card"><div class="label">Total Properties</div><div class="value">${total}</div></div>
+                <div class="summary-card"><div class="label">Active Stock</div><div class="value">${active}</div></div>`;
+            STATUS_ORDER.forEach(s => {
+                if (byStatus[s]) {
+                    html += `<div class="summary-card"><div class="label">${s}</div><div class="value">${byStatus[s]}</div></div>`;
+                }
+            });
+            document.getElementById('summary-grid').innerHTML = html;
+
+            // Averages
+            const dash = (v) => (v === null || v === undefined) ? '—' : `${v} days`;
+            document.getElementById('averages-grid').innerHTML = `
+                <div class="summary-card"><div class="label">Avg. First Seen &rarr; Sold</div><div class="value">${dash(data.avg_days_to_sold)}</div></div>
+                <div class="summary-card"><div class="label">Avg. First Seen &rarr; Delisted</div><div class="value">${dash(data.avg_days_to_delisted)}</div></div>`;
+
+            // By agent
+            const agentBody = document.getElementById('agent-body');
+            const rows = data.by_source || [];
+            agentBody.innerHTML = rows.length ? rows.map(r => `
+                <tr>
+                    <td style="font-weight:600; color: var(--primary-color);">${r.display_source || r.source}</td>
+                    <td class="num">${r.active_stock}</td>
+                    <td class="num">${r.new_listings}</td>
+                    <td class="num">${r.reserved}</td>
+                    <td class="num">${r.under_offer}</td>
+                    <td class="num">${r.exclusive}</td>
+                    <td class="num">${r.sold}</td>
+                    <td class="num">${r.delisted}</td>
+                    <td class="num">${r.moved_to_sold}</td>
+                    <td class="num">${r.moved_to_delisted}</td>
+                </tr>`).join('')
+                : '<tr><td colspan="10" class="empty-cell">No agents found.</td></tr>';
+
+            // Recent status changes
+            const changesBody = document.getElementById('changes-body');
+            const changes = data.recent_changes || [];
+            changesBody.innerHTML = changes.length ? changes.map(c => `
+                <tr>
+                    <td>${fmtDate(c.changed_at)}</td>
+                    <td>${c.display_source || c.source || '—'}</td>
+                    <td>${c.location || '—'}</td>
+                    <td>${c.property_url
+                        ? `<a href="${c.property_url}" target="_blank" class="ref-link">${c.reference || 'Link'}</a>`
+                        : (c.reference || '—')}</td>
+                    <td>${badge(c.previous_status)}</td>
+                    <td>${badge(c.new_status)}</td>
+                </tr>`).join('')
+                : `<tr><td colspan="6" class="empty-cell">
+                       <i class="fas fa-clock-rotate-left" style="font-size:32px; opacity:.3; display:block; margin-bottom:12px;"></i>
+                       No status changes recorded yet. The scraper writes these as listings move.
+                   </td></tr>`;
+
+            // Scrape runs
+            const runsBody = document.getElementById('runs-body');
+            const runs = data.scrape_runs || [];
+            runsBody.innerHTML = runs.length ? runs.map(r => `
+                <tr>
+                    <td>${fmtDate(r.started_at)}</td>
+                    <td>${r.source_name}</td>
+                    <td>${badge(r.run_status)}</td>
+                    <td class="num">${r.properties_found ?? 0}</td>
+                    <td class="num">${r.new_properties ?? 0}</td>
+                    <td class="num">${r.updated_properties ?? 0}</td>
+                    <td class="num">${r.status_changes ?? 0}</td>
+                    <td class="num">${r.delisted_properties ?? 0}</td>
+                    <td class="num">${r.errors_count ?? 0}</td>
+                </tr>`).join('')
+                : '<tr><td colspan="9" class="empty-cell">No scrape runs recorded yet.</td></tr>';
+        };
+
+        document.getElementById('btn-apply').addEventListener('click', loadReport);
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            document.getElementById('date-from').value = '';
+            document.getElementById('date-to').value = '';
+            loadReport();
+        });
+
+        loadReport();
+    </script>
+</body>
+
+</html>

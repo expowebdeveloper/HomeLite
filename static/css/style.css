@@ -1434,3 +1434,35 @@ th.sortable.active-desc .sort-icon::before {
         height: calc(100vh / 0.8);
     }
 }
+/* ==========================================================================
+   Property Status Badges
+   Shared by the results table/grid (index.html) and the reports page.
+   Class names are derived from the status: "Under Offer" -> .status-under-offer
+   ========================================================================== */
+.status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+
+.status-for-sale     { background: rgba(99, 102, 241, 0.12); color: #4f46e5; }
+.status-new-listing  { background: rgba(16, 185, 129, 0.12); color: #059669; }
+.status-reserved     { background: rgba(245, 158, 11, 0.14); color: #b45309; }
+.status-under-offer  { background: rgba(249, 115, 22, 0.14); color: #c2410c; }
+.status-exclusive    { background: rgba(139, 92, 246, 0.13); color: #7c3aed; }
+.status-sold         { background: rgba(239, 68, 68, 0.12);  color: #dc2626; }
+.status-delisted     { background: rgba(100, 116, 139, 0.14); color: #475569; }
+.status-unknown      { background: rgba(100, 116, 139, 0.10); color: #64748b; }
+
+/* Scrape run states reuse the same badge shape */
+.status-completed    { background: rgba(16, 185, 129, 0.12); color: #059669; }
+.status-running      { background: rgba(245, 158, 11, 0.14); color: #b45309; }
+.status-failed       { background: rgba(239, 68, 68, 0.12);  color: #dc2626; }
+.status-suspect      { background: rgba(249, 115, 22, 0.14); color: #c2410c; }
+
+/* Delisted / sold rows read as de-emphasised in the results table */
+tr.row-inactive td { opacity: 0.68; }

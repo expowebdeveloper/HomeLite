@@ -22,7 +22,7 @@
             </div>
             <div class="stats-container">
                 <div class="stat-card">
-                    <span class="stat-label">Total Properties</span>
+                    <span class="stat-label">Active Stock</span>
                     <span class="stat-value" id="stat-total">--</span>
                 </div>
                 <div class="stat-card">
@@ -56,6 +56,9 @@
                         </div>
                         
                         <div style="padding: 8px;">
+                            <a href="{{ url_for('reports') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text-secondary); text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='var(--surface-hover)'; this.style.color='var(--primary-color)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
+                                <i class="fas fa-chart-line" style="width: 16px; text-align: center;"></i> Market Reports
+                            </a>
                             <a href="{{ url_for('login_history') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text-secondary); text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='var(--surface-hover)'; this.style.color='var(--primary-color)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
                                 <i class="fas fa-history" style="width: 16px; text-align: center;"></i> Login History
                             </a>
@@ -114,6 +117,35 @@
                         <option value="">Any Type</option>
                         <!-- Populated via JS -->
                     </select>
+                </div>
+
+                <div class="filter-section">
+                    <label>Status</label>
+                    <select id="filter-statuses" multiple class="multi-select">
+                        <!-- Populated via JS -->
+                    </select>
+                    <small>Hold Ctrl/Cmd to select multiple</small>
+                    <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-weight:500;">
+                        <input type="checkbox" id="filter-hide-delisted" checked style="width:auto; margin:0;">
+                        Hide delisted properties
+                    </label>
+                </div>
+
+                <div class="filter-section">
+                    <label>Agent / Source</label>
+                    <select id="filter-sources" multiple class="multi-select">
+                        <!-- Populated via JS -->
+                    </select>
+                    <small>Hold Ctrl/Cmd to select multiple</small>
+                </div>
+
+                <div class="filter-section">
+                    <label>First Seen (date range)</label>
+                    <div class="input-row">
+                        <input type="date" id="filter-first-seen-from" title="First seen from">
+                        <span>-</span>
+                        <input type="date" id="filter-first-seen-to" title="First seen to">
+                    </div>
                 </div>
 
                 <div class="filter-section">
@@ -218,6 +250,8 @@
                                             class="fas fa-sort sort-icon"></i></th>
                                     <th class="sortable" data-sort="source">Source <i class="fas fa-sort sort-icon"></i>
                                     </th>
+                                    <th class="sortable" data-sort="property_status">Status <i
+                                            class="fas fa-sort sort-icon"></i></th>
                                     <th>SARDO Ref</th>
                                     <th>Reference</th>
                                 </tr>

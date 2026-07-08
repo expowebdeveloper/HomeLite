@@ -57,10 +57,27 @@ class Config:
     # E.g. cryptography.fernet.Fernet.generate_key().decode('utf-8')
     MFA_ENCRYPTION_KEY = os.getenv('MFA_ENCRYPTION_KEY', 'x_uJvYq82bW40P-ZfJ0o1W7aM8R3_59gXhT3iYf1cHg=')
     
+    # Canonical SARDO360 property statuses.
+    # Must stay in sync with the properties_property_status_chk DB constraint
+    # (see migrations/004_property_status.py).
+    PROPERTY_STATUSES = [
+        "For Sale",
+        "New Listing",
+        "Reserved",
+        "Under Offer",
+        "Sold",
+        "Exclusive",
+        "Delisted",
+        "Unknown",
+    ]
+
+    # Statuses that no longer represent live, sellable stock.
+    INACTIVE_STATUSES = ["Sold", "Delisted"]
+
     # Property Types
     PROPERTY_TYPES = [
         "Villa",
-        "Townhouse", 
+        "Townhouse",
         "Apartment",
         "House",
         "Penthouse",
@@ -76,13 +93,21 @@ class Config:
         "AllHomes"
     ]
     
-    # Source Name Mapping (Full name to Display name)
+    # Source Name Mapping (raw scraper `source` value -> Display name).
+    # Keys must match the exact `source` strings written by the scrapers,
+    # otherwise reports group under inconsistent agent labels.
     SOURCE_NAME_MAPPING = {
+        # Currently present in the database
         "WaratahpropertiesScraper": "Waratah",
-        "QuintapropertyScraper": "Quinta", 
-        "LibertyrealestateScraper": "Liberty",
+        "QuintaProperty": "Quinta",
+        "OlivehomesScraper": "Olive Homes",
         "MaproRealEstateScraper": "Mapro",
+        "QuintadoLagoScraper": "Quinta Lago",
         "VendiciPropertiesScraper": "Vendici",
+
+        # Legacy / historical spellings, kept so old rows still map correctly
+        "QuintapropertyScraper": "Quinta",
         "QuintadolagoScraper": "Quinta Lago",
+        "LibertyrealestateScraper": "Liberty",
         "AlgarvePropScraper": "Algarve"
     }

@@ -13,9 +13,11 @@ class DatabaseManager:
         self._cache = {}
         self._cache_ttl = 300 # 5 minutes
         self.connect()
-        self.ensure_login_activity_table()
-        self.ensure_security_columns()
-        self.ensure_user_sessions_table()
+        # NOTE: schema bootstrap (ensure_login_activity_table / ensure_security_columns /
+        # ensure_user_sessions_table) deliberately does NOT run here. Issuing DDL on every
+        # app start takes an ACCESS EXCLUSIVE lock on `users`; if any connection is sitting
+        # idle-in-transaction, the ALTER blocks forever and every later `users` query queues
+        # behind it, which hangs login. Run migrations/005_ensure_auth_schema.py instead.
 
     def _get_cached(self, key):
         if key in self._cache:
@@ -36,6 +38,13 @@ class DatabaseManager:
                 user=self.config.DB_USER,
                 password=self.config.DB_PASSWORD
             )
+            # This manager holds one long-lived connection and is overwhelmingly
+            # read-only. Without autocommit, psycopg2 opens a transaction on the
+            # first SELECT and never closes it, so the connection sits
+            # "idle in transaction" holding locks indefinitely — which blocks any
+            # later ALTER TABLE (and therefore login). Explicit commit()/rollback()
+            # calls elsewhere in this class become harmless no-ops.
+            self.connection.autocommit = True
             logging.info("Database connection established successfully")
             return True
         except Exception as e:
@@ -850,7 +859,50 @@ class DatabaseManager:
                 # If max_baths is provided, exclude NULL bathrooms and include properties with bathrooms <= max_baths
                 base_query += " AND bathrooms <= %s AND bathrooms IS NOT NULL"
                 params.append(filters['max_baths'])
-            
+
+            # Property status filtering (canonical SARDO360 statuses only)
+            statuses = filters.get('statuses') or filters.get('property_status')
+            if statuses:
+                if isinstance(statuses, str):
+                    statuses = [statuses]
+                statuses = [s for s in statuses if s in Config.PROPERTY_STATUSES]
+                if statuses:
+                    placeholders = ', '.join(['%s'] * len(statuses))
+                    base_query += f" AND property_status IN ({placeholders})"
+                    params.extend(statuses)
+
+            # Hide delisted stock (opt-in, so existing callers are unaffected)
+            if filters.get('exclude_delisted'):
+                base_query += " AND property_status <> 'Delisted'"
+
+            # Agent / source filtering (exact match on the raw source value)
+            sources = filters.get('sources') or filters.get('source')
+            if sources:
+                if isinstance(sources, str):
+                    sources = [sources]
+                sources = [s.strip() for s in sources if s and s.strip()]
+                if sources:
+                    placeholders = ', '.join(['%s'] * len(sources))
+                    base_query += f" AND source IN ({placeholders})"
+                    params.extend(sources)
+
+            # Date range: when the listing was first seen by the scraper
+            if filters.get('first_seen_from'):
+                base_query += " AND first_seen_at >= %s::timestamp"
+                params.append(filters['first_seen_from'])
+            if filters.get('first_seen_to'):
+                # Inclusive of the whole end day
+                base_query += " AND first_seen_at < (%s::date + INTERVAL '1 day')"
+                params.append(filters['first_seen_to'])
+
+            # Date range: when the status last changed
+            if filters.get('status_changed_from'):
+                base_query += " AND status_last_changed_at >= %s::timestamp"
+                params.append(filters['status_changed_from'])
+            if filters.get('status_changed_to'):
+                base_query += " AND status_last_changed_at < (%s::date + INTERVAL '1 day')"
+                params.append(filters['status_changed_to'])
+
             # First, get the total count for pagination
             count_query = "SELECT COUNT(*) " + base_query
             cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -874,6 +926,11 @@ class DatabaseManager:
                     image_filename,
                     reference,
                     property_url,
+                    property_status,
+                    previous_status,
+                    first_seen_at,
+                    last_seen_at,
+                    status_last_changed_at,
                     created_at,
                     updated_at
             """ + base_query
@@ -892,7 +949,11 @@ class DatabaseManager:
                 'living_area': 'living_area',
                 'land_area': 'land_area',
                 'source': 'source',
-                'created_at': 'created_at'
+                'created_at': 'created_at',
+                'property_status': 'property_status',
+                'first_seen_at': 'first_seen_at',
+                'last_seen_at': 'last_seen_at',
+                'status_last_changed_at': 'status_last_changed_at'
             }
             
             db_sort_col = sort_column_map.get(sort_by, 'created_at')
@@ -954,9 +1015,14 @@ class DatabaseManager:
                     image_filename,
                     reference,
                     property_url,
+                    property_status,
+                    previous_status,
+                    first_seen_at,
+                    last_seen_at,
+                    status_last_changed_at,
                     created_at,
                     updated_at
-                FROM properties 
+                FROM properties
                 WHERE id = %s
             """
             
@@ -1007,11 +1073,202 @@ class DatabaseManager:
             # Properties by source
             cursor.execute("SELECT source, COUNT(*) FROM properties GROUP BY source")
             stats['by_source'] = {k if k is not None else 'Unknown': v for k, v in cursor.fetchall()}
-            
+
+            # Properties by status
+            cursor.execute("SELECT property_status, COUNT(*) FROM properties GROUP BY property_status")
+            stats['by_status'] = {k if k is not None else 'Unknown': v for k, v in cursor.fetchall()}
+
+            # Active stock excludes Sold and Delisted listings
+            cursor.execute(
+                "SELECT COUNT(*) FROM properties WHERE property_status <> ALL(%s)",
+                (Config.INACTIVE_STATUSES,)
+            )
+            stats['active_properties'] = cursor.fetchone()[0]
+
             cursor.close()
             self._set_cache('statistics', stats)
             return stats
-            
+
         except Exception as e:
             logging.error(f"Error fetching statistics: {e}")
             return {}
+
+    def get_sources(self) -> List[str]:
+        """Get the distinct agent/source values, for the source filter."""
+        cached = self._get_cached('sources')
+        if cached is not None:
+            return cached
+
+        if not self.connection:
+            if not self.connect():
+                return []
+
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                SELECT DISTINCT source FROM properties
+                WHERE source IS NOT NULL AND source != '' AND source != 'N/A'
+                ORDER BY source
+            """)
+            sources = [row[0] for row in cursor.fetchall()]
+            cursor.close()
+            self._set_cache('sources', sources)
+            return sources
+        except Exception as e:
+            logging.error(f"Error fetching sources: {e}")
+            return []
+
+    def get_status_report(self, date_from: str = None, date_to: str = None) -> Dict:
+        """Build the property status report (spec section 6).
+
+        Current-state figures (active stock, status breakdown) always reflect
+        "right now". Movement figures (new listings, sold, delisted) are scoped
+        to the supplied date range when one is given.
+
+        `property_status_history` is written by the scraper; until it runs, the
+        movement figures are legitimately zero.
+        """
+        if not self.connection:
+            if not self.connect():
+                return {}
+
+        # Build a reusable date-range predicate for the history table
+        history_clause = ""
+        history_params = []
+        if date_from:
+            history_clause += " AND h.changed_at >= %s::timestamp"
+            history_params.append(date_from)
+        if date_to:
+            history_clause += " AND h.changed_at < (%s::date + INTERVAL '1 day')"
+            history_params.append(date_to)
+
+        seen_clause = ""
+        seen_params = []
+        if date_from:
+            seen_clause += " AND first_seen_at >= %s::timestamp"
+            seen_params.append(date_from)
+        if date_to:
+            seen_clause += " AND first_seen_at < (%s::date + INTERVAL '1 day')"
+            seen_params.append(date_to)
+
+        try:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            report = {'date_from': date_from, 'date_to': date_to}
+
+            # Current status counts per source
+            cursor.execute("""
+                SELECT source, property_status, COUNT(*) AS n
+                FROM properties GROUP BY source, property_status
+            """)
+            per_source = {}
+            for row in cursor.fetchall():
+                src = row['source'] or 'Unknown'
+                per_source.setdefault(src, {})[row['property_status']] = row['n']
+
+            # New listings per source (by first_seen_at, within range)
+            cursor.execute(f"""
+                SELECT source, COUNT(*) AS n FROM properties
+                WHERE 1=1 {seen_clause}
+                GROUP BY source
+            """, seen_params)
+            new_by_source = {(r['source'] or 'Unknown'): r['n'] for r in cursor.fetchall()}
+
+            # Status movements per source, from the history table (within range)
+            cursor.execute(f"""
+                SELECT p.source, h.new_status, COUNT(*) AS n
+                FROM property_status_history h
+                JOIN properties p ON p.id = h.property_id
+                WHERE 1=1 {history_clause}
+                GROUP BY p.source, h.new_status
+            """, history_params)
+            moves = {}
+            for row in cursor.fetchall():
+                src = row['source'] or 'Unknown'
+                moves.setdefault(src, {})[row['new_status']] = row['n']
+
+            # Assemble the per-agent rows
+            inactive = set(Config.INACTIVE_STATUSES)
+            rows = []
+            for src in sorted(set(per_source) | set(new_by_source) | set(moves)):
+                statuses = per_source.get(src, {})
+                moved = moves.get(src, {})
+                rows.append({
+                    'source': src,
+                    'active_stock': sum(n for s, n in statuses.items() if s not in inactive),
+                    'total_stock': sum(statuses.values()),
+                    'new_listings': new_by_source.get(src, 0),
+                    'reserved': statuses.get('Reserved', 0),
+                    'under_offer': statuses.get('Under Offer', 0),
+                    'exclusive': statuses.get('Exclusive', 0),
+                    'sold': statuses.get('Sold', 0),
+                    'delisted': statuses.get('Delisted', 0),
+                    'moved_to_sold': moved.get('Sold', 0),
+                    'moved_to_delisted': moved.get('Delisted', 0),
+                    'moved_to_reserved': moved.get('Reserved', 0),
+                    'moved_to_under_offer': moved.get('Under Offer', 0),
+                })
+            report['by_source'] = rows
+
+            # Overall status breakdown (current)
+            cursor.execute("SELECT property_status, COUNT(*) AS n FROM properties GROUP BY property_status")
+            report['by_status'] = {r['property_status']: r['n'] for r in cursor.fetchall()}
+
+            # Average days from first_seen_at to Sold / Delisted
+            for target, key in (('Sold', 'avg_days_to_sold'), ('Delisted', 'avg_days_to_delisted')):
+                cursor.execute(f"""
+                    SELECT AVG(EXTRACT(EPOCH FROM (h.changed_at - p.first_seen_at)) / 86400.0) AS days
+                    FROM property_status_history h
+                    JOIN properties p ON p.id = h.property_id
+                    WHERE h.new_status = %s AND p.first_seen_at IS NOT NULL {history_clause}
+                """, [target] + history_params)
+                value = cursor.fetchone()['days']
+                report[key] = round(float(value), 1) if value is not None else None
+
+            # Recent status changes (most recent first)
+            cursor.execute(f"""
+                SELECT h.changed_at, h.previous_status, h.new_status,
+                       p.source, p.location, p.reference, p.property_url
+                FROM property_status_history h
+                JOIN properties p ON p.id = h.property_id
+                WHERE 1=1 {history_clause}
+                ORDER BY h.changed_at DESC
+                LIMIT 100
+            """, history_params)
+            report['recent_changes'] = [dict(r) for r in cursor.fetchall()]
+
+            cursor.close()
+            return report
+
+        except Exception as e:
+            logging.error(f"Error building status report: {e}")
+            try:
+                self.connection.rollback()
+            except Exception:
+                pass
+            return {}
+
+    def get_scrape_runs(self, limit: int = 20) -> List[Dict]:
+        """Recent scrape runs, for the audit view."""
+        if not self.connection:
+            if not self.connect():
+                return []
+        try:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("""
+                SELECT id, source_name, started_at, completed_at, run_status,
+                       properties_found, new_properties, updated_properties,
+                       status_changes, delisted_properties, errors_count, notes
+                FROM scrape_runs
+                ORDER BY started_at DESC
+                LIMIT %s
+            """, (limit,))
+            rows = [dict(r) for r in cursor.fetchall()]
+            cursor.close()
+            return rows
+        except Exception as e:
+            logging.error(f"Error fetching scrape runs: {e}")
+            try:
+                self.connection.rollback()
+            except Exception:
+                pass
+            return []

@@ -22,6 +22,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnExportPdf = document.getElementById('btn-export-pdf');
     const btnExportExcel = document.getElementById('btn-export-excel');
     const filterRef = document.getElementById('filter-ref');
+    const filterStatuses = document.getElementById('filter-statuses');
+    const filterSources = document.getElementById('filter-sources');
+    const filterHideDelisted = document.getElementById('filter-hide-delisted');
+    const filterFirstSeenFrom = document.getElementById('filter-first-seen-from');
+    const filterFirstSeenTo = document.getElementById('filter-first-seen-to');
+
+    // Property status badge. "Under Offer" -> class "status-under-offer" (see style.css)
+    const statusBadge = (status) => {
+        const value = status || 'Unknown';
+        const cls = 'status-badge status-' + value.toLowerCase().replace(/\s+/g, '-');
+        return `<span class="${cls}">${value}</span>`;
+    };
+
+    // Sold / Delisted listings are no longer live stock
+    const isInactiveStatus = (status) => status === 'Sold' || status === 'Delisted';
     const statusText = document.getElementById('status-text');
     const loadingOverlay = document.getElementById('loading-overlay');
 
@@ -160,6 +175,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="card-footer" style="flex-direction: column; align-items: stretch; gap: 10px;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span class="card-source">${prop.display_source || 'Unknown'}</span>
+                            ${statusBadge(prop.property_status)}
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; align-items: center;">
                             <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Ref: ${prop.sardo_reference || 'N/A'}</span>
                         </div>
                         <button class="btn-view-details" style="width: 100%;">View Details</button>
@@ -211,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const visibleProperties = getVisibleProperties();
         if (visibleProperties.length === 0) {
             const row = document.createElement('tr');
-            row.innerHTML = `<td colspan="11" style="text-align: center; padding: 30px;">No properties found matching your criteria.</td>`;
+            row.innerHTML = `<td colspan="12" style="text-align: center; padding: 30px;">No properties found matching your criteria.</td>`;
             tableBody.appendChild(row);
             return;
         }
@@ -220,6 +238,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = document.createElement('tr');
             if (selectedPropertyIds.has(prop.id.toString()) || selectedPropertyIds.has(prop.id)) {
                 row.classList.add('selected-row');
+            }
+            if (isInactiveStatus(prop.property_status)) {
+                row.classList.add('row-inactive');
             }
 
             // Format values
@@ -239,6 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${livingArea}</td>
                 <td>${landArea}</td>
                 <td><span class="source-badge">${prop.display_source || 'N/A'}</span></td>
+                <td>${statusBadge(prop.property_status)}</td>
                 <td>${prop.sardo_reference || 'N/A'}</td>
                 <td>${prop.property_url ? `<a href="${prop.property_url}" target="_blank" class="ref-link" onclick="event.stopPropagation();">${prop.display_reference || 'Link'}</a>` : (prop.display_reference || 'N/A')}</td>
             `;
@@ -303,6 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <hr style="border:none; border-top: 1px solid var(--border-color); margin: 10px 0;">
                 <p><strong>Type:</strong> ${prop.property_type || 'N/A'}</p>
                 <p><strong>Source:</strong> ${prop.display_source || 'N/A'}</p>
+                <p><strong>Status:</strong> ${statusBadge(prop.property_status)}</p>
                 <p><strong>SARDO Ref:</strong> ${prop.sardo_reference || 'N/A'}</p>
             </div>
         `;
@@ -342,6 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="modal-meta">
                         <p><strong>Property Type:</strong> ${prop.property_type || 'N/A'}</p>
                         <p><strong>Source:</strong> ${prop.display_source || 'N/A'}</p>
+                        <p><strong>Status:</strong> ${statusBadge(prop.property_status)}</p>
                         <p><strong>SARDO Ref:</strong> ${prop.sardo_reference || 'N/A'}</p>
                         <p><strong>Original Ref:</strong> ${prop.display_reference || 'N/A'}</p>
                     </div>
@@ -379,6 +403,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const maxBaths = document.getElementById('filter-max-baths').value;
         if (maxBaths) filters.max_baths = parseInt(maxBaths);
 
+        // Property status (multi-select)
+        const selectedStatuses = filterStatuses
+            ? Array.from(filterStatuses.selectedOptions).map(opt => opt.value)
+            : [];
+        if (selectedStatuses.length > 0) filters.statuses = selectedStatuses;
+
+        // Hide delisted stock. Skipped when the user explicitly asked for Delisted,
+        // otherwise the two filters would contradict each other and return nothing.
+        if (filterHideDelisted && filterHideDelisted.checked && !selectedStatuses.includes('Delisted')) {
+            filters.exclude_delisted = true;
+        }
+
+        // Agent / source (multi-select)
+        const selectedSources = filterSources
+            ? Array.from(filterSources.selectedOptions).map(opt => opt.value)
+            : [];
+        if (selectedSources.length > 0) filters.sources = selectedSources;
+
+        // First-seen date range
+        if (filterFirstSeenFrom && filterFirstSeenFrom.value) filters.first_seen_from = filterFirstSeenFrom.value;
+        if (filterFirstSeenTo && filterFirstSeenTo.value) filters.first_seen_to = filterFirstSeenTo.value;
+
         filters.sort_by = currentSortBy;
         filters.sort_dir = currentSortDir;
 
@@ -403,8 +449,15 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('filter-max-baths').value = '';
         if (filterRef) filterRef.value = '';
         refQuery = '';
+        if (filterStatuses) filterStatuses.selectedIndex = -1;
+        if (filterSources) filterSources.selectedIndex = -1;
+        if (filterHideDelisted) filterHideDelisted.checked = true;
+        if (filterFirstSeenFrom) filterFirstSeenFrom.value = '';
+        if (filterFirstSeenTo) filterFirstSeenTo.value = '';
 
-        fetchProperties({});
+        // Clear resets to the default view, which still hides delisted stock
+        currentPage = 1;
+        fetchProperties(getFilters());
     });
 
     // Client-side SARDO Ref / Reference filter (operates on loaded results)
@@ -573,15 +626,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 filterType.appendChild(option);
             });
 
-            // Set Stats
-            statTotal.innerText = data.stats.total_properties.toLocaleString();
+            // Populate Statuses (canonical vocabulary from the server)
+            if (filterStatuses && Array.isArray(data.statuses)) {
+                data.statuses.forEach(status => {
+                    const option = document.createElement('option');
+                    option.value = status;
+                    option.textContent = status;
+                    filterStatuses.appendChild(option);
+                });
+            }
+
+            // Populate Agents / Sources (raw value for filtering, friendly label for display)
+            if (filterSources && Array.isArray(data.sources)) {
+                data.sources.forEach(src => {
+                    const option = document.createElement('option');
+                    option.value = src.value;
+                    option.textContent = src.label;
+                    filterSources.appendChild(option);
+                });
+            }
+
+            // Set Stats — headline count is live stock, not sold/delisted
+            const headlineTotal = (data.stats.active_properties !== undefined)
+                ? data.stats.active_properties
+                : data.stats.total_properties;
+            statTotal.innerText = headlineTotal.toLocaleString();
             statAvg.innerText = formatCurrency(data.stats.avg_price);
 
             // Document Title
             document.title = data.app_title || 'SARDO360';
 
-            // Initial Property Load
-            fetchProperties({});
+            // Initial Property Load (honours the default "hide delisted" filter)
+            fetchProperties(getFilters());
         } catch (error) {
             console.error('Error loading metadata:', error);
             if (statusText) statusText.innerText = 'Error loading metadata';

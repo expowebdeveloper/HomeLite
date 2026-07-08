@@ -134,6 +134,21 @@ def format_area_value(value):
                 pass
         return '—'
 
+def display_source_name(source):
+    """Map a raw scraper `source` value to its friendly agent name.
+
+    Falls back to stripping a trailing 'Scraper' suffix for sources that are not
+    in SOURCE_NAME_MAPPING (e.g. 'OlivehomesScraper' -> 'Olivehomes').
+    """
+    if not source or source == 'N/A':
+        return 'N/A'
+    if source in Config.SOURCE_NAME_MAPPING:
+        return Config.SOURCE_NAME_MAPPING[source]
+    if source.endswith('Scraper'):
+        return source[:-7]
+    return source
+
+
 def assign_sardo_references(properties):
     """Assign SARDO reference IDs to properties based on source and image filename"""
     sardo_ref_counter = 1100
@@ -1028,9 +1043,14 @@ def metadata():
     locations = db_manager.get_locations()
     property_types = db_manager.get_property_types()
     stats = db_manager.get_statistics()
+    # Agent/source options carry the raw value (used for filtering) and the
+    # friendly label (shown in the UI).
+    sources = [{'value': s, 'label': display_source_name(s)} for s in db_manager.get_sources()]
     return jsonify({
         'locations': locations,
         'property_types': property_types,
+        'statuses': Config.PROPERTY_STATUSES,
+        'sources': sources,
         'stats': stats,
         'app_title': Config.APP_TITLE
     })
@@ -1078,14 +1098,8 @@ def search_properties():
             
         # Format the source mapping
         original_source = prop.get('website_source', 'N/A')
-        source = original_source
-        if source and source != 'N/A':
-            if source in Config.SOURCE_NAME_MAPPING:
-                source = Config.SOURCE_NAME_MAPPING[source]
-            elif source.endswith('Scraper'):
-                source = source[:-7]
-        prop['display_source'] = source
-        
+        prop['display_source'] = display_source_name(original_source)
+
         # Determine reference (Waratah properties use title)
         is_waratah = original_source == 'WaratahpropertiesScraper'
         title = prop.get('title')
@@ -1098,6 +1112,38 @@ def search_properties():
         'page': page,
         'limit': limit
     })
+
+@app.route('/reports')
+@login_required
+def reports():
+    """Property status / market movement report page (spec section 6)."""
+    return render_template('reports.html')
+
+
+@app.route('/api/reports/status', methods=['GET'])
+@login_required
+def status_report():
+    """Status + market-movement figures, optionally scoped to a date range.
+
+    Movement figures (sold / delisted / new listings) come from
+    property_status_history, which is populated by the scraper.
+    """
+    date_from = (request.args.get('date_from') or '').strip() or None
+    date_to = (request.args.get('date_to') or '').strip() or None
+
+    report = db_manager.get_status_report(date_from=date_from, date_to=date_to)
+    if not report:
+        return jsonify({'error': 'Could not build the status report'}), 500
+
+    # Attach friendly agent names for display
+    for row in report.get('by_source', []):
+        row['display_source'] = display_source_name(row['source'])
+    for change in report.get('recent_changes', []):
+        change['display_source'] = display_source_name(change.get('source'))
+
+    report['scrape_runs'] = db_manager.get_scrape_runs(limit=10)
+    return jsonify(report)
+
 
 def generate_pdf_report_file(properties, client_name):
     """Assign SARDO refs, compute stats and render the PDF report.
@@ -1140,18 +1186,13 @@ def generate_excel_report(properties, client_name):
     selected_property_data = []
     for prop in properties:
         original_source = prop.get('website_source', 'N/A')
-        source = original_source
-        if source and source != 'N/A':
-            if source in Config.SOURCE_NAME_MAPPING:
-                source = Config.SOURCE_NAME_MAPPING[source]
-            elif source.endswith('Scraper'):
-                source = source[:-7]
-        
+        source = display_source_name(original_source)
+
         is_waratah = original_source == 'WaratahpropertiesScraper'
         title = prop.get('title')
         reference = prop.get('reference', 'N/A')
         display_reference = title if is_waratah and title and title.strip() else reference
-        
+
         row = {
             'Price': format_price_value(prop.get('property_price')),
             'Location': prop.get('location', 'N/A'),
@@ -1161,6 +1202,7 @@ def generate_excel_report(properties, client_name):
             'Build (m²)': format_area_value(prop.get('living_area')),
             'Plot (m²)': format_area_value(prop.get('land_area')),
             'Source': source,
+            'Status': prop.get('property_status') or 'Unknown',
             'SARDO Ref': prop.get('sardo_reference', 'N/A'),
             'Reference (with link to page source)': display_reference,
             'property_url': prop.get('property_url', '')
@@ -1169,8 +1211,8 @@ def generate_excel_report(properties, client_name):
 
     df = pd.DataFrame(selected_property_data)
     columns_order = [
-        'Price', 'Location', 'Type', 'Beds', 'Baths', 
-        'Build (m²)', 'Plot (m²)', 'Source', 'SARDO Ref', 
+        'Price', 'Location', 'Type', 'Beds', 'Baths',
+        'Build (m²)', 'Plot (m²)', 'Source', 'Status', 'SARDO Ref',
         'Reference (with link to page source)'
     ]
     df_export = df[columns_order]
@@ -1197,11 +1239,13 @@ def generate_excel_report(properties, client_name):
             adjusted_width = (max_length + 2)
             worksheet.column_dimensions[column].width = min(adjusted_width, 50)
             
-        # Add hyperlinks manually
-        url_col_idx = len(columns_order) + 1
+        # Add hyperlinks manually onto the Reference column.
+        # Derive the column index from columns_order (1-based) so that inserting
+        # a new column never silently hyperlinks the wrong cells.
+        ref_col_idx = columns_order.index('Reference (with link to page source)') + 1
         for i, url in enumerate(df['property_url']):
             if url and isinstance(url, str) and url.startswith('http'):
-                cell = worksheet.cell(row=i+2, column=10) # Reference column is the 10th
+                cell = worksheet.cell(row=i + 2, column=ref_col_idx)
                 cell.hyperlink = url
                 cell.style = "Hyperlink"
 
