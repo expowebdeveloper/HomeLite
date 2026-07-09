@@ -134,6 +134,12 @@
             </div>
         </header>
 
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay" style="display:none;">
+            <div class="spinner"></div>
+            <p id="loading-text">Loading...</p>
+        </div>
+
         <div class="main-content">
             <div class="reports-content">
                 <div class="page-header">
@@ -250,6 +256,20 @@
     </div>
 
     <script>
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
+
+        const showLoading = (text = 'Loading...') => {
+            if (loadingOverlay) {
+                loadingOverlay.style.display = 'flex';
+                loadingText.innerText = text;
+            }
+        };
+
+        const hideLoading = () => {
+            if (loadingOverlay) loadingOverlay.style.display = 'none';
+        };
+
         const STATUS_ORDER = ['For Sale', 'New Listing', 'Reserved', 'Under Offer', 'Exclusive', 'Sold', 'Delisted', 'Unknown'];
 
         const statusClass = (status) => 'status-badge status-' + String(status || 'Unknown')
@@ -266,20 +286,29 @@
         };
 
         const loadReport = async () => {
+            showLoading('Compiling market data...');
             const from = document.getElementById('date-from').value;
             const to = document.getElementById('date-to').value;
             const params = new URLSearchParams();
             if (from) params.set('date_from', from);
             if (to) params.set('date_to', to);
 
-            const res = await fetch('/api/reports/status?' + params.toString());
-            if (!res.ok) {
+            try {
+                const res = await fetch('/api/reports/status?' + params.toString());
+                if (!res.ok) {
+                    document.getElementById('agent-body').innerHTML =
+                        '<tr><td colspan="10" class="empty-cell">Failed to load the report.</td></tr>';
+                    hideLoading();
+                    return;
+                }
+                const data = await res.json();
+                render(data);
+            } catch (err) {
                 document.getElementById('agent-body').innerHTML =
-                    '<tr><td colspan="10" class="empty-cell">Failed to load the report.</td></tr>';
-                return;
+                    '<tr><td colspan="10" class="empty-cell">Network error loading report.</td></tr>';
+            } finally {
+                hideLoading();
             }
-            const data = await res.json();
-            render(data);
         };
 
         const render = (data) => {

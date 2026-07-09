@@ -588,6 +588,12 @@
         if (link.style.pointerEvents === 'none') return; // still cooling down
 
         document.getElementById('otp-error').style.display = 'none';
+        
+        // Show loading state
+        const originalText = link.innerText;
+        link.innerText = 'Sending...';
+        link.style.pointerEvents = 'none';
+        
         try {
             const res = await fetch('/api/auth/resend-otp', {
                 method: 'POST',
@@ -611,6 +617,9 @@
             }
         } catch {
             showMsg('otp-error', 'Network error. Please try again.');
+        } finally {
+            // Restore link text
+            link.innerText = originalText;
         }
     }
 
