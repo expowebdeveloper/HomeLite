@@ -37,6 +37,8 @@ class Config:
     OTP_LENGTH = int(os.getenv('OTP_LENGTH', '6'))
     OTP_EXPIRY_SECONDS = int(os.getenv('OTP_EXPIRY_SECONDS', '300'))  # 5 minutes
     OTP_MAX_ATTEMPTS = int(os.getenv('OTP_MAX_ATTEMPTS', '5'))
+    # Minimum wait between "resend code" requests, to protect the inbox from spam
+    OTP_RESEND_COOLDOWN_SECONDS = int(os.getenv('OTP_RESEND_COOLDOWN_SECONDS', '30'))
     # Best-effort country lookup from IP (uses a free public API). Set to False to skip.
     GEO_LOOKUP_ENABLED = os.getenv('GEO_LOOKUP_ENABLED', 'True').lower() in ('1', 'true', 'yes')
 
@@ -109,5 +111,5 @@ class Config:
         "QuintapropertyScraper": "Quinta",
         "QuintadolagoScraper": "Quinta Lago",
         "LibertyrealestateScraper": "Liberty",
-        "AlgarvePropScraper": "Algarve"
+        "AlgarvePropScraper": "Gatehouse"
     }

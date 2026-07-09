@@ -328,6 +328,7 @@
         <p class="subtitle" id="otp-subtitle">We've sent a 6-digit code to your email address.</p>
 
         <div id="otp-error" class="error-msg"></div>
+        <div id="otp-success" class="success-msg"></div>
 
         <form id="form-otp">
             <div class="form-group">
@@ -346,6 +347,12 @@
         </form>
 
         <div class="links">
+            <span id="otp-resend-wrap">
+                Didn't get the code?
+                <a href="#" id="otp-resend-link" onclick="resendOtp(event)">Resend</a>
+                <span id="otp-resend-timer" style="color: var(--text-secondary);"></span>
+            </span>
+            <br>
             <a href="#" onclick="switchView('view-login')">← Back to Login</a>
         </div>
     </div>
@@ -527,6 +534,7 @@
                         `A 6-digit code has been sent to your email${maskedEmail}. Enter it below.`;
                     switchView('view-otp');
                     document.getElementById('otp-code').focus();
+                    startResendCooldown(data.cooldown || 30);
                 } else if (data.access_token) {
                     // Trusted device — logged in directly
                     if (data.device_token) localStorage.setItem('device_token', data.device_token);
@@ -542,6 +550,69 @@
             btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In &amp; Send OTP';
         }
     });
+
+    // ====================================================
+    // Resend OTP (with cooldown)
+    // ====================================================
+    let resendTimer = null;
+
+    function startResendCooldown(seconds) {
+        const link = document.getElementById('otp-resend-link');
+        const timer = document.getElementById('otp-resend-timer');
+        let remaining = seconds;
+        if (resendTimer) clearInterval(resendTimer);
+
+        const tick = () => {
+            if (remaining <= 0) {
+                clearInterval(resendTimer);
+                resendTimer = null;
+                link.style.display = '';
+                link.style.pointerEvents = '';
+                link.style.opacity = '';
+                timer.textContent = '';
+                return;
+            }
+            link.style.pointerEvents = 'none';
+            link.style.opacity = '0.5';
+            timer.textContent = ` in ${remaining}s`;
+            remaining -= 1;
+        };
+        tick();
+        resendTimer = setInterval(tick, 1000);
+    }
+
+    async function resendOtp(e) {
+        if (e) e.preventDefault();
+        if (!tempToken) return;
+        const link = document.getElementById('otp-resend-link');
+        if (link.style.pointerEvents === 'none') return; // still cooling down
+
+        document.getElementById('otp-error').style.display = 'none';
+        try {
+            const res = await fetch('/api/auth/resend-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ temp_token: tempToken })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                // Adopt the refreshed pending token so the new code stays valid
+                if (data.temp_token) tempToken = data.temp_token;
+                document.getElementById('otp-code').value = '';
+                document.getElementById('otp-code').focus();
+                showMsg('otp-success', data.message || 'A new code has been sent.', 'success');
+                startResendCooldown(data.cooldown || 30);
+            } else if (res.status === 429 && data.retry_after) {
+                startResendCooldown(data.retry_after);
+                showMsg('otp-error', data.error || 'Please wait before resending.');
+            } else {
+                showMsg('otp-error', data.error || 'Could not resend the code.');
+            }
+        } catch {
+            showMsg('otp-error', 'Network error. Please try again.');
+        }
+    }
 
     // ====================================================
     // Flow 1b: OTP verification

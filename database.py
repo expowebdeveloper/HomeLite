@@ -799,7 +799,11 @@ class DatabaseManager:
         
         try:
             base_query = """
-                FROM properties 
+                FROM (
+                    SELECT *,
+                           'SARDO' || (1099 + ROW_NUMBER() OVER(ORDER BY COALESCE(source, ''), COALESCE(image_filename, ''))) as sardo_reference
+                    FROM properties
+                ) as p
                 WHERE 1=1
             """
             params = []
@@ -814,6 +818,12 @@ class DatabaseManager:
                 # If max_price is provided, exclude NULL prices and include properties with price <= max_price
                 base_query += " AND price <= %s AND price IS NOT NULL"
                 params.append(filters['max_price'])
+
+            # Reference / SARDO ID search
+            if filters.get('reference'):
+                ref_query = f"%{filters['reference'].strip()}%"
+                base_query += " AND (reference ILIKE %s OR sardo_reference ILIKE %s OR title ILIKE %s)"
+                params.extend([ref_query, ref_query, ref_query])
             
             # Location filtering - handle both single location and multiple locations
             if filters.get('location'):
@@ -932,7 +942,8 @@ class DatabaseManager:
                     last_seen_at,
                     status_last_changed_at,
                     created_at,
-                    updated_at
+                    updated_at,
+                    sardo_reference
             """ + base_query
             
             # Add sorting with multiple criteria

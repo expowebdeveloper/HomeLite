@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let totalPropertiesCount = 0;
     let currentSortBy = 'created_at';
     let currentSortDir = 'DESC';
-    let refQuery = ''; // Client-side SARDO Ref / Reference filter over loaded results
+
 
     // DOM Elements
     const statTotal = document.getElementById('stat-total');
@@ -119,18 +119,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Client-side SARDO Ref / Reference filter over the currently loaded results.
-    // Matches against the SARDO reference, the displayed reference, the raw
-    // reference and the title (Waratah listings show the title as the reference).
+    // Results are now returned directly from the backend based on our search criteria.
     const getVisibleProperties = () => {
-        if (!refQuery) return currentProperties;
-        const q = refQuery.toLowerCase();
-        return currentProperties.filter(p =>
-            (p.sardo_reference || '').toLowerCase().includes(q) ||
-            (p.display_reference || '').toLowerCase().includes(q) ||
-            (p.reference || '').toLowerCase().includes(q) ||
-            (p.title || '').toLowerCase().includes(q)
-        );
+        return currentProperties;
     };
 
     // Render Grid
@@ -425,6 +416,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filterFirstSeenFrom && filterFirstSeenFrom.value) filters.first_seen_from = filterFirstSeenFrom.value;
         if (filterFirstSeenTo && filterFirstSeenTo.value) filters.first_seen_to = filterFirstSeenTo.value;
 
+        // Global reference search
+        if (filterRef && filterRef.value.trim()) {
+            filters.reference = filterRef.value.trim();
+        }
+
         filters.sort_by = currentSortBy;
         filters.sort_dir = currentSortDir;
 
@@ -448,7 +444,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('filter-min-baths').value = '';
         document.getElementById('filter-max-baths').value = '';
         if (filterRef) filterRef.value = '';
-        refQuery = '';
         if (filterStatuses) filterStatuses.selectedIndex = -1;
         if (filterSources) filterSources.selectedIndex = -1;
         if (filterHideDelisted) filterHideDelisted.checked = true;
@@ -460,22 +455,36 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchProperties(getFilters());
     });
 
-    // Client-side SARDO Ref / Reference filter (operates on loaded results)
     const updateResultsInfo = () => {
         if (!resultsCount) return;
-        if (refQuery) {
-            resultsCount.innerText = `${getVisibleProperties().length} of ${totalPropertiesCount} shown`;
-        } else {
-            resultsCount.innerText = `${totalPropertiesCount} Properties Found`;
-        }
+        resultsCount.innerText = `${totalPropertiesCount} Properties Found`;
     };
 
+    // Auto-search logic: when user stops typing for 1 second, OR presses Enter, OR clicks away
     if (filterRef) {
-        filterRef.addEventListener('input', (e) => {
-            refQuery = e.target.value.trim();
-            renderGrid();
-            renderTable();
-            updateResultsInfo();
+        let debounceTimer;
+
+        // Auto-search after user stops typing for 1 second
+        filterRef.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                btnSearch.click();
+            }, 1000); // 1 full second delay
+        });
+
+        // Search immediately if they click outside the box
+        filterRef.addEventListener('blur', () => {
+            clearTimeout(debounceTimer);
+            btnSearch.click();
+        });
+        
+        // Search immediately if they press Enter
+        filterRef.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                clearTimeout(debounceTimer);
+                btnSearch.click();
+            }
         });
     }
 

@@ -150,24 +150,7 @@ def display_source_name(source):
 
 
 def assign_sardo_references(properties):
-    """Assign SARDO reference IDs to properties based on source and image filename"""
-    sardo_ref_counter = 1100
-    
-    # Create a list of tuples (source, image_filename, property_index) for sorting
-    property_info = []
-    for i, prop in enumerate(properties):
-        source = prop.get('website_source', '') or ''
-        image_filename = prop.get('image_filename', '') or ''
-        property_info.append((source, image_filename, i))
-    
-    # Sort by source name, then by image filename (alphabetical)
-    property_info.sort(key=lambda x: (x[0] or '', x[1] or ''))
-    
-    # Assign SARDO reference IDs
-    for _, _, prop_index in property_info:
-        properties[prop_index]['sardo_reference'] = f"SARDO{sardo_ref_counter}"
-        sardo_ref_counter += 1
-    
+    """(Deprecated) SARDO reference IDs are now assigned natively in the database CTE."""
     return properties
 
 
@@ -639,7 +622,8 @@ def api_login():
                 'message': 'OTP sent to your email',
                 'require_otp': True,
                 'temp_token': temp_token,
-                'masked_email': masked
+                'masked_email': masked,
+                'cooldown': Config.OTP_RESEND_COOLDOWN_SECONDS
             })
             
         # Trusted device — complete login without OTP
@@ -745,6 +729,79 @@ def api_verify_otp():
     # Success
     db_manager.clear_otp(user_id)
     return _complete_login_flow(user_data, payload.get('trust_device'))
+
+
+@app.route('/api/auth/resend-otp', methods=['POST'])
+def api_resend_otp():
+    """Resend the email login OTP for a pending 2FA session.
+
+    Requires the temp_token issued by /api/auth/login. Rate limited by a short
+    cooldown so the endpoint cannot be used to spam the recipient inbox.
+    """
+    data = request.json or {}
+    temp_token = data.get('temp_token')
+    if not temp_token:
+        return jsonify({'error': 'temp_token is required'}), 400
+
+    try:
+        payload = jwt.decode(temp_token, Config.JWT_SECRET_KEY, algorithms=['HS256'])
+        if payload.get('type') != 'email_otp_pending':
+            return jsonify({'error': 'Invalid token type'}), 401
+        user_id = int(payload['sub'])
+    except Exception:
+        return jsonify({'error': 'Your session has expired. Please login again.'}), 401
+
+    user_data = db_manager.get_user_by_id(user_id)
+    if not user_data:
+        return jsonify({'error': 'User not found'}), 404
+
+    # Cooldown: block rapid re-requests. get_active_otp().created_at is the DB
+    # time the current code was issued; compare against UTC now.
+    active_otp = db_manager.get_active_otp(user_id)
+    if active_otp and active_otp.get('created_at'):
+        try:
+            elapsed = (datetime.utcnow() - active_otp['created_at']).total_seconds()
+            remaining = int(Config.OTP_RESEND_COOLDOWN_SECONDS - elapsed)
+            if 0 < remaining <= Config.OTP_RESEND_COOLDOWN_SECONDS:
+                return jsonify({
+                    'error': f'Please wait {remaining}s before requesting a new code.',
+                    'retry_after': remaining
+                }), 429
+        except Exception:
+            pass  # never block a legitimate resend on a clock/parse issue
+
+    # Issue and send a fresh OTP (store_otp clears the previous one and resets attempts)
+    code = _generate_otp()
+    expires_at = time.time() + Config.OTP_EXPIRY_SECONDS
+    db_manager.store_otp(user_id, _hash_otp(code), expires_at)
+    try:
+        _send_otp_email(code, user_data.get('email'))
+    except Exception as e:
+        app.logger.error(f"Failed to resend login OTP email: {e}")
+        return jsonify({'error': 'Could not send the code. Please try again.'}), 500
+
+    ip = get_client_ip()
+    db_manager.log_login_activity(
+        'api_otp_sent', username=user_data['username'], user_id=user_id,
+        ip_address=ip, country=get_country(ip),
+        user_agent=request.headers.get('User-Agent', ''))
+
+    # Refresh the pending window so it matches the new code's lifetime
+    new_temp_token = jwt.encode({
+        'sub': str(user_id),
+        'type': 'email_otp_pending',
+        'exp': datetime.utcnow() + timedelta(minutes=5),
+        'iat': datetime.utcnow(),
+        'trust_device': payload.get('trust_device')
+    }, Config.JWT_SECRET_KEY, algorithm='HS256')
+
+    return jsonify({
+        'message': 'A new code has been sent to your email.',
+        'temp_token': new_temp_token,
+        'masked_email': _mask_email(user_data.get('email') or ''),
+        'cooldown': Config.OTP_RESEND_COOLDOWN_SECONDS
+    })
+
 
 @app.route('/api/auth/refresh', methods=['POST'])
 def api_refresh():
