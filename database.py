@@ -36,7 +36,13 @@ class DatabaseManager:
                 port=self.config.DB_PORT,
                 database=self.config.DB_NAME,
                 user=self.config.DB_USER,
-                password=self.config.DB_PASSWORD
+                password=self.config.DB_PASSWORD,
+                # Detect connections dropped by RDS/network instead of letting them
+                # linger as half-open sockets that only fail on the next query.
+                keepalives=1,
+                keepalives_idle=30,
+                keepalives_interval=10,
+                keepalives_count=5,
             )
             # This manager holds one long-lived connection and is overwhelmingly
             # read-only. Without autocommit, psycopg2 opens a transaction on the
@@ -68,7 +74,7 @@ class DatabaseManager:
         if cached is not None:
             return cached
 
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return []
         
@@ -103,7 +109,7 @@ class DatabaseManager:
         if cached is not None:
             return cached
 
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return []
         
@@ -129,7 +135,7 @@ class DatabaseManager:
     
     def create_user(self, email: str, username: str, password_hash: str) -> bool:
         """Create a new user."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -151,39 +157,56 @@ class DatabaseManager:
 
     def get_user_by_identifier(self, identifier: str) -> Optional[Dict]:
         """Fetch a user by their username or email"""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return None
         
-        try:
-            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-            cursor.execute("SELECT * FROM users WHERE username = %s OR email = %s", (identifier, identifier))
-            user = cursor.fetchone()
-            cursor.close()
-            return dict(user) if user else None
-        except Exception as e:
-            logging.error(f"Error fetching user by identifier: {e}")
-            return None
+        return self._fetch_user("username = %s OR email = %s",
+                                (identifier, identifier), f"by identifier {identifier!r}")
 
     def get_user_by_id(self, user_id: int) -> Optional[Dict]:
         """Fetch a user by their ID"""
-        if not self.connection:
-            if not self.connect():
+        return self._fetch_user("id = %s", (user_id,), f"by id {user_id}")
+
+    def _fetch_user(self, where_sql: str, params: tuple, what: str) -> Optional[Dict]:
+        """Run a single-row user lookup, retrying once if the connection died.
+
+        This matters for login: a dropped connection makes the query raise, and if
+        we just returned None the caller could not tell "database unreachable" apart
+        from "no such user" — so a perfectly valid account gets rejected with
+        'Invalid credentials'. A server-side disconnect is only detected when a query
+        is actually attempted, so the first attempt can fail even though
+        connection.closed was still 0.
+        """
+        for attempt in (1, 2):
+            if not self.connection or self.connection.closed:
+                if not self.connect():
+                    return None
+            try:
+                cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                cursor.execute(f"SELECT * FROM users WHERE {where_sql}", params)
+                user = cursor.fetchone()
+                cursor.close()
+                return dict(user) if user else None
+            except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+                # Connection-level failure: discard it and retry once on a fresh one.
+                logging.warning(f"Connection lost fetching user {what} (attempt {attempt}): {e}")
+                try:
+                    self.connection.close()
+                except Exception:
+                    pass
+                self.connection = None
+                if attempt == 2:
+                    logging.error(f"Error fetching user {what}: connection unrecoverable")
+                    return None
+            except Exception as e:
+                logging.error(f"Error fetching user {what}: {e}")
                 return None
-        
-        try:
-            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-            cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
-            user = cursor.fetchone()
-            cursor.close()
-            return dict(user) if user else None
-        except Exception as e:
-            logging.error(f"Error fetching user by ID: {e}")
-            return None
+        return None
 
     def store_otp(self, user_id: int, otp_hash: str, expires_at: float) -> bool:
         """Store a new OTP in the database, clearing any previous active ones."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -209,7 +232,7 @@ class DatabaseManager:
 
     def get_active_otp(self, user_id: int) -> Optional[Dict]:
         """Get the active OTP for a user, if it has not expired."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return None
         try:
@@ -229,7 +252,7 @@ class DatabaseManager:
 
     def increment_otp_attempts(self, otp_id: int) -> bool:
         """Increment the attempts counter for an OTP."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -252,7 +275,7 @@ class DatabaseManager:
 
     def clear_otp(self, user_id: int) -> bool:
         """Clear all OTPs for a user."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -272,7 +295,7 @@ class DatabaseManager:
 
     def ensure_login_activity_table(self):
         """Create the login_activity table if it does not exist."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -306,7 +329,7 @@ class DatabaseManager:
 
     def ensure_user_sessions_table(self):
         """Create the user_sessions table if it does not exist."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -338,7 +361,7 @@ class DatabaseManager:
                            ip_address=None, country=None, user_agent=None,
                            browser=None, os=None, device_fingerprint=None):
         """Insert a login activity record. Best-effort: never raises."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -361,7 +384,7 @@ class DatabaseManager:
 
     def ensure_security_columns(self):
         """Ensure security columns exist on the users table."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -392,7 +415,7 @@ class DatabaseManager:
             return False
 
     def increment_failed_login(self, user_id: int) -> int:
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return 0
         try:
@@ -413,7 +436,7 @@ class DatabaseManager:
             return 0
 
     def reset_failed_login(self, user_id: int):
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return
         try:
@@ -425,7 +448,7 @@ class DatabaseManager:
             logging.error(f"Error resetting failed logins: {e}")
 
     def add_trusted_device(self, user_id: int, fingerprint: str):
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return
         try:
@@ -448,7 +471,7 @@ class DatabaseManager:
 
     def is_new_device_for_user(self, user_id: int, fingerprint: str, browser: str, os_info: str) -> bool:
         """Check if this device fingerprint or browser/OS has been successfully used by this user before."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False  # Fail open/silent
         try:
@@ -471,7 +494,7 @@ class DatabaseManager:
         """Check if the user has successfully logged in from this country before."""
         if not country or country == 'Local':
             return False
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -493,7 +516,7 @@ class DatabaseManager:
 
     def set_mfa_status(self, user_id: int, status: bool) -> bool:
         """Enable or disable MFA for a user."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -515,7 +538,7 @@ class DatabaseManager:
             return False
 
     def set_totp_secret(self, user_id: int, encrypted_secret: str) -> bool:
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -529,7 +552,7 @@ class DatabaseManager:
             return False
 
     def enable_totp_mfa(self, user_id: int, encrypted_backup_codes) -> bool:
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -547,7 +570,7 @@ class DatabaseManager:
             return False
 
     def disable_totp_mfa(self, user_id: int) -> bool:
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -565,7 +588,7 @@ class DatabaseManager:
             return False
 
     def update_backup_codes(self, user_id: int, encrypted_backup_codes) -> bool:
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -580,7 +603,7 @@ class DatabaseManager:
 
     def update_user_password(self, user_id: int, new_password_hash: str) -> bool:
         """Update a user's password hash."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -603,7 +626,7 @@ class DatabaseManager:
 
     def update_last_login(self, user_id: int, ip: str, device: str) -> bool:
         """Update last login details."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -629,7 +652,7 @@ class DatabaseManager:
     def create_user_session(self, user_id: int, session_token: str, expires_at: float, 
                             ip_address: str, user_agent: str) -> bool:
         """Create a persistent user session (refresh token)."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -652,7 +675,7 @@ class DatabaseManager:
 
     def validate_session_token(self, token: str) -> bool:
         """Check if a session token (refresh token) exists and is valid."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -667,7 +690,7 @@ class DatabaseManager:
 
     def cleanup_expired_sessions(self) -> bool:
         """Delete sessions that have expired."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -683,7 +706,7 @@ class DatabaseManager:
     def get_active_sessions(self, user_id: int) -> List[Dict]:
         """Fetch all active sessions for a user."""
         self.cleanup_expired_sessions()
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return []
         try:
@@ -703,7 +726,7 @@ class DatabaseManager:
 
     def revoke_session(self, user_id: int, session_id: int) -> bool:
         """Revoke a specific session by ID (ensuring it belongs to the user)."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -718,7 +741,7 @@ class DatabaseManager:
 
     def revoke_all_sessions(self, user_id: int) -> bool:
         """Revoke all sessions for a user (Global Logout)."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -733,7 +756,7 @@ class DatabaseManager:
 
     def revoke_session_by_token(self, token: str) -> bool:
         """Revoke a session by its token string."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
@@ -748,7 +771,7 @@ class DatabaseManager:
 
     def get_login_history(self, limit: int = 100, username: str = None) -> List[Dict]:
         """Fetch recent login activity, newest first."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return []
         try:
@@ -793,7 +816,7 @@ class DatabaseManager:
         Returns:
             Dictionary containing 'properties' list and 'total_count' int
         """
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return {'properties': [], 'total_count': 0}
         
@@ -1006,7 +1029,7 @@ class DatabaseManager:
     
     def get_property_by_id(self, property_id: str) -> Optional[Dict]:
         """Get a specific property by ID"""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return None
         
@@ -1054,7 +1077,7 @@ class DatabaseManager:
         if cached is not None:
             return cached
 
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return {}
         
@@ -1110,7 +1133,7 @@ class DatabaseManager:
         if cached is not None:
             return cached
 
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return []
 
@@ -1139,7 +1162,7 @@ class DatabaseManager:
         `property_status_history` is written by the scraper; until it runs, the
         movement figures are legitimately zero.
         """
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return {}
 
@@ -1260,7 +1283,7 @@ class DatabaseManager:
 
     def get_scrape_runs(self, limit: int = 20) -> List[Dict]:
         """Recent scrape runs, for the audit view."""
-        if not self.connection:
+        if not self.connection or self.connection.closed:
             if not self.connect():
                 return []
         try:
@@ -1283,3 +1306,231 @@ class DatabaseManager:
             except Exception:
                 pass
             return []
+
+    # ------------------------------------------------------------------
+    # Live scraper activity (Scraper Logs page)
+    # ------------------------------------------------------------------
+
+    # A run flagged 'running' whose heartbeat has gone quiet for longer than this
+    # is treated as dead, not live. Without this a crashed scraper would show as
+    # "running" forever — which is exactly what happened to runs #1 and #2.
+    STALE_HEARTBEAT_SECONDS = 180
+
+    def get_scraper_activity(self, limit: int = 25) -> Dict:
+        """Current state of every scraper, plus the most recent runs.
+
+        Returns {'runs': [...], 'active_count': int, 'server_time': datetime}.
+
+        Each run carries a derived `live_status`:
+            running   - flagged running and heart still beating
+            stalled   - flagged running but the heartbeat went quiet (crashed)
+            completed / failed / suspect - terminal states as recorded
+        """
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return {'runs': [], 'active_count': 0, 'server_time': None}
+
+        try:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("""
+                SELECT
+                    r.id, r.source_name, r.run_status, r.started_at, r.completed_at,
+                    r.last_heartbeat_at, r.progress_current, r.progress_total,
+                    r.triggered_by, r.properties_found, r.new_properties,
+                    r.updated_properties, r.status_changes, r.delisted_properties,
+                    r.errors_count, r.notes,
+                    EXTRACT(EPOCH FROM (
+                        now() - COALESCE(r.last_heartbeat_at, r.started_at)
+                    )) AS seconds_since_heartbeat,
+                    EXTRACT(EPOCH FROM (
+                        COALESCE(r.completed_at, now()) - r.started_at
+                    )) AS duration_seconds,
+                    (SELECT COUNT(*) FROM scrape_logs l WHERE l.scrape_run_id = r.id) AS log_count,
+                    (SELECT COUNT(*) FROM scrape_logs l
+                      WHERE l.scrape_run_id = r.id AND l.level = 'ERROR') AS error_log_count
+                FROM scrape_runs r
+                ORDER BY r.started_at DESC
+                LIMIT %s
+            """, (limit,))
+            rows = [dict(r) for r in cursor.fetchall()]
+
+            cursor.execute("SELECT now() AS now;")
+            server_time = cursor.fetchone()['now']
+            cursor.close()
+
+            active = 0
+            for r in rows:
+                quiet = r.get('seconds_since_heartbeat') or 0
+                if r['run_status'] == 'running':
+                    if quiet > self.STALE_HEARTBEAT_SECONDS:
+                        r['live_status'] = 'stalled'
+                        r['stale_reason'] = (
+                            f"No heartbeat for {int(quiet)}s — the scraper most likely "
+                            f"crashed or was killed."
+                        )
+                    else:
+                        r['live_status'] = 'running'
+                        active += 1
+                else:
+                    r['live_status'] = r['run_status']
+
+                # Progress bar. Be defensive: NEVER render a half-filled bar for a run
+                # that has already finished. Scrapers routinely forget to set
+                # progress_current = progress_total on the final update (run #18 finished
+                # having only ever written 1/2), and a 50% bar on a completed run reads
+                # as "stuck" to the user. The run_status is the source of truth for
+                # whether work is still happening; progress_* is only a hint.
+                total = r.get('progress_total') or 0
+                current = r.get('progress_current') or 0
+                raw_pct = round(min(current / total * 100, 100), 1) if total > 0 else None
+
+                if r['live_status'] == 'completed':
+                    r['progress_percent'] = 100.0     # finished == 100% by definition
+                    r['progress_state'] = 'done'
+                elif r['live_status'] == 'running':
+                    r['progress_percent'] = raw_pct
+                    r['progress_state'] = 'active'
+                elif r['live_status'] == 'suspect':
+                    # A 'suspect' run did NOT crash. It scraped fine and then deliberately
+                    # SKIPPED the delist sweep because the safety guard tripped. Rendering
+                    # it like a failure ("Stopped at…", red) makes a healthy run look broken.
+                    # It's a warning, not an error — and `notes` says exactly why.
+                    r['progress_percent'] = 100.0 if r['run_status'] == 'suspect' else raw_pct
+                    r['progress_state'] = 'warning'
+                else:
+                    # failed / stalled — genuinely died partway.
+                    r['progress_percent'] = raw_pct
+                    r['progress_state'] = 'stopped'
+
+                # Surface the discrepancy where a run clearly did work (it has progress and
+                # log output) but reported zero counters — that means the uploader never
+                # wrote its totals back, not that the scrape found nothing.
+                r['counters_missing'] = bool(
+                    (r.get('properties_found') or 0) == 0
+                    and ((r.get('progress_current') or 0) > 0 or (r.get('log_count') or 0) > 0)
+                    and r['live_status'] in ('completed', 'suspect')
+                )
+
+            return {'runs': rows, 'active_count': active, 'server_time': server_time}
+
+        except Exception as e:
+            logging.error(f"Error fetching scraper activity: {e}")
+            try:
+                self.connection.rollback()
+            except Exception:
+                pass
+            return {'runs': [], 'active_count': 0, 'server_time': None}
+
+    def get_scrape_logs(self, run_id: int, after_id: int = 0, before_id: int = None,
+                        level: str = None, limit: int = 500) -> Dict:
+        """Fetch log lines for one run.
+
+        Three modes, mirroring how a real terminal behaves:
+
+        * `after_id > 0`  -> incremental poll: only lines newer than what we already
+                             have. Used while a scrape is streaming.
+        * `before_id`     -> "load earlier": the chunk immediately preceding a line
+                             we already have (scrolling back up).
+        * neither         -> **tail**: the MOST RECENT `limit` lines.
+
+        The tail default matters. A run can have thousands of lines (run #26 had
+        1,985); loading the *first* 500 would leave the user staring at the start of
+        the scrape and never showing the "Scraping completed" line at the end — which
+        looks like the scrape is stuck partway.
+        """
+        empty = {'logs': [], 'total': 0, 'first_id': None, 'last_id': after_id, 'has_more_before': False}
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return empty
+        try:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+            level_sql, level_params = "", []
+            if level and level.upper() in ('INFO', 'WARNING', 'ERROR', 'DEBUG'):
+                level_sql = " AND level = %s"
+                level_params = [level.upper()]
+
+            # Total matching lines, so the UI can say "showing last 500 of 1985"
+            cursor.execute(
+                f"SELECT COUNT(*) AS n FROM scrape_logs WHERE scrape_run_id = %s{level_sql}",
+                [run_id] + level_params)
+            total = cursor.fetchone()['n']
+
+            if after_id and after_id > 0:
+                # Incremental: new lines only, oldest-first.
+                cursor.execute(f"""
+                    SELECT id, scrape_run_id, source_name, level, message, created_at
+                    FROM scrape_logs
+                    WHERE scrape_run_id = %s AND id > %s{level_sql}
+                    ORDER BY id ASC LIMIT %s
+                """, [run_id, after_id] + level_params + [limit])
+                rows = [dict(r) for r in cursor.fetchall()]
+            else:
+                # Tail (or "load earlier" when before_id is given): take the newest
+                # `limit` rows with DESC, then flip back to chronological order.
+                bound_sql, bound_params = "", []
+                if before_id:
+                    bound_sql = " AND id < %s"
+                    bound_params = [before_id]
+                cursor.execute(f"""
+                    SELECT id, scrape_run_id, source_name, level, message, created_at
+                    FROM scrape_logs
+                    WHERE scrape_run_id = %s{bound_sql}{level_sql}
+                    ORDER BY id DESC LIMIT %s
+                """, [run_id] + bound_params + level_params + [limit])
+                rows = [dict(r) for r in cursor.fetchall()][::-1]   # back to ASC
+
+            cursor.close()
+
+            first_id = rows[0]['id'] if rows else None
+            last_id = rows[-1]['id'] if rows else after_id
+            return {
+                'logs': rows,
+                'total': total,
+                'first_id': first_id,
+                'last_id': last_id,
+                # Are there older lines above what we just returned?
+                'has_more_before': bool(first_id) and len(rows) == limit,
+            }
+        except Exception as e:
+            logging.error(f"Error fetching scrape logs: {e}")
+            try:
+                self.connection.rollback()
+            except Exception:
+                pass
+            return empty
+
+    def mark_stalled_runs_failed(self) -> int:
+        """Close out runs whose scraper died without finalising them.
+
+        A crashed scraper leaves its row at 'running' forever, which poisons the
+        delist guard's "last successful run" baseline. Returns rows updated.
+        """
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return 0
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                UPDATE scrape_runs
+                   SET run_status = 'failed',
+                       completed_at = COALESCE(completed_at, now()),
+                       notes = COALESCE(notes, '') ||
+                               ' [auto-closed: no heartbeat, scraper presumed dead]'
+                 WHERE run_status = 'running'
+                   AND now() - COALESCE(last_heartbeat_at, started_at)
+                       > (%s * INTERVAL '1 second')
+            """, (self.STALE_HEARTBEAT_SECONDS,))
+            n = cursor.rowcount
+            self.connection.commit()
+            cursor.close()
+            if n:
+                logging.warning(f"Auto-closed {n} stalled scrape run(s) as failed")
+            return n
+        except Exception as e:
+            logging.error(f"Error closing stalled runs: {e}")
+            try:
+                self.connection.rollback()
+            except Exception:
+                pass
+            return 0

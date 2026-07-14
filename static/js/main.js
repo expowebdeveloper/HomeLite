@@ -25,8 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterStatuses = document.getElementById('filter-statuses');
     const filterSources = document.getElementById('filter-sources');
     const filterHideDelisted = document.getElementById('filter-hide-delisted');
-    const filterFirstSeenFrom = document.getElementById('filter-first-seen-from');
-    const filterFirstSeenTo = document.getElementById('filter-first-seen-to');
+
 
     // Property status badge. "Under Offer" -> class "status-under-offer" (see style.css)
     const statusBadge = (status) => {
@@ -412,10 +411,6 @@ document.addEventListener('DOMContentLoaded', () => {
             : [];
         if (selectedSources.length > 0) filters.sources = selectedSources;
 
-        // First-seen date range
-        if (filterFirstSeenFrom && filterFirstSeenFrom.value) filters.first_seen_from = filterFirstSeenFrom.value;
-        if (filterFirstSeenTo && filterFirstSeenTo.value) filters.first_seen_to = filterFirstSeenTo.value;
-
         // Global reference search
         if (filterRef && filterRef.value.trim()) {
             filters.reference = filterRef.value.trim();
@@ -447,8 +442,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filterStatuses) filterStatuses.selectedIndex = -1;
         if (filterSources) filterSources.selectedIndex = -1;
         if (filterHideDelisted) filterHideDelisted.checked = true;
-        if (filterFirstSeenFrom) filterFirstSeenFrom.value = '';
-        if (filterFirstSeenTo) filterFirstSeenTo.value = '';
 
         // Clear resets to the default view, which still hides delisted stock
         currentPage = 1;
@@ -929,6 +922,27 @@ document.addEventListener('DOMContentLoaded', () => {
     btnSearch.addEventListener('click', () => {
         if (window.innerWidth <= 1100) closeSidebar();
     });
+
+    // Live indicator on the "Scraper Logs" button: green dot while a scrape is running.
+    // Reads the same activity feed as the Scraper Logs page.
+    const scraperLiveDot = document.getElementById('scraper-live-dot');
+    const pollScraperActivity = async () => {
+        if (!scraperLiveDot) return;
+        try {
+            const res = await fetch('/api/scrapers/activity?limit=5');
+            if (!res.ok) return;
+            const data = await res.json();
+            const running = (data.active_count || 0) > 0;
+            scraperLiveDot.style.display = running ? 'inline-block' : 'none';
+            scraperLiveDot.title = running
+                ? `${data.active_count} scraper(s) running`
+                : '';
+        } catch (_) {
+            // Non-critical: the dot just stays hidden.
+        }
+    };
+    pollScraperActivity();
+    setInterval(pollScraperActivity, 15000);
 
     // Initialize
     loadMetadata();

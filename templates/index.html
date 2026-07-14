@@ -30,6 +30,12 @@
                     <span class="stat-value" id="stat-avg">--</span>
                 </div>
 
+                <a href="{{ url_for('scraper_logs') }}" class="btn btn-secondary" id="btn-scraper-logs"
+                   style="text-decoration: none; display: flex; align-items: center; gap: 8px; margin-left: 20px; position: relative;">
+                    <i class="fas fa-terminal"></i> Scraper Logs
+                    <span id="scraper-live-dot" style="display:none; width:8px; height:8px; border-radius:50%; background:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,.2);"></span>
+                </a>
+
                 <div class="user-profile-dropdown" style="position: relative; margin-left: 20px;">
                     <button class="btn btn-secondary profile-toggle-btn" id="profileToggleBtn" onclick="toggleProfileMenu(event)" style="display: flex; align-items: center; gap: 8px; border-radius: 20px; padding: 6px 14px; cursor: pointer; background: white; border: 1px solid var(--border-color);">
                         <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px;">
@@ -58,6 +64,9 @@
                         <div style="padding: 8px;">
                             <a href="{{ url_for('reports') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text-secondary); text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='var(--surface-hover)'; this.style.color='var(--primary-color)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
                                 <i class="fas fa-chart-line" style="width: 16px; text-align: center;"></i> Market Reports
+                            </a>
+                            <a href="{{ url_for('scraper_logs') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text-secondary); text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='var(--surface-hover)'; this.style.color='var(--primary-color)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
+                                <i class="fas fa-terminal" style="width: 16px; text-align: center;"></i> Scraper Logs
                             </a>
                             <a href="{{ url_for('login_history') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text-secondary); text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='var(--surface-hover)'; this.style.color='var(--primary-color)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
                                 <i class="fas fa-history" style="width: 16px; text-align: center;"></i> Login History
@@ -137,15 +146,6 @@
                         <!-- Populated via JS -->
                     </select>
                     <small>Hold Ctrl/Cmd to select multiple</small>
-                </div>
-
-                <div class="filter-section">
-                    <label>First Seen (date range)</label>
-                    <div class="input-row">
-                        <input type="date" id="filter-first-seen-from" title="First seen from">
-                        <span>-</span>
-                        <input type="date" id="filter-first-seen-to" title="First seen to">
-                    </div>
                 </div>
 
                 <div class="filter-section">

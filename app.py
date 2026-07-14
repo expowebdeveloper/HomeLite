@@ -1177,6 +1177,61 @@ def reports():
     return render_template('reports.html')
 
 
+@app.route('/scraper-logs')
+@login_required
+def scraper_logs():
+    """Live scraper activity + log console."""
+    return render_template('scraper_logs.html')
+
+
+@app.route('/api/scrapers/activity', methods=['GET'])
+@login_required
+def scrapers_activity():
+    """Current state of every scraper run, for live polling.
+
+    Data is published by the scraper application into `scrape_runs` /
+    `scrape_logs`; this endpoint only reads it.
+    """
+    data = db_manager.get_scraper_activity(limit=int(request.args.get('limit', 25)))
+
+    for run in data.get('runs', []):
+        run['display_source'] = display_source_name(run.get('source_name'))
+
+    # Which scrapers have never reported a run at all?
+    # Use only the source values that actually exist in `properties` — the legacy
+    # aliases in SOURCE_NAME_MAPPING would otherwise show up as phantom duplicates
+    # (e.g. both 'QuintaProperty' and 'QuintapropertyScraper' -> "Quinta").
+    reported = {r['source_name'] for r in data.get('runs', [])}
+    data['never_reported'] = [
+        {'source': s, 'display_source': display_source_name(s)}
+        for s in db_manager.get_sources() if s not in reported
+    ]
+    data['stale_after_seconds'] = DatabaseManager.STALE_HEARTBEAT_SECONDS
+    return jsonify(data)
+
+
+@app.route('/api/scrapers/logs/<int:run_id>', methods=['GET'])
+@login_required
+def scraper_run_logs(run_id):
+    """Log lines for one run.
+
+    Behaves like a terminal:
+      * no params            -> the MOST RECENT lines (tail), so you always see the end
+                                of the scrape (including "Scraping completed")
+      * ?after_id=<last seen> -> incremental poll: only lines newer than that
+      * ?before_id=<first seen> -> "load earlier": the chunk above what you have
+    """
+    after_id = int(request.args.get('after_id', 0))
+    before_id = request.args.get('before_id', type=int)
+    level = request.args.get('level') or None
+    limit = min(int(request.args.get('limit', 500)), 2000)
+
+    result = db_manager.get_scrape_logs(
+        run_id, after_id=after_id, before_id=before_id, level=level, limit=limit)
+    result['run_id'] = run_id
+    return jsonify(result)
+
+
 @app.route('/api/reports/status', methods=['GET'])
 @login_required
 def status_report():
