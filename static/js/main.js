@@ -6,7 +6,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentPage = 1;
     let itemsPerPage = 10;
     let totalPropertiesCount = 0;
-    let currentSortBy = 'created_at';
+    // Default view: most expensive properties first (client request).
+    // The backend pushes P.O.A. listings (price NULL or <= 0) to the bottom for
+    // either direction, so "High to Low" starts at the top of the market.
+    let currentSortBy = 'price';
     let currentSortDir = 'DESC';
 
 
@@ -38,6 +41,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const isInactiveStatus = (status) => status === 'Sold' || status === 'Delisted';
     const statusText = document.getElementById('status-text');
     const loadingOverlay = document.getElementById('loading-overlay');
+
+    // Escape text destined for an HTML attribute (e.g. the Location title tooltip),
+    // so a quote or angle bracket in the data can't break out of the attribute.
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
+        c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
     // Utility: Format Currency
     const formatCurrency = (value) => {
@@ -243,7 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <input type="checkbox" class="row-checkbox" value="${prop.id}" ${selectedPropertyIds.has(prop.id.toString()) || selectedPropertyIds.has(prop.id) ? 'checked' : ''}>
                 </td>
                 <td style="font-weight: 600; color: var(--primary-color);">${price}</td>
-                <td>${prop.location || 'N/A'}</td>
+                <td title="${esc(prop.location || 'N/A')}">${prop.location || 'N/A'}</td>
                 <td>${prop.property_type || 'N/A'}</td>
                 <td>${prop.num_beds || '-'}</td>
                 <td>${prop.num_baths || '-'}</td>

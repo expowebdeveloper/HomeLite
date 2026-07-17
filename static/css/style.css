@@ -1466,3 +1466,36 @@ th.sortable.active-desc .sort-icon::before {
 
 /* Delisted / sold rows read as de-emphasised in the results table */
 tr.row-inactive td { opacity: 0.68; }
+
+/* ==========================================================================
+   Properties results table — Location column width
+   Client request: reduce the Location column by ~25%. Location values are long
+   ("Carvoeiro, Lagoa e Carvoeiro, Lagoa, Faro, 8400-518, Portugal") so with the
+   default auto table layout it was claiming ~375px and squeezing every other
+   column. Capped at 280px (~25% narrower) and truncated with an ellipsis; the
+   full value stays available via the cell's title tooltip and the Quick Preview
+   panel, so no information is lost.
+   Scoped to .properties-table — the login-history and reports pages share
+   .table-container but have completely different columns.
+   ========================================================================== */
+.properties-table th:nth-child(3),
+.properties-table td:nth-child(3) {
+    max-width: 280px;
+    width: 280px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 1400px) {
+    .properties-table th:nth-child(3),
+    .properties-table td:nth-child(3) {
+        max-width: 200px;
+        width: 200px;
+    }
+}
+
+
+thead tr th:hover {
+    background-color: #fff !important;
+}

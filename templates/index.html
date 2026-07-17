@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SARDO360 - PROPERTY INSIGHT</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=3.1">
+    <link rel="stylesheet" href="/static/css/style.css?v=3.3">
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -216,7 +216,7 @@
                     <select id="grid-sort" style="padding: 6px 12px; width: auto; font-size: 0.9rem;">
                         <option value="created_at-DESC">Newest</option>
                         <option value="price-ASC">Price (Low to High)</option>
-                        <option value="price-DESC">Price (High to Low)</option>
+                        <option value="price-DESC" selected>Price (High to Low)</option>
                         <option value="living_area-DESC">Build Area (Large to Small)</option>
                         <option value="land_area-DESC">Plot Area (Large to Small)</option>
                     </select>
@@ -230,7 +230,7 @@
                 <!-- The Table (Hidden by default) -->
                 <div class="table-area" id="table-area">
                     <div class="table-container">
-                        <table>
+                        <table class="properties-table">
                             <thead>
                                 <tr>
                                     <th>Select</th>
@@ -369,7 +369,7 @@
         </div>
     </div>
 
-    <script src="/static/js/main.js?v=3.0"></script>
+    <script src="/static/js/main.js?v=3.3"></script>
     <script>
         // Simple Toast logic
         function showToast(title, message, type = 'info') {
