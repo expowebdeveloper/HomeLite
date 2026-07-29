@@ -950,6 +950,8 @@
                 const btnSearch = document.getElementById('btn-search');
                 if (btnSearch) btnSearch.click();
 
+                if (typeof refreshStatsUI === 'function') await refreshStatsUI();
+
                 if (!isEdit && savedPropId) {
                     showToast('Saved', 'Property saved and file attached.', 'info');
                     closeManualPropertyModal();
@@ -982,9 +984,26 @@
                 if (propModal) propModal.style.display = 'none';
                 const btnSearch = document.getElementById('btn-search');
                 if (btnSearch) btnSearch.click();
+                if (typeof refreshStatsUI === 'function') await refreshStatsUI();
             } catch (err) {
                 showToast('Error', err.message, 'error');
             }
+        }
+
+        async function refreshStatsUI() {
+            try {
+                const res = await fetch('/api/metadata');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.stats) {
+                        const headlineTotal = data.stats.active_properties !== undefined ? data.stats.active_properties : data.stats.total_properties;
+                        const statTotal = document.getElementById('stat-total');
+                        const statAvg = document.getElementById('stat-avg');
+                        if (statTotal) statTotal.innerText = headlineTotal.toLocaleString();
+                        if (statAvg) statAvg.innerText = '€' + Number(data.stats.avg_price || 0).toLocaleString(undefined, {maximumFractionDigits:0});
+                    }
+                }
+            } catch (e) { console.error('Error refreshing stats:', e); }
         }
 
         async function loadManualDocuments(propId) {

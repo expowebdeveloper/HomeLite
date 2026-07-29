@@ -242,6 +242,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Render Table
     const renderTable = () => {
         tableBody.innerHTML = '';
+        if (previewImageContainer) previewImageContainer.innerHTML = `<div class="no-image-placeholder"><i class="fas fa-mouse-pointer" style="font-size: 24px; margin-bottom: 10px;"></i><p>Hover over a property to preview</p></div>`;
+        if (previewDetails) previewDetails.innerHTML = `<div style="text-align: center; color: var(--text-secondary); margin-top: 20px;"><p>No property selected.</p></div>`;
         const visibleProperties = getVisibleProperties();
         if (visibleProperties.length === 0) {
             const row = document.createElement('tr');
