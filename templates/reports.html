@@ -202,6 +202,36 @@
                     </div>
                 </div>
 
+                <!-- Properties Sold in Date Range -->
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h3 class="section-title" style="margin-bottom: 0;">
+                            <i class="fas fa-handshake"></i> Properties Sold in Date Range
+                            <span class="muted">(tracked via sold_at timestamp)</span>
+                        </h3>
+                        <button class="btn" style="padding: 6px 12px; font-size: 13px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer;" onclick="exportSoldCSV()">
+                            <i class="fas fa-file-csv"></i> Export Sold CSV
+                        </button>
+                    </div>
+                    <div class="table-area">
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date Sold</th>
+                                        <th>Agent</th>
+                                        <th>Area / Location</th>
+                                        <th>Property Reference</th>
+                                        <th>Title</th>
+                                        <th class="num">Sold Value (€)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sold-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Recent status changes -->
                 <div>
                     <h3 class="section-title">
@@ -357,6 +387,31 @@
                 </tr>`).join('')
                 : '<tr><td colspan="10" class="empty-cell">No agents found.</td></tr>';
 
+            // Sold properties
+            const soldBody = document.getElementById('sold-body');
+            const soldList = data.sold_properties || [];
+            window.currentSoldProperties = soldList;
+            if (soldBody) {
+                soldBody.innerHTML = soldList.length ? soldList.map(s => {
+                    const val = s.price ? '€' + Number(s.price).toLocaleString() : '—';
+                    return `
+                    <tr>
+                        <td>${fmtDate(s.sold_at)}</td>
+                        <td>${s.source || '—'}</td>
+                        <td>${s.location || '—'}</td>
+                        <td>${s.property_url
+                            ? `<a href="${s.property_url}" target="_blank" class="ref-link">${s.reference || 'Link'}</a>`
+                            : (s.reference || '—')}</td>
+                        <td style="max-width:250px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${s.title || ''}">${s.title || '—'}</td>
+                        <td class="num" style="font-weight:700; color:#10b981;">${val}</td>
+                    </tr>`;
+                }).join('')
+                : `<tr><td colspan="6" class="empty-cell">
+                       <i class="fas fa-tag" style="font-size:32px; opacity:.3; display:block; margin-bottom:12px;"></i>
+                       No properties sold within the selected date range.
+                   </td></tr>`;
+            }
+
             // Recent status changes
             const changesBody = document.getElementById('changes-body');
             const changes = data.recent_changes || [];
@@ -393,6 +448,29 @@
                 </tr>`).join('')
                 : '<tr><td colspan="9" class="empty-cell">No scrape runs recorded yet.</td></tr>';
         };
+
+        function exportSoldCSV() {
+            const list = window.currentSoldProperties || [];
+            if (!list.length) {
+                alert('No sold properties found in this date range to export.');
+                return;
+            }
+            let csv = 'Date Sold,Agent,Area / Location,Reference,Title,Sold Value (EUR)\n';
+            list.forEach(s => {
+                const dt = s.sold_at ? new Date(s.sold_at).toISOString().slice(0, 19).replace('T', ' ') : '';
+                const agent = `"${(s.source || '').replace(/"/g, '""')}"`;
+                const loc = `"${(s.location || '').replace(/"/g, '""')}"`;
+                const ref = `"${(s.reference || '').replace(/"/g, '""')}"`;
+                const title = `"${(s.title || '').replace(/"/g, '""')}"`;
+                const val = s.price || 0;
+                csv += `${dt},${agent},${loc},${ref},${title},${val}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `sold_properties_report_${new Date().toISOString().slice(0, 10)}.csv`;
+            link.click();
+        }
 
         document.getElementById('btn-apply').addEventListener('click', loadReport);
         document.getElementById('btn-reset').addEventListener('click', () => {

@@ -105,6 +105,24 @@ class S3Manager:
         except Exception as e:
             logging.error(f"Error uploading image {image_key}: {e}")
             return False
+            
+    def upload_file_object(self, file_obj, image_key: str, content_type: str = None) -> bool:
+        """Upload file-like object (e.g. Flask FileStorage) to S3"""
+        if not self.s3_client:
+            return False
+        try:
+            extra_args = {'ContentType': content_type} if content_type else {}
+            self.s3_client.upload_fileobj(
+                file_obj,
+                self.config.S3_BUCKET_NAME,
+                image_key,
+                ExtraArgs=extra_args
+            )
+            logging.info(f"File object uploaded successfully: {image_key}")
+            return True
+        except Exception as e:
+            logging.error(f"Error uploading file object {image_key}: {e}")
+            return False
     
     def delete_image(self, image_key: str) -> bool:
         """

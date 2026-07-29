@@ -4,6 +4,7 @@ from typing import List, Dict, Optional, Tuple
 import logging
 import time
 import datetime
+import uuid
 from config import Config
 
 class DatabaseManager:
@@ -908,6 +909,18 @@ class DatabaseManager:
             if filters.get('exclude_delisted'):
                 base_query += " AND property_status <> 'Delisted'"
 
+            # Market visibility filtering
+            vis = filters.get('market_visibility')
+            if vis and str(vis).strip().lower() in ('public', 'off_market'):
+                base_query += " AND market_visibility = %s"
+                params.append(str(vis).strip().lower())
+
+            # Source type filtering
+            stype = filters.get('source_type')
+            if stype and str(stype).strip().lower() in ('scraped', 'manual'):
+                base_query += " AND source_type = %s"
+                params.append(str(stype).strip().lower())
+
             # Agent / source filtering (exact match on the raw source value)
             sources = filters.get('sources') or filters.get('source')
             if sources:
@@ -966,7 +979,23 @@ class DatabaseManager:
                     status_last_changed_at,
                     created_at,
                     updated_at,
-                    sardo_reference
+                    sardo_reference,
+                    source_type,
+                    market_visibility,
+                    resort_area,
+                    sub_area,
+                    address,
+                    coordinates,
+                    construction_year,
+                    renovation_year,
+                    energy_rating,
+                    source_contact_name,
+                    source_contact_email,
+                    source_contact_phone,
+                    source_agent,
+                    introduced_by,
+                    date_introduced,
+                    notes
             """ + base_query
             
             # Add sorting with multiple criteria
@@ -982,14 +1011,15 @@ class DatabaseManager:
                 'bathrooms': 'bathrooms',
                 'living_area': 'living_area',
                 'land_area': 'land_area',
-                'source': 'source',
-                'created_at': 'created_at',
+                'website_source': 'source',
                 'property_status': 'property_status',
                 'first_seen_at': 'first_seen_at',
                 'last_seen_at': 'last_seen_at',
-                'status_last_changed_at': 'status_last_changed_at'
+                'status_last_changed_at': 'status_last_changed_at',
+                'created_at': 'created_at'
             }
             
+            # Default to created_at if invalid sort column
             db_sort_col = sort_column_map.get(sort_by, 'created_at')
             if sort_dir not in ['ASC', 'DESC']:
                 sort_dir = 'DESC'
@@ -1003,23 +1033,24 @@ class DatabaseManager:
                 # Push nulls to the bottom regardless of direction
                 query += f" ORDER BY {db_sort_col} {sort_dir} NULLS LAST, created_at DESC"
             
+            # Add secondary sort by id for consistent pagination
+            query += ", id DESC"
+            
             # Add pagination
             if limit is not None:
                 query += " LIMIT %s"
                 params.append(limit)
+                
             if offset is not None:
                 query += " OFFSET %s"
                 params.append(offset)
-            
+                
             cursor.execute(query, params)
-            properties = cursor.fetchall()
+            records = cursor.fetchall()
             cursor.close()
             
-            # Log the search for debugging
-            logging.info(f"Search executed with {len(params)} params, found {len(properties)} properties out of {total_count} total")
-            
             return {
-                'properties': [dict(prop) for prop in properties],
+                'properties': [dict(record) for record in records],
                 'total_count': total_count
             }
             
@@ -1028,7 +1059,15 @@ class DatabaseManager:
             return {'properties': [], 'total_count': 0}
     
     def get_property_by_id(self, property_id: str) -> Optional[Dict]:
-        """Get a specific property by ID"""
+        """
+        Get a single property by its ID
+        
+        Args:
+            property_id: ID of the property
+            
+        Returns:
+            Property dictionary or None if not found
+        """
         if not self.connection or self.connection.closed:
             if not self.connect():
                 return None
@@ -1055,7 +1094,23 @@ class DatabaseManager:
                     last_seen_at,
                     status_last_changed_at,
                     created_at,
-                    updated_at
+                    updated_at,
+                    source_type,
+                    market_visibility,
+                    resort_area,
+                    sub_area,
+                    address,
+                    coordinates,
+                    construction_year,
+                    renovation_year,
+                    energy_rating,
+                    source_contact_name,
+                    source_contact_email,
+                    source_contact_phone,
+                    source_agent,
+                    introduced_by,
+                    date_introduced,
+                    notes
                 FROM properties
                 WHERE id = %s
             """
@@ -1065,7 +1120,11 @@ class DatabaseManager:
             property_data = cursor.fetchone()
             cursor.close()
             
-            return dict(property_data) if property_data else None
+            if not property_data:
+                return None
+            data = dict(property_data)
+            data['documents'] = self.get_property_documents(property_id)
+            return data
             
         except Exception as e:
             logging.error(f"Error fetching property {property_id}: {e}")
@@ -1269,6 +1328,29 @@ class DatabaseManager:
                 LIMIT 100
             """, history_params)
             report['recent_changes'] = [dict(r) for r in cursor.fetchall()]
+
+            # Properties sold within date range (client reporting requirement)
+            sold_clause = ""
+            sold_params = []
+            if date_from:
+                sold_clause += " AND sold_at >= %s::timestamp"
+                sold_params.append(date_from)
+            if date_to:
+                sold_clause += " AND sold_at < (%s::date + INTERVAL '1 day')"
+                sold_params.append(date_to)
+
+            try:
+                cursor.execute(f"""
+                    SELECT reference, title, price, location, source, sold_at, property_url
+                    FROM properties
+                    WHERE property_status = 'Sold' AND sold_at IS NOT NULL {sold_clause}
+                    ORDER BY sold_at DESC
+                    LIMIT 500
+                """, sold_params)
+                report['sold_properties'] = [dict(r) for r in cursor.fetchall()]
+            except Exception as ex:
+                logging.warning(f"Could not query sold_properties: {ex}")
+                report['sold_properties'] = []
 
             cursor.close()
             return report
@@ -1534,3 +1616,404 @@ class DatabaseManager:
             except Exception:
                 pass
             return 0
+
+    def create_manual_property(self, data: Dict, user_id: int, force: bool = False) -> Dict:
+        """Create a new manual off-market property with duplicate detection."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return {'success': False, 'error': 'Database connection failed'}
+                
+        try:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            property_type = data.get('property_type', 'Villa')
+            bedrooms = data.get('bedrooms')
+            try:
+                bedrooms_int = int(bedrooms) if bedrooms is not None and str(bedrooms).strip() != '' else None
+            except ValueError:
+                bedrooms_int = None
+                
+            price = data.get('price')
+            try:
+                price = int(float(price)) if price is not None and str(price).strip() != '' else None
+            except ValueError:
+                price = None
+
+            location = data.get('location', '').strip()
+            coordinates = data.get('coordinates', '').strip()
+
+            # Duplicate listing detection (spec section 5)
+            if not force and not data.get('confirm_duplicate'):
+                dup_conditions = ["property_type = %s", "source_type = 'scraped'"]
+                dup_params = [property_type]
+                
+                if bedrooms_int is not None:
+                    dup_conditions.append("bedrooms::varchar = %s")
+                    dup_params.append(str(bedrooms_int))
+                    
+                if price is not None and price > 0:
+                    dup_conditions.append("price >= %s AND price <= %s")
+                    dup_params.extend([int(price * 0.95), int(price * 1.05)])
+                    
+                loc_conds = []
+                if location:
+                    loc_conds.append("location ILIKE %s")
+                    dup_params.append(f"%{location}%")
+                if coordinates:
+                    loc_conds.append("coordinates = %s")
+                    dup_params.append(coordinates)
+                if loc_conds:
+                    dup_conditions.append(f"({' OR '.join(loc_conds)})")
+                    
+                if len(dup_conditions) > 2:  # Ensure we have more than just type + source
+                    dup_query = f"SELECT id, title, location, price, property_url FROM properties WHERE {' AND '.join(dup_conditions)} LIMIT 5"
+                    cursor.execute(dup_query, dup_params)
+                    matches = cursor.fetchall()
+                    if matches:
+                        cursor.close()
+                        return {
+                            'success': False,
+                            'duplicate_warning': True,
+                            'matches': [dict(m) for m in matches],
+                            'message': f"Notice: {len(matches)} similar public listing(s) exist in this area. Proceed with creation?"
+                        }
+
+            # Generate synthetic URL and unique reference
+            prop_uuid = str(uuid.uuid4())
+            property_url = f"sardo://manual/{prop_uuid}"
+            
+            reference = data.get('reference', '').strip()
+            if not reference:
+                reference = f"SARDO-OM-{prop_uuid[:8].upper()}"
+
+            # Helper for numeric conversion
+            def to_int(val):
+                try: return int(float(val)) if val is not None and str(val).strip() != '' else None
+                except: return None
+
+            def to_str(val):
+                if val is None: return None
+                s = str(val).strip()
+                if s == '' or s == 'None': return None
+                try:
+                    f = float(s)
+                    if f == int(f): return str(int(f))
+                except:
+                    pass
+                return s
+
+            now_dt = datetime.datetime.now()
+            status = data.get('property_status', 'Off Market')
+            sold_at = now_dt if status == 'Sold' else None
+            
+            insert_query = """
+                INSERT INTO properties (
+                    id, title, property_type, location, price, bedrooms, bathrooms,
+                    living_area, land_area, source, reference, property_url,
+                    property_status, raw_status_text, source_type, market_visibility,
+                    resort_area, sub_area, address, coordinates, construction_year,
+                    renovation_year, energy_rating, source_contact_name,
+                    source_contact_email, source_contact_phone, source_agent,
+                    introduced_by, date_introduced, notes, created_at, updated_at,
+                    first_seen_at, last_seen_at, status_last_changed_at, sold_at
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s
+                ) RETURNING id;
+            """
+            
+            params = (
+                prop_uuid,
+                data.get('title', 'Untitled Off-Market Opportunity'),
+                property_type,
+                location,
+                to_int(price),
+                to_str(bedrooms),
+                to_str(data.get('bathrooms')),
+                to_str(data.get('living_area') or data.get('build_size')),
+                to_str(data.get('land_area') or data.get('plot_size')),
+                'Manual / Off-Market',
+                reference,
+                property_url,
+                status,
+                'Manual Off-Market Creation',
+                'manual',
+                data.get('market_visibility', 'off_market'),
+                data.get('resort_area'),
+                data.get('sub_area'),
+                data.get('address'),
+                coordinates,
+                str(data.get('construction_year')) if data.get('construction_year') else None,
+                str(data.get('renovation_year')) if data.get('renovation_year') else None,
+                str(data.get('energy_rating')) if data.get('energy_rating') else None,
+                data.get('source_contact_name'),
+                data.get('source_contact_email'),
+                data.get('source_contact_phone'),
+                data.get('source_agent'),
+                data.get('introduced_by'),
+                data.get('date_introduced') or now_dt,
+                data.get('notes'),
+                now_dt, now_dt, now_dt, now_dt, now_dt, sold_at
+            )
+            
+            cursor.execute(insert_query, params)
+            ret_id = cursor.fetchone()['id']
+            cursor.close()
+            
+            self._cache.pop('locations', None)
+            self._cache.pop('property_types', None)
+            self._cache.pop('statistics', None)
+            
+            logging.info(f"Created manual property {ret_id} ({reference}) by user {user_id}")
+            return {'success': True, 'property_id': str(ret_id), 'reference': reference}
+            
+        except Exception as e:
+            logging.error(f"Error creating manual property: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def update_manual_property(self, property_id: str, data: Dict, user_id: int) -> Dict:
+        """Update an existing manual property and audit status/price changes."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return {'success': False, 'error': 'Database connection failed'}
+                
+        try:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("SELECT * FROM properties WHERE id = %s", (property_id,))
+            existing = cursor.fetchone()
+            if not existing:
+                cursor.close()
+                return {'success': False, 'error': 'Property not found'}
+                
+            if existing.get('source_type') != 'manual':
+                cursor.close()
+                return {'success': False, 'error': 'Only manual properties can be updated via this endpoint'}
+                
+            old_status = existing.get('property_status')
+            new_status = data.get('property_status', old_status)
+            
+            old_price = existing.get('price')
+            try:
+                new_price = float(data.get('price')) if data.get('price') is not None and str(data.get('price')).strip() != '' else None
+            except ValueError:
+                new_price = old_price
+
+            now_dt = datetime.datetime.now()
+            
+            status_changed = (old_status != new_status)
+            price_changed = (old_price != new_price)
+            
+            if status_changed or price_changed:
+                audit_text = 'Manual Admin Update'
+                if price_changed:
+                    audit_text += f" (Price: {old_price} -> {new_price})"
+                if status_changed:
+                    audit_text += f" (Status: {old_status} -> {new_status})"
+                    
+                audit_sql = """
+                    INSERT INTO property_status_history (
+                        property_id, previous_status, new_status, changed_at, raw_status_text, created_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s)
+                """
+                cursor.execute(audit_sql, (property_id, old_status, new_status, now_dt, audit_text, now_dt))
+
+            def to_int(val):
+                try: return int(float(val)) if val is not None and str(val).strip() != '' else None
+                except: return None
+
+            def to_str(val):
+                if val is None: return None
+                s = str(val).strip()
+                if s == '' or s == 'None': return None
+                try:
+                    f = float(s)
+                    if f == int(f): return str(int(f))
+                except:
+                    pass
+                return s
+
+            update_sql = """
+                UPDATE properties SET
+                    title = %s,
+                    property_type = %s,
+                    location = %s,
+                    price = %s,
+                    bedrooms = %s,
+                    bathrooms = %s,
+                    living_area = %s,
+                    land_area = %s,
+                    property_status = %s,
+                    previous_status = CASE WHEN %s THEN %s ELSE previous_status END,
+                    status_last_changed_at = CASE WHEN %s THEN %s ELSE status_last_changed_at END,
+                    sold_at = CASE WHEN %s THEN %s ELSE sold_at END,
+                    market_visibility = %s,
+                    resort_area = %s,
+                    sub_area = %s,
+                    address = %s,
+                    coordinates = %s,
+                    construction_year = %s,
+                    renovation_year = %s,
+                    energy_rating = %s,
+                    source_contact_name = %s,
+                    source_contact_email = %s,
+                    source_contact_phone = %s,
+                    source_agent = %s,
+                    introduced_by = %s,
+                    notes = %s,
+                    updated_at = %s
+                WHERE id = %s
+            """
+            
+            params = (
+                data.get('title', existing.get('title')),
+                data.get('property_type', existing.get('property_type')),
+                data.get('location', existing.get('location')),
+                new_price,
+                to_str(data.get('bedrooms', existing.get('bedrooms'))),
+                to_str(data.get('bathrooms', existing.get('bathrooms'))),
+                to_str(data.get('living_area', existing.get('living_area')) or data.get('build_size')),
+                to_str(data.get('land_area', existing.get('land_area')) or data.get('plot_size')),
+                new_status,
+                status_changed, old_status,
+                status_changed, now_dt,
+                status_changed and new_status == 'Sold' and not existing.get('sold_at'), now_dt,
+                data.get('market_visibility', existing.get('market_visibility') or 'off_market'),
+                data.get('resort_area', existing.get('resort_area')),
+                data.get('sub_area', existing.get('sub_area')),
+                data.get('address', existing.get('address')),
+                data.get('coordinates', existing.get('coordinates')),
+                str(data.get('construction_year')) if data.get('construction_year') else existing.get('construction_year'),
+                str(data.get('renovation_year')) if data.get('renovation_year') else existing.get('renovation_year'),
+                str(data.get('energy_rating')) if data.get('energy_rating') else existing.get('energy_rating'),
+                data.get('source_contact_name', existing.get('source_contact_name')),
+                data.get('source_contact_email', existing.get('source_contact_email')),
+                data.get('source_contact_phone', existing.get('source_contact_phone')),
+                data.get('source_agent', existing.get('source_agent')),
+                data.get('introduced_by', existing.get('introduced_by')),
+                data.get('notes', existing.get('notes')),
+                now_dt,
+                property_id
+            )
+            
+            cursor.execute(update_sql, params)
+            cursor.close()
+            
+            self._cache.pop('locations', None)
+            self._cache.pop('property_types', None)
+            self._cache.pop('statistics', None)
+            
+            logging.info(f"Updated manual property {property_id} by user {user_id}")
+            return {'success': True, 'property_id': property_id}
+            
+        except Exception as e:
+            logging.error(f"Error updating manual property {property_id}: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def delete_manual_property(self, property_id: str) -> Dict:
+        """Delete a manual off-market property."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return {'success': False, 'error': 'Database connection failed'}
+                
+        try:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("SELECT * FROM properties WHERE id = %s", (property_id,))
+            existing = cursor.fetchone()
+            if not existing:
+                cursor.close()
+                return {'success': False, 'error': 'Property not found'}
+                
+            if existing.get('source_type') != 'manual':
+                cursor.close()
+                return {'success': False, 'error': 'Cannot delete scraped listings manually'}
+                
+            cursor.execute("DELETE FROM properties WHERE id = %s AND source_type = 'manual'", (property_id,))
+            cursor.close()
+            
+            self._cache.pop('locations', None)
+            self._cache.pop('property_types', None)
+            self._cache.pop('statistics', None)
+            
+            logging.info(f"Deleted manual property {property_id}")
+            return {'success': True}
+            
+        except Exception as e:
+            logging.error(f"Error deleting manual property {property_id}: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def add_property_document(self, property_id: str, doc_type: str, file_name: str, file_url: str, user_id: int, notes: str = None) -> Dict:
+        """Add a media/document record for a property."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return {'success': False, 'error': 'Database connection failed'}
+                
+        try:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            cursor.execute("SELECT image_filename FROM properties WHERE id = %s", (property_id,))
+            prop = cursor.fetchone()
+            if not prop:
+                cursor.close()
+                return {'success': False, 'error': 'Property not found'}
+                
+            insert_sql = """
+                INSERT INTO property_documents (
+                    property_id, document_type, file_name, file_url, uploaded_by, uploaded_at, notes
+                ) VALUES (%s, %s, %s, %s, %s, now(), %s)
+                RETURNING id
+            """
+            cursor.execute(insert_sql, (property_id, doc_type or 'Image', file_name, file_url, user_id, notes))
+            doc_id = cursor.fetchone()['id']
+            
+            if doc_type == 'Image' or not doc_type or not prop.get('image_filename'):
+                cursor.execute("UPDATE properties SET image_filename = %s WHERE id = %s", (file_url, property_id))
+                
+            cursor.close()
+            return {'success': True, 'doc_id': doc_id, 'file_url': file_url, 'file_name': file_name}
+            
+        except Exception as e:
+            logging.error(f"Error adding property document: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def get_property_documents(self, property_id: str) -> List[Dict]:
+        """Get all uploaded documents/media for a property."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return []
+                
+        try:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("SELECT * FROM property_documents WHERE property_id = %s ORDER BY uploaded_at DESC", (property_id,))
+            docs = cursor.fetchall()
+            cursor.close()
+            return [dict(d) for d in docs]
+        except Exception as e:
+            logging.error(f"Error fetching property documents for {property_id}: {e}")
+            return []
+
+    def delete_property_document(self, doc_id: int) -> Dict:
+        """Delete a property document record."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return {'success': False, 'error': 'Database connection failed'}
+                
+        try:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("SELECT * FROM property_documents WHERE id = %s", (doc_id,))
+            doc = cursor.fetchone()
+            if not doc:
+                cursor.close()
+                return {'success': False, 'error': 'Document not found'}
+                
+            cursor.execute("DELETE FROM property_documents WHERE id = %s", (doc_id,))
+            cursor.close()
+            return {'success': True, 'document': dict(doc)}
+        except Exception as e:
+            logging.error(f"Error deleting property document {doc_id}: {e}")
+            return {'success': False, 'error': str(e)}

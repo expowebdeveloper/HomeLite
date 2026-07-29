@@ -13,6 +13,7 @@ import tempfile
 from functools import wraps
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import check_password_hash
+from werkzeug.utils import secure_filename
 import bcrypt
 import jwt
 from user_agents import parse
@@ -1147,9 +1148,16 @@ def search_properties():
         if prop.get('image_filename'):
             s3_key = prop['image_filename']
             source = prop.get('website_source')
-            if source:
+            if prop.get('source_type') == 'manual' or source == 'Manual / Off-Market':
+                if s3_key.startswith('http'):
+                    prop['image_url'] = s3_key
+                else:
+                    prop['image_url'] = s3_manager.get_image_url(s3_key)
+            elif source:
                 s3_key = f"properties/{source}/{prop['image_filename']}"
-            prop['image_url'] = s3_manager.get_image_url(s3_key)
+                prop['image_url'] = s3_manager.get_image_url(s3_key)
+            else:
+                prop['image_url'] = s3_manager.get_image_url(s3_key)
         else:
             prop['image_url'] = None
             
@@ -1169,6 +1177,104 @@ def search_properties():
         'page': page,
         'limit': limit
     })
+
+@app.route('/api/properties/<property_id>', methods=['GET'])
+@login_required
+def get_property_detail(property_id):
+    prop = db_manager.get_property_by_id(property_id)
+    if not prop:
+        return jsonify({'error': 'Property not found'}), 404
+    if prop.get('image_filename'):
+        s3_key = prop['image_filename']
+        source = prop.get('website_source')
+        if prop.get('source_type') == 'manual' or source == 'Manual / Off-Market':
+            prop['image_url'] = s3_key if s3_key.startswith('http') else s3_manager.get_image_url(s3_key)
+        elif source:
+            prop['image_url'] = s3_manager.get_image_url(f"properties/{source}/{s3_key}")
+        else:
+            prop['image_url'] = s3_manager.get_image_url(s3_key)
+    else:
+        prop['image_url'] = None
+    return jsonify(prop)
+
+@app.route('/api/properties/manual', methods=['POST'])
+@login_required
+def create_manual_property_endpoint():
+    data = request.json or {}
+    force = data.get('confirm_duplicate', False)
+    user_id = int(current_user.id) if hasattr(current_user, 'id') else 0
+    res = db_manager.create_manual_property(data, user_id=user_id, force=force)
+    if not res.get('success'):
+        if res.get('duplicate_warning'):
+            return jsonify(res), 409
+        return jsonify(res), 400
+    return jsonify(res), 201
+
+@app.route('/api/properties/manual/<property_id>', methods=['PUT'])
+@login_required
+def update_manual_property_endpoint(property_id):
+    data = request.json or {}
+    user_id = int(current_user.id) if hasattr(current_user, 'id') else 0
+    res = db_manager.update_manual_property(property_id, data, user_id=user_id)
+    if not res.get('success'):
+        return jsonify(res), 400
+    return jsonify(res)
+
+@app.route('/api/properties/manual/<property_id>', methods=['DELETE'])
+@login_required
+def delete_manual_property_endpoint(property_id):
+    res = db_manager.delete_manual_property(property_id)
+    if not res.get('success'):
+        return jsonify(res), 400
+    return jsonify(res)
+
+@app.route('/api/properties/<property_id>/documents', methods=['POST'])
+@login_required
+def upload_property_document_endpoint(property_id):
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file part provided'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': 'No file selected'}), 400
+        
+    doc_type = request.form.get('document_type', 'Image')
+    notes = request.form.get('notes', '')
+    user_id = int(current_user.id) if hasattr(current_user, 'id') else 0
+    
+    filename = secure_filename(file.filename)
+    timestamp = int(time.time())
+    s3_key = f"properties/manual/{property_id}/{timestamp}_{filename}"
+    
+    upload_ok = s3_manager.upload_file_object(file, s3_key, content_type=file.content_type)
+    if not upload_ok:
+        return jsonify({'success': False, 'error': 'Failed to upload file to S3'}), 500
+        
+    res = db_manager.add_property_document(property_id, doc_type, filename, s3_key, user_id=user_id, notes=notes)
+    if not res.get('success'):
+        return jsonify(res), 400
+        
+    res['display_url'] = s3_manager.get_image_url(s3_key)
+    return jsonify(res), 201
+
+@app.route('/api/properties/<property_id>/documents', methods=['GET'])
+@login_required
+def get_property_documents_endpoint(property_id):
+    docs = db_manager.get_property_documents(property_id)
+    for d in docs:
+        if d.get('file_url'):
+            d['display_url'] = s3_manager.get_image_url(d['file_url']) if not d['file_url'].startswith('http') else d['file_url']
+    return jsonify({'documents': docs})
+
+@app.route('/api/properties/documents/<int:doc_id>', methods=['DELETE'])
+@login_required
+def delete_property_document_endpoint(doc_id):
+    res = db_manager.delete_property_document(doc_id)
+    if not res.get('success'):
+        return jsonify(res), 400
+    doc = res.get('document', {})
+    if doc.get('file_url') and not doc['file_url'].startswith('http'):
+        s3_manager.delete_image(doc['file_url'])
+    return jsonify(res)
 
 @app.route('/reports')
 @login_required

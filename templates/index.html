@@ -30,8 +30,13 @@
                     <span class="stat-value" id="stat-avg">--</span>
                 </div>
 
+                <button class="btn btn-secondary" id="btn-add-off-market" onclick="openCreateManualModal()"
+                        style="display: flex; align-items: center; gap: 8px; margin-left: 15px;">
+                    <i class="fas fa-plus-circle" style="color: var(--accent-color);"></i> Add Off-Market Property
+                </button>
+
                 <a href="{{ url_for('scraper_logs') }}" class="btn btn-secondary" id="btn-scraper-logs"
-                   style="text-decoration: none; display: flex; align-items: center; gap: 8px; margin-left: 20px; position: relative;">
+                   style="text-decoration: none; display: flex; align-items: center; gap: 8px; margin-left: 15px; position: relative;">
                     <i class="fas fa-terminal"></i> Scraper Logs
                     <span id="scraper-live-dot" style="display:none; width:8px; height:8px; border-radius:50%; background:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,.2);"></span>
                 </a>
@@ -146,6 +151,24 @@
                         <!-- Populated via JS -->
                     </select>
                     <small>Hold Ctrl/Cmd to select multiple</small>
+                </div>
+
+                <div class="filter-section">
+                    <label>Market Visibility</label>
+                    <select id="filter-visibility" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: white;">
+                        <option value="all">All Properties</option>
+                        <option value="public">Public Only</option>
+                        <option value="off_market">Off-Market Only</option>
+                    </select>
+                </div>
+
+                <div class="filter-section">
+                    <label>Source Type</label>
+                    <select id="filter-source-type" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: white;">
+                        <option value="all">All Sources</option>
+                        <option value="scraped">Scraped Listings</option>
+                        <option value="manual">Manual / Off-Market</option>
+                    </select>
                 </div>
 
                 <div class="filter-section">
@@ -369,6 +392,209 @@
         </div>
     </div>
 
+    <!-- Manual Off-Market Property Modal (Application Default Theme) -->
+    <div id="manual-property-modal" class="modal-overlay" style="display:none; z-index: 1500; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(5px);">
+        <div class="modal-content" style="max-width: 900px; padding: 0; max-height: 90vh; overflow-y: auto; background: #ffffff; color: var(--text-primary); border-radius: var(--border-radius-lg); border: 1px solid var(--border-color); box-shadow: var(--shadow-hover);">
+            <!-- Modal Header -->
+            <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 24px 30px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; position: relative;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div style="width: 48px; height: 48px; border-radius: 12px; background: var(--primary-color); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: var(--shadow-md);">
+                        <i class="fas fa-user-secret"></i>
+                    </div>
+                    <div>
+                        <h2 id="manual-modal-title" style="margin: 0; font-size: 22px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.5px;">Add VIP Off-Market Asset</h2>
+                        <p id="manual-modal-subtitle" style="margin: 4px 0 0; font-size: 13px; color: var(--text-secondary);">Confidential property registration & private client portfolio management</p>
+                    </div>
+                </div>
+                <span class="close-modal" onclick="closeManualPropertyModal()" style="color: var(--text-secondary); font-size: 28px; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='var(--danger-color)'" onmouseout="this.style.color='var(--text-secondary)'">&times;</span>
+            </div>
+
+            <form id="manual-property-form" onsubmit="handleManualPropertySubmit(event)" style="padding: 30px;">
+                <input type="hidden" id="manual-prop-id" value="">
+                
+                <!-- Section 1: Core Specs Card -->
+                <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 22px; margin-bottom: 24px; box-shadow: var(--shadow-sm);">
+                    <h3 style="font-size: 14px; font-weight: 700; margin: 0 0 18px 0; color: var(--primary-color); display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                        <i class="fas fa-gem" style="color: var(--accent-color);"></i> Core Specifications
+                    </h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div style="grid-column: span 2;">
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Listing Title *</label>
+                            <input type="text" id="manual-title" required placeholder="e.g. Exclusive Modern Villa with Panoramic Ocean Views" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none; transition: all 0.2s;" onfocus="this.style.borderColor='var(--accent-color)'; this.style.boxShadow='0 0 0 3px rgba(99, 102, 241, 0.1)'" onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='none'">
+                        </div>
+
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Property Type *</label>
+                            <select id="manual-type" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='#cbd5e1'">
+                                <option value="Villa">Villa</option>
+                                <option value="Apartment">Apartment</option>
+                                <option value="Townhouse">Townhouse</option>
+                                <option value="Plot">Plot</option>
+                                <option value="Commercial">Commercial</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Status *</label>
+                            <select id="manual-status" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='#cbd5e1'">
+                                <option value="Off Market">Off Market</option>
+                                <option value="For Sale">For Sale</option>
+                                <option value="Under Offer">Under Offer</option>
+                                <option value="Sold">Sold</option>
+                                <option value="Withdrawn">Withdrawn</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Price (€)</label>
+                            <input type="number" id="manual-price" placeholder="e.g. 2500000" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='var(--accent-color)'; this.style.boxShadow='0 0 0 3px rgba(99, 102, 241, 0.1)'" onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='none'">
+                        </div>
+
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Market Visibility</label>
+                            <select id="manual-visibility" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='#cbd5e1'">
+                                <option value="off_market">Off-Market (Confidential)</option>
+                                <option value="public">Public</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Bedrooms</label>
+                            <input type="number" id="manual-bedrooms" placeholder="e.g. 5" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Bathrooms</label>
+                            <input type="number" id="manual-bathrooms" placeholder="e.g. 6" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Living Area (m²)</label>
+                            <input type="number" id="manual-living" placeholder="e.g. 450" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Land / Plot Area (m²)</label>
+                            <input type="number" id="manual-land" placeholder="e.g. 3000" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Location & Architectural Card -->
+                <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 22px; margin-bottom: 24px; box-shadow: var(--shadow-sm);">
+                    <h3 style="font-size: 14px; font-weight: 700; margin: 0 0 18px 0; color: var(--primary-color); display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                        <i class="fas fa-map-marked-alt" style="color: #0284c7;"></i> Location & Architectural Specs
+                    </h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Location</label>
+                            <input type="text" id="manual-location" placeholder="e.g. Quinta do Lago" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Resort Area</label>
+                            <input type="text" id="manual-resort-area" placeholder="e.g. Vale do Lobo" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Sub Area</label>
+                            <input type="text" id="manual-sub-area" placeholder="e.g. Ocean Club" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div style="grid-column: span 2;">
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Confidential Address</label>
+                            <input type="text" id="manual-address" placeholder="Full street address (kept private)" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">GPS Coordinates</label>
+                            <input type="text" id="manual-coordinates" placeholder="37.0500, -8.0200" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Construction Year</label>
+                            <input type="number" id="manual-construction-year" placeholder="2022" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Renovation Year</label>
+                            <input type="number" id="manual-renovation-year" placeholder="2025" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Energy Rating</label>
+                            <input type="text" id="manual-energy-rating" placeholder="A+" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Source & Contact Card -->
+                <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 22px; margin-bottom: 24px; box-shadow: var(--shadow-sm);">
+                    <h3 style="font-size: 14px; font-weight: 700; margin: 0 0 18px 0; color: var(--primary-color); display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                        <i class="fas fa-handshake" style="color: #7c3aed;"></i> Confidential Source & Introducer
+                    </h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Source Contact Name</label>
+                            <input type="text" id="manual-contact-name" placeholder="e.g. Client / Owner Name" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Source Contact Email</label>
+                            <input type="email" id="manual-contact-email" placeholder="owner@private.com" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Source Contact Phone</label>
+                            <input type="text" id="manual-contact-phone" placeholder="+351 912 345 678" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Source Agency / Partner</label>
+                            <input type="text" id="manual-source-agent" placeholder="e.g. Private Advisory" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Introduced By</label>
+                            <input type="text" id="manual-introduced-by" placeholder="e.g. VIP Referral" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Reference ID (Optional)</label>
+                            <input type="text" id="manual-reference" placeholder="Auto-generated if left blank" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 4: Notes & Media Card -->
+                <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 22px; margin-bottom: 24px; box-shadow: var(--shadow-sm);">
+                    <h3 style="font-size: 14px; font-weight: 700; margin: 0 0 18px 0; color: var(--primary-color); display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                        <i class="fas fa-file-contract" style="color: var(--success-color);"></i> Confidential Notes & Attached Media
+                    </h3>
+                    <div style="margin-bottom: 20px;">
+                        <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Internal Advisory Notes</label>
+                        <textarea id="manual-notes" rows="3" placeholder="Internal viewing instructions, owner terms, price negotiation flexibility..." style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; font-family: inherit; outline: none; transition: all 0.2s;" onfocus="this.style.borderColor='var(--success-color)'" onblur="this.style.borderColor='#cbd5e1'"></textarea>
+                    </div>
+
+                    <!-- Documents & Media Section -->
+                    <div id="manual-docs-section" style="border-top: 1px dashed var(--border-color); padding-top: 18px;">
+                        <label style="font-weight: 600; font-size: 12px; margin-bottom: 10px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Upload Photos / Brochures / Floorplans</label>
+                        <div style="display: flex; gap: 12px; margin-bottom: 16px; align-items: center; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+                            <input type="file" id="manual-file-input" style="border: none; color: var(--text-secondary); font-size: 13px; flex: 1;">
+                            <select id="manual-file-type" style="padding: 8px 12px; background: #ffffff; color: var(--text-primary); border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none;">
+                                <option value="Image">Image / Photo</option>
+                                <option value="Brochure">Brochure (PDF)</option>
+                                <option value="Floorplan">Floorplan</option>
+                                <option value="Contract">Contract</option>
+                                <option value="Other">Other Document</option>
+                            </select>
+                        </div>
+                        <div id="manual-docs-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;"></div>
+                    </div>
+                </div>
+
+                <!-- Footer Bar -->
+                <div style="display: flex; justify-content: flex-end; gap: 14px; border-top: 1px solid var(--border-color); padding-top: 24px; align-items: center;">
+                    <button type="button" onclick="closeManualPropertyModal()" style="background: transparent; border: 1px solid #cbd5e1; color: var(--text-secondary); padding: 11px 22px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#f1f5f9'; this.style.color='var(--text-primary)'" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)'">
+                        Cancel
+                    </button>
+                    <button type="submit" id="btn-save-manual" style="background: var(--primary-color); color: #ffffff; padding: 12px 28px; border: none; border-radius: 8px; font-weight: 700; font-size: 15px; cursor: pointer; box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 8px; transition: all 0.2s;" onmouseover="this.style.background='var(--secondary-color)'" onmouseout="this.style.background='var(--primary-color)'">
+                        <i class="fas fa-save"></i> Save VIP Asset
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="/static/js/main.js?v=3.3"></script>
     <script>
         // Simple Toast logic
@@ -569,6 +795,304 @@
 
         function closeMfaModal() {
             document.getElementById('mfa-setup-modal').style.display = 'none';
+        }
+
+        // Manual Off-Market Property UI Logic
+        function openCreateManualModal() {
+            document.getElementById('manual-modal-title').innerHTML = 'Add VIP Off-Market Asset';
+            const sub = document.getElementById('manual-modal-subtitle');
+            if (sub) sub.innerText = 'Confidential property registration & private client portfolio management';
+            document.getElementById('manual-property-form').reset();
+            document.getElementById('manual-prop-id').value = '';
+            document.getElementById('manual-docs-section').style.display = 'block';
+            document.getElementById('manual-docs-list').innerHTML = '<div style="color:var(--text-secondary); font-size:13px; grid-column: 1/-1;">Select files above. They will be uploaded automatically when you save the property.</div>';
+            document.getElementById('manual-property-modal').style.display = 'flex';
+        }
+
+        async function openEditManualModal(id) {
+            const propModal = document.getElementById('property-modal');
+            if (propModal) propModal.style.display = 'none';
+            
+            document.getElementById('manual-modal-title').innerHTML = 'Edit VIP Off-Market Asset';
+            const sub = document.getElementById('manual-modal-subtitle');
+            if (sub) sub.innerText = 'Updating confidential listing details & attached media';
+            document.getElementById('manual-property-form').reset();
+            document.getElementById('manual-prop-id').value = id;
+
+            try {
+                const res = await fetch(`/api/properties/${id}`);
+                if (!res.ok) throw new Error('Failed to load property');
+                const p = await res.json();
+                
+                document.getElementById('manual-title').value = p.title || '';
+                document.getElementById('manual-type').value = p.property_type || 'Villa';
+                document.getElementById('manual-status').value = p.property_status || 'Off Market';
+                document.getElementById('manual-price').value = p.property_price || '';
+                document.getElementById('manual-visibility').value = p.market_visibility || 'off_market';
+                document.getElementById('manual-bedrooms').value = p.num_beds || '';
+                document.getElementById('manual-bathrooms').value = p.num_baths || '';
+                document.getElementById('manual-living').value = p.living_area || '';
+                document.getElementById('manual-land').value = p.land_area || '';
+                document.getElementById('manual-location').value = p.location || '';
+                document.getElementById('manual-resort-area').value = p.resort_area || '';
+                document.getElementById('manual-sub-area').value = p.sub_area || '';
+                document.getElementById('manual-address').value = p.address || '';
+                document.getElementById('manual-coordinates').value = p.coordinates || '';
+                document.getElementById('manual-construction-year').value = p.construction_year || '';
+                document.getElementById('manual-renovation-year').value = p.renovation_year || '';
+                document.getElementById('manual-energy-rating').value = p.energy_rating || '';
+                document.getElementById('manual-contact-name').value = p.source_contact_name || '';
+                document.getElementById('manual-contact-email').value = p.source_contact_email || '';
+                document.getElementById('manual-contact-phone').value = p.source_contact_phone || '';
+                document.getElementById('manual-source-agent').value = p.source_agent || '';
+                document.getElementById('manual-introduced-by').value = p.introduced_by || '';
+                document.getElementById('manual-reference').value = p.reference || '';
+                document.getElementById('manual-notes').value = p.notes || '';
+
+                document.getElementById('manual-docs-section').style.display = 'block';
+                loadManualDocuments(id);
+                document.getElementById('manual-property-modal').style.display = 'flex';
+            } catch (err) {
+                showToast('Error', err.message, 'error');
+            }
+        }
+
+        function closeManualPropertyModal() {
+            document.getElementById('manual-property-modal').style.display = 'none';
+        }
+
+        async function handleManualPropertySubmit(event, confirmDuplicate = false) {
+            if (event && event.preventDefault) event.preventDefault();
+            
+            const id = document.getElementById('manual-prop-id').value;
+            const isEdit = !!id;
+
+            const payload = {
+                title: document.getElementById('manual-title').value.trim(),
+                property_type: document.getElementById('manual-type').value,
+                property_status: document.getElementById('manual-status').value,
+                price: parseFloat(document.getElementById('manual-price').value) || 0,
+                market_visibility: document.getElementById('manual-visibility').value,
+                bedrooms: parseInt(document.getElementById('manual-bedrooms').value) || 0,
+                bathrooms: parseInt(document.getElementById('manual-bathrooms').value) || 0,
+                living_area: parseFloat(document.getElementById('manual-living').value) || null,
+                land_area: parseFloat(document.getElementById('manual-land').value) || null,
+                location: document.getElementById('manual-location').value.trim(),
+                resort_area: document.getElementById('manual-resort-area').value.trim(),
+                sub_area: document.getElementById('manual-sub-area').value.trim(),
+                address: document.getElementById('manual-address').value.trim(),
+                coordinates: document.getElementById('manual-coordinates').value.trim(),
+                construction_year: parseInt(document.getElementById('manual-construction-year').value) || null,
+                renovation_year: parseInt(document.getElementById('manual-renovation-year').value) || null,
+                energy_rating: document.getElementById('manual-energy-rating').value.trim(),
+                source_contact_name: document.getElementById('manual-contact-name').value.trim(),
+                source_contact_email: document.getElementById('manual-contact-email').value.trim(),
+                source_contact_phone: document.getElementById('manual-contact-phone').value.trim(),
+                source_agent: document.getElementById('manual-source-agent').value.trim(),
+                introduced_by: document.getElementById('manual-introduced-by').value.trim(),
+                reference: document.getElementById('manual-reference').value.trim(),
+                notes: document.getElementById('manual-notes').value.trim(),
+                confirm_duplicate: confirmDuplicate
+            };
+
+            const url = isEdit ? `/api/properties/manual/${id}` : '/api/properties/manual';
+            const method = isEdit ? 'PUT' : 'POST';
+
+            try {
+                const res = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await res.json();
+
+                if (res.status === 409 && data.duplicate_warning) {
+                    const confirmed = await sardoConfirm({
+                        title: 'Potential Duplicate Detected',
+                        body: `Similar public listing(s) found in this location with similar specs.<br><br><strong>${data.error || 'Duplicate detected'}</strong><br><br>Are you sure you want to proceed creating this off-market property?`,
+                        confirmText: 'Proceed Anyway',
+                        cancelText: 'Cancel',
+                        type: 'warning'
+                    });
+                    if (confirmed) {
+                        return handleManualPropertySubmit(event, true);
+                    }
+                    return;
+                }
+
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to save property.');
+                }
+
+                showToast('Success', isEdit ? 'Property updated successfully.' : 'Property created successfully.', 'success');
+                
+                const btnSearch = document.getElementById('btn-search');
+                if (btnSearch) btnSearch.click();
+
+                const fileInput = document.getElementById('manual-file-input');
+                const savedPropId = isEdit ? id : (data.property_id || null);
+                
+                if (fileInput && fileInput.files && fileInput.files.length > 0 && savedPropId) {
+                    const typeSelect = document.getElementById('manual-file-type');
+                    const formData = new FormData();
+                    formData.append('file', fileInput.files[0]);
+                    formData.append('document_type', typeSelect ? typeSelect.value : 'Image');
+                    try {
+                        await fetch(`/api/properties/${savedPropId}/documents`, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        fileInput.value = '';
+                    } catch (e) {
+                        console.error('Error uploading file after save:', e);
+                    }
+                }
+
+                if (!isEdit && savedPropId) {
+                    showToast('Saved', 'Property saved and file attached.', 'info');
+                    closeManualPropertyModal();
+                } else {
+                    if (isEdit && id) loadManualDocuments(id);
+                    closeManualPropertyModal();
+                }
+            } catch (err) {
+                showToast('Save Error', err.message, 'error');
+            }
+        }
+
+        async function deleteManualPropertyConfirm(id) {
+            const confirmed = await sardoConfirm({
+                title: 'Delete Property?',
+                body: 'Are you sure you want to permanently delete this manual property and its attached documents? This action cannot be undone.',
+                confirmText: 'Delete',
+                cancelText: 'Cancel',
+                type: 'danger'
+            });
+            if (!confirmed) return;
+
+            try {
+                const res = await fetch(`/api/properties/manual/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Failed to delete property.');
+                
+                showToast('Deleted', 'Property deleted successfully.', 'success');
+                const propModal = document.getElementById('property-modal');
+                if (propModal) propModal.style.display = 'none';
+                const btnSearch = document.getElementById('btn-search');
+                if (btnSearch) btnSearch.click();
+            } catch (err) {
+                showToast('Error', err.message, 'error');
+            }
+        }
+
+        async function loadManualDocuments(propId) {
+            const container = document.getElementById('manual-docs-list');
+            if (!container) return;
+            container.innerHTML = '<div style="color:var(--text-secondary); font-size:13px;">Loading documents...</div>';
+            
+            try {
+                const res = await fetch(`/api/properties/${propId}/documents`);
+                const data = await res.json();
+                const docs = data.documents || [];
+                
+                if (docs.length === 0) {
+                    container.innerHTML = '<div style="color:var(--text-secondary); font-size:13px; grid-column: 1/-1;">No documents attached yet.</div>';
+                    return;
+                }
+
+                container.innerHTML = docs.map(d => `
+                    <div style="border:1px solid var(--border-color); border-radius:8px; padding:10px; background:#f8fafc; display:flex; flex-direction:column; justify-content:space-between; gap:8px;">
+                        <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
+                            <i class="fas ${d.document_type === 'Image' ? 'fa-image' : 'fa-file-alt'}" style="color:var(--primary-color); font-size:18px; flex-shrink:0;"></i>
+                            <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; font-weight:600;" title="${d.filename || 'Document'}">${d.filename || 'Document'}</div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--text-secondary);">
+                            <span>${d.document_type || 'File'}</span>
+                            <div>
+                                ${d.display_url ? `<a href="${d.display_url}" target="_blank" style="color:var(--primary-color); margin-right:8px;" title="View/Download"><i class="fas fa-external-link-alt"></i></a>` : ''}
+                                <button type="button" onclick="deleteManualDoc(${d.id})" style="background:none; border:none; color:#ef4444; cursor:pointer;" title="Delete"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = '<div style="color:#ef4444; font-size:13px;">Failed to load documents.</div>';
+            }
+        }
+
+        async function uploadManualDocument() {
+            const fileInput = document.getElementById('manual-file-input');
+            const typeSelect = document.getElementById('manual-file-type');
+            const propId = document.getElementById('manual-prop-id').value;
+
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showToast('Warning', 'Please select a file to upload.', 'warning');
+                return;
+            }
+            if (!propId) {
+                showToast('Info', 'Saving property first to attach file...', 'info');
+                await handleManualPropertySubmit(null);
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('document_type', typeSelect.value);
+
+            try {
+                const res = await fetch(`/api/properties/${propId}/documents`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Upload failed');
+                
+                showToast('Success', 'Document uploaded successfully.', 'success');
+                fileInput.value = '';
+                loadManualDocuments(propId);
+            } catch (err) {
+                showToast('Upload Error', err.message, 'error');
+            }
+        }
+
+        async function deleteManualDoc(docId) {
+            try {
+                const res = await fetch(`/api/properties/documents/${docId}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Delete failed');
+                
+                showToast('Deleted', 'Document removed.', 'success');
+                const propId = document.getElementById('manual-prop-id').value;
+                if (propId) loadManualDocuments(propId);
+            } catch (err) {
+                showToast('Error', err.message, 'error');
+            }
+        }
+
+        async function loadPropertyDocumentsForModal(propId) {
+            const container = document.getElementById('modal-docs-list');
+            if (!container) return;
+            
+            try {
+                const res = await fetch(`/api/properties/${propId}/documents`);
+                const data = await res.json();
+                const docs = data.documents || [];
+                
+                if (docs.length === 0) {
+                    container.innerHTML = '<span style="color:var(--text-secondary); font-size:13px;">No documents attached.</span>';
+                    return;
+                }
+
+                container.innerHTML = docs.map(d => `
+                    <a href="${d.display_url || '#'}" target="_blank" style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px; background:#f1f5f9; border:1px solid var(--border-color); border-radius:6px; text-decoration:none; color:var(--text-primary); font-size:12px; font-weight:600;">
+                        <i class="fas ${d.document_type === 'Image' ? 'fa-image' : 'fa-file-pdf'}" style="color:var(--primary-color);"></i>
+                        ${d.filename || 'Document'} (${d.document_type || 'File'})
+                    </a>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = '<span style="color:#ef4444; font-size:13px;">Could not load documents.</span>';
+            }
         }
     </script>
 </body>

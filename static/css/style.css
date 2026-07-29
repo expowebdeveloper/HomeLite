@@ -1456,6 +1456,9 @@ th.sortable.active-desc .sort-icon::before {
 .status-exclusive    { background: rgba(139, 92, 246, 0.13); color: #7c3aed; }
 .status-sold         { background: rgba(239, 68, 68, 0.12);  color: #dc2626; }
 .status-delisted     { background: rgba(100, 116, 139, 0.14); color: #475569; }
+.status-off-market   { background: rgba(245, 158, 11, 0.18); color: #d97706; font-weight: 700; border: 1px solid rgba(245, 158, 11, 0.35); }
+.status-manual       { background: rgba(245, 158, 11, 0.18); color: #d97706; font-weight: 700; border: 1px solid rgba(245, 158, 11, 0.35); }
+.status-confidential { background: rgba(245, 158, 11, 0.18); color: #d97706; font-weight: 700; border: 1px solid rgba(245, 158, 11, 0.35); }
 .status-unknown      { background: rgba(100, 116, 139, 0.10); color: #64748b; }
 
 /* Scrape run states reuse the same badge shape */

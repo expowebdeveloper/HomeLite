@@ -71,10 +71,12 @@ class Config:
         "Exclusive",
         "Delisted",
         "Unknown",
+        "Off Market",
+        "Withdrawn",
     ]
 
     # Statuses that no longer represent live, sellable stock.
-    INACTIVE_STATUSES = ["Sold", "Delisted"]
+    INACTIVE_STATUSES = ["Sold", "Delisted", "Withdrawn"]
 
     # Property Types
     PROPERTY_TYPES = [
@@ -85,14 +87,16 @@ class Config:
         "Penthouse",
         "Studio",
         "Duplex",
-        "Triplex"
+        "Triplex",
+        "Land",
     ]
     
     # Website Sources
     WEBSITE_SOURCES = [
         "Domain",
         "RealEstate",
-        "AllHomes"
+        "AllHomes",
+        "Manual / Off-Market",
     ]
     
     # Source Name Mapping (raw scraper `source` value -> Display name).
@@ -106,6 +110,7 @@ class Config:
         "MaproRealEstateScraper": "Mapro",
         "QuintadoLagoScraper": "Quinta Lago",
         "VendiciPropertiesScraper": "Vendici",
+        "Manual / Off-Market": "Manual / Off-Market",
 
         # Legacy / historical spellings, kept so old rows still map correctly
         "QuintapropertyScraper": "Quinta",

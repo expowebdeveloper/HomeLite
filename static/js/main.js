@@ -150,14 +150,23 @@ document.addEventListener('DOMContentLoaded', () => {
             // Price formatted
             const price = formatPrice(prop.property_price);
 
+            const isOffMarket = prop.market_visibility === 'off_market' || prop.source_type === 'manual' || prop.website_source === 'Manual / Off-Market' || (prop.property_url && prop.property_url.startsWith('sardo://'));
+
             // Image handling
-            const imgHtml = prop.image_url
-                ? `<img src="${prop.image_url}" alt="Property" onerror="this.src=''; this.onerror=null; this.parentElement.innerHTML='<div class=\\'no-image\\'><i class=\\'fas fa-image-slash\\'></i></div>';">`
-                : `<div class="no-image"><i class="fas fa-image"></i></div>`;
+            const imgHtml = prop.image_url && prop.image_url !== 'null' && prop.image_url !== 'undefined'
+                ? `<img src="${prop.image_url}" alt="Property" onerror="this.onerror=null; this.outerHTML='<div class=\\'no-image\\' style=\\'background: #0f172a; color: #64748b; display: flex; align-items: center; justify-content: center;\\'><i class=\\'fas fa-image-slash\\' style=\\'font-size: 2rem;\\'></i></div>';">`
+                : (isOffMarket 
+                    ? `<div class="no-image" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f59e0b; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px;"><i class="fas fa-user-secret" style="font-size: 2.5rem; opacity: 0.9;"></i><span style="font-size: 0.75rem; font-weight: 700; color: #cbd5e1; letter-spacing: 0.5px;">VIP ASSET</span></div>`
+                    : `<div class="no-image"><i class="fas fa-image"></i></div>`);
+
+            const offMarketBadge = isOffMarket
+                ? `<div style="position: absolute; top: 10px; right: 10px; background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; z-index: 5; box-shadow: 0 4px 6px rgba(0,0,0,0.3); letter-spacing: 0.5px;"><i class="fas fa-user-secret"></i> VIP OFF-MARKET</div>`
+                : '';
 
             card.innerHTML = `
-                <div class="card-image-container">
+                <div class="card-image-container" style="position: relative;">
                     ${imgHtml}
+                    ${offMarketBadge}
                     <div class="checkbox-container" onclick="event.stopPropagation();">
                         <input type="checkbox" class="card-checkbox" value="${prop.id}" ${selectedPropertyIds.has(prop.id.toString()) || selectedPropertyIds.has(prop.id) ? 'checked' : ''}>
                     </div>
@@ -175,10 +184,19 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="card-source">${prop.display_source || 'Unknown'}</span>
                             ${statusBadge(prop.property_status)}
                         </div>
-                        <div style="display: flex; justify-content: flex-end; align-items: center;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Ref: ${prop.sardo_reference || 'N/A'}</span>
+                            ${isOffMarket ? `<span style="color: #f59e0b; font-size: 0.8rem; font-weight: 700;"><i class="fas fa-lock"></i> Confidential</span>` : ''}
                         </div>
-                        <button class="btn-view-details" style="width: 100%;">View Details</button>
+                        <div style="width: 100%;">
+                            <button class="btn-view-details" style="width: 100%;">View Details</button>
+                        </div>
+                        ${isOffMarket ? `
+                            <div style="display: flex; gap: 8px; width: 100%; margin-top: 2px;">
+                                <button onclick="event.stopPropagation(); openEditManualModal('${prop.id}')" style="flex: 1; background: #3b82f6; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 4px rgba(59,130,246,0.2); transition: all 0.2s;" title="Edit Off-Market Property"><i class="fas fa-edit"></i> Edit</button>
+                                <button onclick="event.stopPropagation(); deleteManualPropertyConfirm('${prop.id}')" style="flex: 1; background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 4px rgba(239,68,68,0.2); transition: all 0.2s;" title="Delete Property"><i class="fas fa-trash-alt"></i> Delete</button>
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
             `;
@@ -245,13 +263,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const price = formatPrice(prop.property_price);
             const livingArea = prop.living_area ? parseFloat(prop.living_area).toFixed(0) : '—';
             const landArea = prop.land_area ? parseFloat(prop.land_area).toFixed(0) : '—';
+            const isOffMarket = prop.market_visibility === 'off_market' || prop.source_type === 'manual' || prop.website_source === 'Manual / Off-Market' || (prop.property_url && prop.property_url.startsWith('sardo://'));
+            const offMarketTag = isOffMarket ? '<span style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 6px;"><i class="fas fa-user-secret"></i> VIP OFF-MARKET</span>' : '';
 
             row.innerHTML = `
                 <td onclick="event.stopPropagation();">
                     <input type="checkbox" class="row-checkbox" value="${prop.id}" ${selectedPropertyIds.has(prop.id.toString()) || selectedPropertyIds.has(prop.id) ? 'checked' : ''}>
                 </td>
                 <td style="font-weight: 600; color: var(--primary-color);">${price}</td>
-                <td title="${esc(prop.location || 'N/A')}">${prop.location || 'N/A'}</td>
+                <td title="${esc(prop.location || 'N/A')}">${prop.location || 'N/A'} ${offMarketTag}</td>
                 <td>${prop.property_type || 'N/A'}</td>
                 <td>${prop.num_beds || '-'}</td>
                 <td>${prop.num_baths || '-'}</td>
@@ -260,8 +280,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td><span class="source-badge">${prop.display_source || 'N/A'}</span></td>
                 <td>${statusBadge(prop.property_status)}</td>
                 <td>${prop.sardo_reference || 'N/A'}</td>
-                <td>${prop.property_url ? `<a href="${prop.property_url}" target="_blank" class="ref-link" onclick="event.stopPropagation();">${prop.display_reference || 'Link'}</a>` : (prop.display_reference || 'N/A')}</td>
+                <td>
+                    ${prop.property_url && !isOffMarket 
+                        ? `<a href="${prop.property_url}" target="_blank" class="ref-link" onclick="event.stopPropagation();">${prop.display_reference || 'Link'}</a>` 
+                        : `<a href="javascript:void(0)" class="off-market-ref-link" style="color: #3b82f6; font-weight: 700; text-decoration: underline; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Click to open details card"><i class="fas fa-id-card"></i> ${prop.display_reference || prop.sardo_reference || 'N/A'}</a>`}
+                </td>
             `;
+
+            const offRefBtn = row.querySelector('.off-market-ref-link');
+            if (offRefBtn) {
+                offRefBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    showModal(prop);
+                });
+            }
 
             row.addEventListener('click', () => {
                 const checkbox = row.querySelector('.row-checkbox');
@@ -332,23 +365,59 @@ document.addEventListener('DOMContentLoaded', () => {
     // Show Modal Details
     const showModal = (prop) => {
         const price = formatPrice(prop.property_price);
-        const imgHtml = prop.image_url
-            ? `<img src="${prop.image_url}" class="modal-main-img" alt="Property" onerror="this.src=''; this.onerror=null; this.parentElement.innerHTML='<div class=\\'no-image-placeholder\\'><i class=\\'fas fa-image-slash\\'></i></div>';">`
-            : `<div class="no-image-placeholder"><i class="fas fa-image"></i></div>`;
+        const isOffMarket = prop.market_visibility === 'off_market' || prop.source_type === 'manual' || prop.website_source === 'Manual / Off-Market' || (prop.property_url && prop.property_url.startsWith('sardo://'));
 
-        const referenceHtml = prop.property_url
-            ? `<a href="${prop.property_url}" target="_blank" class="preview-link"><i class="fas fa-external-link-alt"></i> View Original Listing</a>`
-            : ``;
+        const imgHtml = prop.image_url && prop.image_url !== 'null' && prop.image_url !== 'undefined'
+            ? `<img src="${prop.image_url}" class="modal-main-img" alt="Property" style="height: 400px; width: 100%; object-fit: cover;" onerror="this.onerror=null; this.outerHTML='<div style=\\'height:400px; width:100%; background:#0f172a; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#64748b; gap:12px;\\'><i class=\\'fas fa-image-slash\\' style=\\'font-size:3rem;\\'></i><span>Image Unavailable</span></div>';">`
+            : (isOffMarket
+                ? `<div style="height: 400px; width: 100%; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; color: #f59e0b; gap: 16px; border-bottom: 1px solid #334155; position: relative;"><div style="width:80px; height:80px; border-radius:50%; background:rgba(245, 158, 11, 0.1); display:flex; align-items:center; justify-content:center; border:1px solid rgba(245, 158, 11, 0.3); box-shadow: 0 4px 12px rgba(0,0,0,0.3);"><i class="fas fa-user-secret" style="font-size: 2.5rem;"></i></div><div style="text-align:center;"><h3 style="margin:0; font-size:1.3rem; font-weight:700; color:#f8fafc; letter-spacing:0.5px;">VIP Confidential Opportunity</h3><p style="margin:6px 0 0; font-size:0.85rem; color:#94a3b8;">Private asset details & restricted viewing</p></div></div>`
+                : `<div style="height: 400px; width: 100%; background: #0f172a; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #64748b; gap: 12px;"><i class="fas fa-image" style="font-size: 3.5rem; opacity: 0.5;"></i><span>No Photos Available</span></div>`);
+
+        const actionsHtml = isOffMarket ? `
+            <div style="width: 100%; display: flex; flex-direction: column; gap: 12px;">
+                <div style="background: #1e293b; color: #f59e0b; padding: 12px; border-radius: 8px; font-size: 13px; font-weight: 600; text-align: center; border: 1px solid #334155;"><i class="fas fa-lock"></i> VIP Confidential Opportunity</div>
+                <div style="display: flex; gap: 10px; width: 100%;">
+                    <button onclick="openEditManualModal('${prop.id}')" style="flex: 1; background: #3b82f6; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; box-shadow: 0 2px 4px rgba(59,130,246,0.3); transition: all 0.2s;"><i class="fas fa-edit"></i> Edit Property</button>
+                    <button onclick="deleteManualPropertyConfirm('${prop.id}')" style="flex: 1; background: #ef4444; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; box-shadow: 0 2px 4px rgba(239,68,68,0.3); transition: all 0.2s;"><i class="fas fa-trash-alt"></i> Delete Property</button>
+                </div>
+            </div>
+        ` : (prop.property_url ? `<a href="${prop.property_url}" target="_blank" class="preview-link" style="width: 100%; justify-content: center;"><i class="fas fa-external-link-alt"></i> View Original Listing</a>` : '');
+
+        const offMarketBadgeModal = isOffMarket
+            ? `<div style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 700; display: inline-block; margin-bottom: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);"><i class="fas fa-user-secret"></i> VIP Off-Market Property</div>`
+            : '';
+
+        const extraManualFields = isOffMarket ? `
+            <hr style="border:none; border-top: 1px solid var(--border-color); margin: 12px 0;">
+            <p><strong>Resort Area:</strong> ${prop.resort_area || 'N/A'}</p>
+            <p><strong>Sub Area:</strong> ${prop.sub_area || 'N/A'}</p>
+            <p><strong>Address:</strong> ${prop.address || 'Confidential'}</p>
+            <p><strong>Coordinates:</strong> ${prop.coordinates || 'N/A'}</p>
+            <p><strong>Construction / Renovation:</strong> ${prop.construction_year || 'N/A'} / ${prop.renovation_year || 'N/A'}</p>
+            <p><strong>Energy Rating:</strong> ${prop.energy_rating || 'N/A'}</p>
+            <hr style="border:none; border-top: 1px solid var(--border-color); margin: 12px 0;">
+            <p><strong>Contact Name:</strong> ${prop.source_contact_name || 'N/A'}</p>
+            <p><strong>Contact Email:</strong> ${prop.source_contact_email || 'N/A'}</p>
+            <p><strong>Contact Phone:</strong> ${prop.source_contact_phone || 'N/A'}</p>
+            <p><strong>Source Agent:</strong> ${prop.source_agent || 'N/A'}</p>
+            <p><strong>Introduced By:</strong> ${prop.introduced_by || 'N/A'}</p>
+            <p><strong>Notes:</strong> <span style="color:#64748b; font-style:italic;">${prop.notes || 'No confidential notes'}</span></p>
+            <div id="modal-docs-container" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                <h4 style="font-size:14px; margin-bottom:10px; color:var(--text-primary);"><i class="fas fa-folder-open"></i> Attached Documents</h4>
+                <div id="modal-docs-list" style="display:flex; flex-wrap:wrap; gap:8px;">Loading documents...</div>
+            </div>
+        ` : '';
 
         modalBody.innerHTML = `
             <div class="modal-grid">
                 <div class="modal-image-col">
                     ${imgHtml}
-                    <div class="modal-actions">
-                        ${referenceHtml}
+                    <div class="modal-actions" style="padding: 20px; background: var(--bg-color); display: flex; justify-content: center;">
+                        ${actionsHtml}
                     </div>
                 </div>
                 <div class="modal-details-col">
+                    ${offMarketBadgeModal}
                     <h2>${prop.title && prop.title !== 'N/A' ? prop.title : (prop.property_type || 'Property')}</h2>
                     <h3 class="modal-price">${price}</h3>
                     <p class="modal-location"><i class="fas fa-map-marker-alt"></i> ${prop.location || 'Unknown Location'}</p>
@@ -366,11 +435,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         <p><strong>Status:</strong> ${statusBadge(prop.property_status)}</p>
                         <p><strong>SARDO Ref:</strong> ${prop.sardo_reference || 'N/A'}</p>
                         <p><strong>Original Ref:</strong> ${prop.display_reference || 'N/A'}</p>
+                        ${extraManualFields}
                     </div>
                 </div>
             </div>
         `;
         propertyModal.style.display = 'flex';
+        if (isOffMarket && typeof loadPropertyDocumentsForModal === 'function') {
+            loadPropertyDocumentsForModal(prop.id);
+        }
     };
 
     // Build Filters Object
@@ -424,6 +497,16 @@ document.addEventListener('DOMContentLoaded', () => {
             filters.reference = filterRef.value.trim();
         }
 
+        const vis = document.getElementById('filter-visibility');
+        if (vis && vis.value && vis.value !== 'all') {
+            filters.market_visibility = vis.value;
+        }
+
+        const stype = document.getElementById('filter-source-type');
+        if (stype && stype.value && stype.value !== 'all') {
+            filters.source_type = stype.value;
+        }
+
         filters.sort_by = currentSortBy;
         filters.sort_dir = currentSortDir;
 
@@ -450,6 +533,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filterStatuses) filterStatuses.selectedIndex = -1;
         if (filterSources) filterSources.selectedIndex = -1;
         if (filterHideDelisted) filterHideDelisted.checked = true;
+        const vis = document.getElementById('filter-visibility');
+        if (vis) vis.value = 'all';
+        const stype = document.getElementById('filter-source-type');
+        if (stype) stype.value = 'all';
 
         // Clear resets to the default view, which still hides delisted stock
         currentPage = 1;
@@ -488,6 +575,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    const visFilter = document.getElementById('filter-visibility');
+    if (visFilter) visFilter.addEventListener('change', () => btnSearch.click());
+    const stypeFilter = document.getElementById('filter-source-type');
+    if (stypeFilter) stypeFilter.addEventListener('change', () => btnSearch.click());
 
     selectAllCheckbox.addEventListener('change', (e) => {
         const isChecked = e.target.checked;
