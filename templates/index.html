@@ -927,9 +927,6 @@
 
                 showToast('Success', isEdit ? 'Property updated successfully.' : 'Property created successfully.', 'success');
                 
-                const btnSearch = document.getElementById('btn-search');
-                if (btnSearch) btnSearch.click();
-
                 const fileInput = document.getElementById('manual-file-input');
                 const savedPropId = isEdit ? id : (data.property_id || null);
                 
@@ -948,6 +945,10 @@
                         console.error('Error uploading file after save:', e);
                     }
                 }
+
+                // Reload the table AFTER upload is complete so image is visible
+                const btnSearch = document.getElementById('btn-search');
+                if (btnSearch) btnSearch.click();
 
                 if (!isEdit && savedPropId) {
                     showToast('Saved', 'Property saved and file attached.', 'info');
