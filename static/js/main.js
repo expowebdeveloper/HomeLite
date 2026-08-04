@@ -31,14 +31,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // Property status badge. "Under Offer" -> class "status-under-offer" (see style.css)
+    // NULL / missing property_status from DB defaults to 'For Sale' (not 'Unknown')
+    // because a property with no badge set by the scraper is still an active listing.
+    const STATUS_ICONS = {
+        'For Sale':     'fa-tag',
+        'New Listing':  'fa-star',
+        'Reserved':     'fa-clock',
+        'Under Offer':  'fa-handshake',
+        'Sold':         'fa-check-circle',
+        'Exclusive':    'fa-gem',
+        'Delisted':     'fa-ban',
+        'Unknown':      'fa-question-circle',
+        'Off Market':   'fa-lock',
+        'Withdrawn':    'fa-times-circle',
+    };
     const statusBadge = (status) => {
-        const value = status || 'Unknown';
+        // NULL from DB means the scraper didn't set a status yet — treat as For Sale
+        const value = (status && status !== 'null' && status !== 'undefined') ? status : 'For Sale';
         const cls = 'status-badge status-' + value.toLowerCase().replace(/\s+/g, '-');
-        return `<span class="${cls}">${value}</span>`;
+        const icon = STATUS_ICONS[value] || 'fa-circle';
+        return `<span class="${cls}"><i class="fas ${icon}"></i> ${value}</span>`;
     };
 
-    // Sold / Delisted listings are no longer live stock
-    const isInactiveStatus = (status) => status === 'Sold' || status === 'Delisted';
+    // Sold / Delisted / Withdrawn listings are no longer live stock
+    const isInactiveStatus = (status) => status === 'Sold' || status === 'Delisted' || status === 'Withdrawn';
     const statusText = document.getElementById('status-text');
     const loadingOverlay = document.getElementById('loading-overlay');
 
