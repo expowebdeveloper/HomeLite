@@ -1171,6 +1171,13 @@ def search_properties():
         reference = prop.get('reference', 'N/A')
         prop['display_reference'] = title if is_waratah and title and title.strip() else reference
 
+        # Coerce NULL/missing property_status to 'For Sale'.
+        # Per spec §4: "No status detected at all → For Sale".
+        # This prevents the frontend from showing 'Unknown' for properties
+        # where the scraper hasn't written a status yet.
+        if not prop.get('property_status'):
+            prop['property_status'] = 'For Sale'
+
     return jsonify({
         'properties': properties,
         'total_count': total_count,
@@ -1195,6 +1202,9 @@ def get_property_detail(property_id):
             prop['image_url'] = s3_manager.get_image_url(s3_key)
     else:
         prop['image_url'] = None
+    # Coerce NULL property_status → 'For Sale' (same rule as the list endpoint)
+    if not prop.get('property_status'):
+        prop['property_status'] = 'For Sale'
     return jsonify(prop)
 
 @app.route('/api/properties/manual', methods=['POST'])
