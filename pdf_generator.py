@@ -565,7 +565,8 @@ class PDFGenerator:
             if len(sub_images) < 2:
                 import urllib.request
                 from urllib.parse import urljoin
-                from database import db_manager
+                from database import DatabaseManager
+                db_manager = DatabaseManager()
                 
                 # Fetch documents
                 docs = db_manager.get_property_documents(property_data.get('id'))
