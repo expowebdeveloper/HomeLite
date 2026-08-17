@@ -1440,30 +1440,6 @@ def generate_pdf_report_file(properties, client_name):
     """
     properties = assign_sardo_references(properties)
 
-    # Perform on-the-fly crawling for missing Year Built or Energy Rating data
-    for prop in properties:
-        year_missing = not prop.get('construction_year') or prop.get('construction_year') == 'N/A' or prop.get('construction_year') == '—'
-        energy_missing = not prop.get('energy_rating') or prop.get('energy_rating') == 'N/A' or prop.get('energy_rating') == '—'
-        
-        if year_missing or energy_missing:
-            crawled_year, crawled_energy = crawl_missing_details_live(prop)
-            
-            # If found, update local dict AND save to local database
-            updated = False
-            if crawled_year and year_missing:
-                prop['construction_year'] = crawled_year
-                updated = True
-            if crawled_energy and energy_missing:
-                prop['energy_rating'] = crawled_energy
-                updated = True
-                
-            if updated and prop.get('id'):
-                db_manager.update_property_scraped_details(
-                    prop['id'], 
-                    prop.get('construction_year'), 
-                    prop.get('energy_rating')
-                )
-
     # Calculate stats for the selected properties.
     # Only count real, positive prices — properties with no published price
     # (-1 sentinel, 0, None) are P.O.A. and must be excluded from min/avg/median.
