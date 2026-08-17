@@ -286,7 +286,7 @@ class PDFGenerator:
         doc.build(story)
         
         # Merge phase using pypdf
-        template_path = "/home/aviox/Downloads/Property Portfolio Template (DEV).pdf"
+        template_path = os.path.join(os.path.dirname(__file__), "static", "pdfs", "Property_Portfolio_Template.pdf")
         
         writer = PdfWriter()
         
