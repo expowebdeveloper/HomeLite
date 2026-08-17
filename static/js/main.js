@@ -45,6 +45,28 @@ document.addEventListener('DOMContentLoaded', () => {
         'Off Market':   'fa-lock',
         'Withdrawn':    'fa-times-circle',
     };
+
+function energyBadge(rating) {
+    if (!rating || rating === '—' || rating === 'N/A') return '—';
+    let bg = '#e2e8f0';
+    let color = '#475569';
+    const r = String(rating).toUpperCase();
+    if (r.startsWith('A')) { bg = '#16a34a'; color = '#fff'; }
+    else if (r.startsWith('B')) { bg = '#65a30d'; color = '#fff'; }
+    else if (r.startsWith('C')) { bg = '#ca8a04'; color = '#fff'; }
+    else if (r.startsWith('D')) { bg = '#d97706'; color = '#fff'; }
+    else if (r.startsWith('E')) { bg = '#ea580c'; color = '#fff'; }
+    else if (r.startsWith('F')) { bg = '#dc2626'; color = '#fff'; }
+    else if (r.startsWith('G')) { bg = '#991b1b'; color = '#fff'; }
+    else if (r === 'ELECTRIC') { bg = '#0284c7'; color = '#fff'; }
+    else if (r === 'SOLAR') { bg = '#fbbf24'; color = '#000'; }
+    else if (r === 'GAS') { bg = '#4f46e5'; color = '#fff'; }
+    else if (r === 'EXEMPT' || r === 'ISENTO') { bg = '#94a3b8'; color = '#fff'; }
+    else { bg = '#334155'; color = '#fff'; }
+    
+    return `<span style="background: ${bg}; color: ${color}; padding: 3px 8px; border-radius: 4px; font-weight: 700; font-size: 11px; display: inline-block; min-width: 24px; text-align: center;">${rating}</span>`;
+}
+
     const statusBadge = (status) => {
         // NULL from DB means the scraper didn't set a status yet — treat as For Sale
         const value = (status && status !== 'null' && status !== 'undefined') ? status : 'For Sale';
@@ -295,6 +317,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${prop.num_baths || '-'}</td>
                 <td>${livingArea}</td>
                 <td>${landArea}</td>
+                <td>${prop.construction_year || '—'}</td>
+                <td>${energyBadge(prop.energy_rating)}</td>
                 <td><span class="source-badge">${prop.display_source || 'N/A'}</span></td>
                 <td>${statusBadge(prop.property_status)}</td>
                 <td>${prop.sardo_reference || 'N/A'}</td>
@@ -376,6 +400,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p><strong>Source:</strong> ${prop.display_source || 'N/A'}</p>
                 <p><strong>Status:</strong> ${statusBadge(prop.property_status)}</p>
                 <p><strong>SARDO Ref:</strong> ${prop.sardo_reference || 'N/A'}</p>
+                <p><strong>Year Built:</strong> ${prop.construction_year || '—'}</p>
+                <p><strong>Energy Rating:</strong> ${energyBadge(prop.energy_rating)}</p>
             </div>
         `;
     };
@@ -411,8 +437,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <p><strong>Sub Area:</strong> ${prop.sub_area || 'N/A'}</p>
             <p><strong>Address:</strong> ${prop.address || 'Confidential'}</p>
             <p><strong>Coordinates:</strong> ${prop.coordinates || 'N/A'}</p>
-            <p><strong>Construction / Renovation:</strong> ${prop.construction_year || 'N/A'} / ${prop.renovation_year || 'N/A'}</p>
-            <p><strong>Energy Rating:</strong> ${prop.energy_rating || 'N/A'}</p>
             <hr style="border:none; border-top: 1px solid var(--border-color); margin: 12px 0;">
             <p><strong>Contact Name:</strong> ${prop.source_contact_name || 'N/A'}</p>
             <p><strong>Contact Email:</strong> ${prop.source_contact_email || 'N/A'}</p>
@@ -453,6 +477,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         <p><strong>Status:</strong> ${statusBadge(prop.property_status)}</p>
                         <p><strong>SARDO Ref:</strong> ${prop.sardo_reference || 'N/A'}</p>
                         <p><strong>Original Ref:</strong> ${prop.display_reference || 'N/A'}</p>
+                        <p><strong>Construction / Renovation:</strong> ${prop.construction_year || 'N/A'} / ${prop.renovation_year || 'N/A'}</p>
+                        <p><strong>Energy Rating:</strong> ${energyBadge(prop.energy_rating)}</p>
                         ${extraManualFields}
                     </div>
                 </div>

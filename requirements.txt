@@ -2,10 +2,11 @@ boto3
 psycopg2-binary
 Pillow
 python-dotenv
-pandas
-matplotlib
-reportlab
-alembic
+pandas==2.3.3
+matplotlib==3.10.9
+reportlab==5.0.0
+pypdf==6.16.0
+alembic==1.19.1
 Flask
 openpyxl
 Flask-Login

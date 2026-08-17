@@ -1373,13 +1373,96 @@ def status_report():
     return jsonify(report)
 
 
+def crawl_missing_details_live(prop):
+    """Attempt a fast crawl of missing details from the property's live URL using HTTP regex matching"""
+    url = prop.get('property_url')
+    if not url or url.startswith('sardo://'):
+        return None, None
+        
+    try:
+        import urllib.request
+        import re
+        req = urllib.request.Request(
+            url, 
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        )
+        with urllib.request.urlopen(req, timeout=4) as response:
+            html = response.read().decode('utf-8', errors='ignore')
+            
+        construction_year = None
+        energy_rating = None
+        
+        # Look for Year Built
+        year_pattern = re.compile(
+            r'(?:build\s+year|year\s+built|built\s+in|construction\s+year|year\s+of\s+construction|ano\s+de\s+construção|ano\s+construcao)\s*[:\-\s]\s*(\d{4})',
+            re.IGNORECASE
+        )
+        year_match = year_pattern.search(html)
+        if year_match:
+            construction_year = year_match.group(1)
+        else:
+            # Look for "construction" or "construção" text and find a year near it to avoid matching other years (like copyright dates, e.g. 2026)
+            near_year_match = re.search(
+                r'(?:ano\s+de\s+construção|ano\s+construção|year\s+built|built\s+in|year\s+of\s+construction).{1,50}?\b(19\d{2}|20\d{2})\b',
+                html,
+                re.IGNORECASE | re.DOTALL
+            )
+            if near_year_match:
+                construction_year = near_year_match.group(1)
+                
+        # Look for Energy Rating
+        energy_pattern = re.compile(
+            r'(?:energy\s+certificate|energetic\s+certificate|energy\s+rating|certificado\s+energético|classe\s+energética|certificação\s+energética|energy\s+source|energy\s+efficiency)\s*[:\-\s]?[<\w\s=">/]*?\b(A\+?|B\-?|[C-G]|Electric|Gas|Solar|Exempt|Isento)\b',
+            re.IGNORECASE
+        )
+        energy_match = energy_pattern.search(html)
+        if energy_match:
+            energy_rating = energy_match.group(1).title()
+        else:
+            # Fallback scan for isolated Energy class values if keyword not directly adjacent
+            energy_rating_fallback = re.search(
+                r'(?:energy\s+class|classe\s+energética|energy\s+rating|certificação\s+energética)\s*[:\-\s]?\s*([A-Ga-g]\+?)',
+                html,
+                re.IGNORECASE
+            )
+            if energy_rating_fallback:
+                energy_rating = energy_rating_fallback.group(1).upper()
+            
+        return construction_year, energy_rating
+    except Exception as e:
+        print(f"Error crawling missing details live for URL {url}: {e}")
+        return None, None
+
+
 def generate_pdf_report_file(properties, client_name):
     """Assign SARDO refs, compute stats and render the PDF report.
-
-    Returns the path to the generated PDF file. Shared by the PDF export and
-    the email routes.
+    Triggers live crawls for properties missing details to instantly populate the PDF and database.
     """
     properties = assign_sardo_references(properties)
+
+    # Perform on-the-fly crawling for missing Year Built or Energy Rating data
+    for prop in properties:
+        year_missing = not prop.get('construction_year') or prop.get('construction_year') == 'N/A' or prop.get('construction_year') == '—'
+        energy_missing = not prop.get('energy_rating') or prop.get('energy_rating') == 'N/A' or prop.get('energy_rating') == '—'
+        
+        if year_missing or energy_missing:
+            crawled_year, crawled_energy = crawl_missing_details_live(prop)
+            
+            # If found, update local dict AND save to local database
+            updated = False
+            if crawled_year and year_missing:
+                prop['construction_year'] = crawled_year
+                updated = True
+            if crawled_energy and energy_missing:
+                prop['energy_rating'] = crawled_energy
+                updated = True
+                
+            if updated and prop.get('id'):
+                db_manager.update_property_scraped_details(
+                    prop['id'], 
+                    prop.get('construction_year'), 
+                    prop.get('energy_rating')
+                )
 
     # Calculate stats for the selected properties.
     # Only count real, positive prices — properties with no published price

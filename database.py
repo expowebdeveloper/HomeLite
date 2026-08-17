@@ -970,6 +970,9 @@ class DatabaseManager:
                     land_area,
                     source as website_source,
                     image_filename,
+                    image_filename_2,
+                    image_filename_3,
+                    map_filename,
                     reference,
                     property_url,
                     property_status,
@@ -1086,6 +1089,9 @@ class DatabaseManager:
                     land_area,
                     source as website_source,
                     image_filename,
+                    image_filename_2,
+                    image_filename_3,
+                    map_filename,
                     reference,
                     property_url,
                     property_status,
@@ -1129,6 +1135,24 @@ class DatabaseManager:
         except Exception as e:
             logging.error(f"Error fetching property {property_id}: {e}")
             return None
+
+    def update_property_scraped_details(self, property_id: str, construction_year: str, energy_rating: str) -> bool:
+        """Update construction year and energy rating in the database for a property"""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return False
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                UPDATE properties 
+                SET construction_year = %s, energy_rating = %s, updated_at = NOW()
+                WHERE id = %s
+            """, (construction_year, energy_rating, property_id))
+            cursor.close()
+            return True
+        except Exception as e:
+            logging.error(f"Error updating scraped details for property {property_id}: {e}")
+            return False
     
     def get_statistics(self) -> Dict:
         """Get basic statistics about the property database"""
