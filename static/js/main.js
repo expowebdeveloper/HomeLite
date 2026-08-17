@@ -70,17 +70,11 @@ function energyBadge(rating) {
     const statusBadge = (status) => {
         // NULL from DB means the scraper didn't set a status yet — treat as For Sale
         const value = (status && status !== 'null' && status !== 'undefined') ? status : 'For Sale';
-        // NULL from DB means the scraper didn't set a status yet — treat as For Sale
-        const value = (status && status !== 'null' && status !== 'undefined') ? status : 'For Sale';
         const cls = 'status-badge status-' + value.toLowerCase().replace(/\s+/g, '-');
-        const icon = STATUS_ICONS[value] || 'fa-circle';
-        return `<span class="${cls}"><i class="fas ${icon}"></i> ${value}</span>`;
         const icon = STATUS_ICONS[value] || 'fa-circle';
         return `<span class="${cls}"><i class="fas ${icon}"></i> ${value}</span>`;
     };
 
-    // Sold / Delisted / Withdrawn listings are no longer live stock
-    const isInactiveStatus = (status) => status === 'Sold' || status === 'Delisted' || status === 'Withdrawn';
     // Sold / Delisted / Withdrawn listings are no longer live stock
     const isInactiveStatus = (status) => status === 'Sold' || status === 'Delisted' || status === 'Withdrawn';
     const statusText = document.getElementById('status-text');
