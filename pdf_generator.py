@@ -7,15 +7,39 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 import os
+import re
 import tempfile
 from typing import List, Dict
 from datetime import datetime
 from s3_manager import S3Manager
 from pypdf import PdfReader, PdfWriter
 
-# Register the font  
-pdfmetrics.registerFont(TTFont('Trajan Pro', 'fonts/TrajanPro-Regular.ttf'))
-pdfmetrics.registerFont(TTFont('Isidora Sans', 'fonts/IsidoraSans-Regular.ttf'))
+# Register custom TTF fonts
+fonts_dir = os.path.join(os.path.dirname(__file__), 'fonts')
+
+# Montserrat (for Titles / Headers)
+if os.path.exists(os.path.join(fonts_dir, 'Montserrat-Regular.ttf')):
+    pdfmetrics.registerFont(TTFont('Montserrat', os.path.join(fonts_dir, 'Montserrat-Regular.ttf')))
+if os.path.exists(os.path.join(fonts_dir, 'Montserrat-Bold.ttf')):
+    pdfmetrics.registerFont(TTFont('Montserrat-Bold', os.path.join(fonts_dir, 'Montserrat-Bold.ttf')))
+if os.path.exists(os.path.join(fonts_dir, 'Montserrat-SemiBold.ttf')):
+    pdfmetrics.registerFont(TTFont('Montserrat-SemiBold', os.path.join(fonts_dir, 'Montserrat-SemiBold.ttf')))
+pdfmetrics.registerFontFamily('Montserrat', normal='Montserrat', bold='Montserrat-Bold')
+
+# Open Sans (for Body Text / Tables / Metadata)
+if os.path.exists(os.path.join(fonts_dir, 'OpenSans-Regular.ttf')):
+    pdfmetrics.registerFont(TTFont('Open Sans', os.path.join(fonts_dir, 'OpenSans-Regular.ttf')))
+if os.path.exists(os.path.join(fonts_dir, 'OpenSans-Bold.ttf')):
+    pdfmetrics.registerFont(TTFont('Open Sans-Bold', os.path.join(fonts_dir, 'OpenSans-Bold.ttf')))
+if os.path.exists(os.path.join(fonts_dir, 'OpenSans-SemiBold.ttf')):
+    pdfmetrics.registerFont(TTFont('Open Sans-SemiBold', os.path.join(fonts_dir, 'OpenSans-SemiBold.ttf')))
+pdfmetrics.registerFontFamily('Open Sans', normal='Open Sans', bold='Open Sans-Bold')
+
+# Legacy fallback fonts if present
+if os.path.exists(os.path.join(fonts_dir, 'TrajanPro-Regular.ttf')):
+    pdfmetrics.registerFont(TTFont('Trajan Pro', os.path.join(fonts_dir, 'TrajanPro-Regular.ttf')))
+if os.path.exists(os.path.join(fonts_dir, 'IsidoraSans-Regular.ttf')):
+    pdfmetrics.registerFont(TTFont('Isidora Sans', os.path.join(fonts_dir, 'IsidoraSans-Regular.ttf')))
 
 class PDFGenerator:
     def __init__(self):
@@ -29,34 +53,38 @@ class PDFGenerator:
         self.title_style = ParagraphStyle(
             'CustomTitle',
             parent=self.styles['Heading1'],
+            fontName='Montserrat-Bold',
             fontSize=24,
             spaceAfter=30,
             alignment=TA_CENTER,
-            textColor=colors.darkblue
+            textColor=colors.HexColor('#8B1E24')
         )
         
         # Subtitle style
         self.subtitle_style = ParagraphStyle(
             'CustomSubtitle',
             parent=self.styles['Heading2'],
+            fontName='Montserrat-Bold',
             fontSize=16,
             spaceAfter=20,
-            textColor=colors.darkblue
+            textColor=colors.HexColor('#8B1E24')
         )
         
         # Property title style
         self.property_title_style = ParagraphStyle(
             'PropertyTitle',
             parent=self.styles['Heading3'],
+            fontName='Montserrat-Bold',
             fontSize=14,
             spaceAfter=10,
-            textColor=colors.darkgreen
+            textColor=colors.HexColor('#8B1E24')
         )
         
         # Normal text style
         self.normal_style = ParagraphStyle(
             'CustomNormal',
             parent=self.styles['Normal'],
+            fontName='Open Sans',
             fontSize=10,
             spaceAfter=6
         )
@@ -117,7 +145,8 @@ class PDFGenerator:
             ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
             ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTNAME', (0, 0), (0, -1), 'Open Sans-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Open Sans'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             ('GRID', (0, 0), (-1, -1), 1, colors.black)
@@ -186,7 +215,7 @@ class PDFGenerator:
             ('BACKGROUND', (0, 0), (0, -1), colors.lightblue),
             ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Open Sans-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 12),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
             ('GRID', (0, 0), (-1, -1), 1, colors.black)
@@ -208,7 +237,8 @@ class PDFGenerator:
                 ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
                 ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Open Sans-Bold'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Open Sans'),
                 ('FONTSIZE', (0, 0), (-1, -1), 10),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black)
@@ -230,7 +260,8 @@ class PDFGenerator:
                 ('BACKGROUND', (0, 0), (-1, 0), colors.lightyellow),
                 ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Open Sans-Bold'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Open Sans'),
                 ('FONTSIZE', (0, 0), (-1, -1), 10),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black)
@@ -332,21 +363,24 @@ class PDFGenerator:
         title_style = ParagraphStyle(
             'ExecSummaryTitle',
             parent=self.styles['Heading1'],
-            fontSize=24,
-            spaceAfter=5,
+            fontSize=22,
+            leading=26,
+            spaceAfter=4,
             alignment=TA_LEFT,
             textColor=colors.black,
-            fontName='Trajan Pro'
+            fontName='Montserrat-Bold'
         )
         elements.append(Paragraph("EXECUTIVE SUMMARY", title_style))
         
-        # Add the red block under header
+        # Add the red block under header (left-aligned dot)
         red_bar_data = [['']]
-        red_bar = Table(red_bar_data, colWidths=[0.3*inch], rowHeights=[0.05*inch])
+        red_bar = Table(red_bar_data, colWidths=[0.08*inch], rowHeights=[0.08*inch], hAlign='LEFT')
         red_bar.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.darkred),
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#8B1E24')),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
             ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
         ]))
         elements.append(red_bar)
         elements.append(Spacer(1, 20))
@@ -354,36 +388,37 @@ class PDFGenerator:
         meta_style = ParagraphStyle(
             'ExecMeta',
             parent=self.styles['Normal'],
-            fontSize=11,
+            fontSize=10.5,
             leading=16,
             textColor=colors.black,
-            fontName='Helvetica'
+            fontName='Open Sans'
         )
         
         today_str = datetime.now().strftime("%dth %B %Y")
         elements.append(Paragraph(f"<b>Client Name(s)</b> {client_name}", meta_style))
         elements.append(Paragraph(f"<b>Date</b> {today_str}", meta_style))
         elements.append(Paragraph("<b>Assigned Advisor/Contact Details</b> Mario Sardo", meta_style))
-        elements.append(Spacer(1, 15))
+        elements.append(Spacer(1, 16))
         
         section_style = ParagraphStyle(
             'ExecSectionTitle',
             parent=self.styles['Heading2'],
-            fontSize=12,
-            spaceAfter=8,
-            textColor=colors.darkred,
-            fontName='Helvetica-Bold'
+            fontSize=11.5,
+            leading=15,
+            spaceAfter=6,
+            textColor=colors.HexColor('#8B1E24'),
+            fontName='Montserrat-Bold'
         )
         elements.append(Paragraph("CLIENT BRIEF", section_style))
         
         body_style = ParagraphStyle(
             'ExecBody',
             parent=self.styles['Normal'],
-            fontSize=10,
+            fontSize=9.5,
             leading=14,
-            spaceAfter=6,
+            spaceAfter=5,
             textColor=colors.black,
-            fontName='Helvetica'
+            fontName='Open Sans'
         )
         elements.append(Paragraph(f"<b>Location:</b> Algarve, Portugal", body_style))
         elements.append(Paragraph(f"<b>Bedrooms:</b> {total_properties}+", body_style))
@@ -392,7 +427,7 @@ class PDFGenerator:
         elements.append(Paragraph(f"<b>Average Selected Price:</b> €{avg_price:,.0f}", body_style))
         elements.append(Paragraph(f"<b>Timeline:</b> Immediate", body_style))
         elements.append(Paragraph(f"<b>Overview:</b> Client requested portfolio analysis for the top {total_properties} target items.", body_style))
-        elements.append(Spacer(1, 15))
+        elements.append(Spacer(1, 16))
         
         elements.append(Paragraph("KEY INSIGHTS", section_style))
         elements.append(Paragraph(
@@ -401,7 +436,7 @@ class PDFGenerator:
             "erxi tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat.",
             body_style
         ))
-        elements.append(Spacer(1, 10))
+        elements.append(Spacer(1, 12))
         
         elements.append(Paragraph("MARKET OBSERVATIONS", section_style))
         elements.append(Paragraph(
@@ -420,20 +455,23 @@ class PDFGenerator:
         title_style = ParagraphStyle(
             'ScopeTitle',
             parent=self.styles['Heading1'],
-            fontSize=24,
-            spaceAfter=5,
+            fontSize=22,
+            leading=26,
+            spaceAfter=4,
             alignment=TA_LEFT,
             textColor=colors.black,
-            fontName='Trajan Pro'
+            fontName='Montserrat-Bold'
         )
         elements.append(Paragraph("EXECUTIVE SUMMARY", title_style))
         
         red_bar_data = [['']]
-        red_bar = Table(red_bar_data, colWidths=[0.3*inch], rowHeights=[0.05*inch])
+        red_bar = Table(red_bar_data, colWidths=[0.08*inch], rowHeights=[0.08*inch], hAlign='LEFT')
         red_bar.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.darkred),
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#8B1E24')),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
             ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
         ]))
         elements.append(red_bar)
         elements.append(Spacer(1, 20))
@@ -441,21 +479,22 @@ class PDFGenerator:
         section_style = ParagraphStyle(
             'ScopeSectionTitle',
             parent=self.styles['Heading2'],
-            fontSize=12,
+            fontSize=11.5,
+            leading=15,
             spaceAfter=8,
-            textColor=colors.darkred,
-            fontName='Helvetica-Bold'
+            textColor=colors.HexColor('#8B1E24'),
+            fontName='Montserrat-Bold'
         )
         elements.append(Paragraph("SCOPE OF PROPERTY SEARCH", section_style))
         
         body_style = ParagraphStyle(
             'ScopeBody',
             parent=self.styles['Normal'],
-            fontSize=10,
+            fontSize=9.5,
             leading=15,
             spaceAfter=12,
             textColor=colors.black,
-            fontName='Helvetica'
+            fontName='Open Sans'
         )
         elements.append(Paragraph(
             "Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh "
@@ -486,8 +525,10 @@ class PDFGenerator:
         # 1. Header block: Title on Left, Reference on Right
         header_data = [
             [
-                Paragraph(f"<b>{(property_data.get('title') or property_data.get('property_type') or 'PROPERTY').upper()}</b>", ParagraphStyle('PropTitleLeft', parent=self.styles['Normal'], fontName='Trajan Pro', fontSize=18, textColor=colors.darkred)),
-                Paragraph(f"<b>REF {property_data.get('sardo_reference') or 'N/A'}</b>", ParagraphStyle('PropRefRight', parent=self.styles['Normal'], fontName='Trajan Pro', fontSize=12, alignment=2, textColor=colors.darkred))
+                Paragraph(f"<b>{(property_data.get('title') or property_data.get('property_type') or 'PROPERTY').upper()}</b>", 
+                          ParagraphStyle('PropTitleLeft', parent=self.styles['Normal'], fontName='Montserrat-Bold', fontSize=16, leading=20, textColor=colors.HexColor('#8B1E24'))),
+                Paragraph(f"<b>REF {property_data.get('sardo_reference') or 'N/A'}</b>", 
+                          ParagraphStyle('PropRefRight', parent=self.styles['Normal'], fontName='Montserrat-Bold', fontSize=11, leading=16, alignment=2, textColor=colors.HexColor('#8B1E24')))
             ]
         ]
         header_table = Table(header_data, colWidths=[5.0*inch, 2.2*inch])
@@ -530,8 +571,8 @@ class PDFGenerator:
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
-                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 12),
+                ('FONTNAME', (0, 0), (-1, -1), 'Open Sans-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 11),
                 ('TEXTCOLOR', (0, 0), (-1, -1), colors.gray)
             ]))
             elements.append(hero_placeholder)
@@ -661,7 +702,7 @@ class PDFGenerator:
                     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
-                    ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                    ('FONTNAME', (0, 0), (-1, -1), 'Open Sans'),
                     ('FONTSIZE', (0, 0), (-1, -1), 9),
                     ('TEXTCOLOR', (0, 0), (-1, -1), colors.gray)
                 ]))
@@ -694,10 +735,10 @@ class PDFGenerator:
         attr_style = ParagraphStyle(
             'AttrItem',
             parent=self.styles['Normal'],
-            fontSize=10,
+            fontSize=9.5,
             leading=18,
             textColor=colors.black,
-            fontName='Helvetica'
+            fontName='Open Sans'
         )
         
         # Compile attributes HTML column using clean character icons matching template layout
@@ -726,10 +767,10 @@ class PDFGenerator:
         desc_style = ParagraphStyle(
             'RightDesc',
             parent=self.styles['Normal'],
-            fontSize=10,
+            fontSize=9.5,
             leading=14,
             textColor=colors.black,
-            fontName='Helvetica'
+            fontName='Open Sans'
         )
         
         right_elements.append(Paragraph(
@@ -747,7 +788,7 @@ class PDFGenerator:
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Open Sans'),
             ('FONTSIZE', (0, 0), (-1, -1), 9),
             ('TEXTCOLOR', (0, 0), (-1, -1), colors.gray)
         ]))
@@ -798,74 +839,75 @@ class PDFGenerator:
         return elements
 
     def _create_property_analysis_page(self, property_data: Dict, index: int) -> List:
-        """Create the analysis page (Page 2) containing placeholder Lorem Ipsum commentary"""
+        """Create the analysis page (Page 2) matching the template format:
+        - Top header row with Title (left) and Reference (right)
+        - Red 'PROPERTY ANALYSIS' section header
+        - 3 structured commentary paragraphs
+        """
         elements = []
         
-        title_style = ParagraphStyle(
-            'Analysis_Title',
-            parent=self.styles['Heading1'],
-            fontSize=20,
-            spaceAfter=25,
-            alignment=TA_LEFT,
-            textColor=colors.darkred,
-            fontName='Trajan Pro'
-        )
-        elements.append(Paragraph(f"{index}. Property Analysis & Commentary", title_style))
+        # 1. Header block: Title on Left, Reference on Right
+        header_data = [
+            [
+                Paragraph(f"<b>{(property_data.get('title') or property_data.get('property_type') or 'PROPERTY').upper()}</b>", 
+                          ParagraphStyle('PropAnalysisTitleLeft', parent=self.styles['Normal'], fontName='Montserrat-Bold', fontSize=16, leading=20, textColor=colors.HexColor('#8B1E24'))),
+                Paragraph(f"<b>REF {property_data.get('sardo_reference') or 'N/A'}</b>", 
+                          ParagraphStyle('PropAnalysisRefRight', parent=self.styles['Normal'], fontName='Montserrat-Bold', fontSize=11, leading=16, alignment=2, textColor=colors.HexColor('#8B1E24')))
+            ]
+        ]
+        header_table = Table(header_data, colWidths=[5.0*inch, 2.2*inch])
+        header_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        elements.append(header_table)
+        elements.append(Spacer(1, 20))
         
-        lorem_title_style = ParagraphStyle(
-            'Lorem_Title',
+        section_style = ParagraphStyle(
+            'AnalysisSectionHeader',
             parent=self.styles['Heading2'],
-            fontSize=14,
-            spaceAfter=10,
-            textColor=colors.black,
-            fontName='Helvetica-Bold'
-        )
-        
-        lorem_body_style = ParagraphStyle(
-            'Lorem_Body',
-            parent=self.styles['Normal'],
-            fontSize=11,
+            fontSize=11.5,
+            leading=15,
             spaceAfter=15,
-            leading=16,
+            textColor=colors.HexColor('#8B1E24'),
+            fontName='Montserrat-Bold'
+        )
+        elements.append(Paragraph("PROPERTY ANALYSIS", section_style))
+        
+        body_style = ParagraphStyle(
+            'AnalysisBody',
+            parent=self.styles['Normal'],
+            fontSize=9.5,
+            leading=15,
+            spaceAfter=14,
             textColor=colors.black,
-            fontName='Helvetica'
+            fontName='Open Sans'
         )
         
-        # Section 1
-        elements.append(Paragraph("1. Market Context & Valuation Analysis", lorem_title_style))
         elements.append(Paragraph(
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam pulvinar vestibulum erat, "
-            "ut dictum dolor. Duis et congue erat. Sed tempor lorem sed elit aliquam congue. "
-            "Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. "
-            "Integer at urna id leo commodo facilisis. Ut pellentesque elementum luctus. "
-            "Praesent et diam in dui volutpat efficitur. Mauris vitae tellus nec elit gravida pellentesque nec vel nisl.",
-            lorem_body_style
+            "Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh "
+            "euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim "
+            "veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea "
+            "commodo consequat.",
+            body_style
         ))
-        elements.append(Spacer(1, 10))
         
-        # Section 2
-        elements.append(Paragraph("2. Strategic Fit & Investment Potential", lorem_title_style))
         elements.append(Paragraph(
-            "Phasellus aliquet, elit vel rhoncus efficitur, ligula mauris porta augue, vitae eleifend "
-            "lectus lectus sit amet erat. Integer facilisis eros quis congue lobortis. "
-            "Aliquam eget leo et tellus tincidunt finibus. Ut sed felis nec eros gravida sodales porta vel metus. "
-            "Curabitur rhoncus nunc sed eros feugiat, sit amet egestas mauris efficitur. "
-            "Donec id pulvinar dolor. Sed facilisis, risus quis congue ultrices, arcu ligula porttitor "
-            "mauris, sed sollicitudin nisl magna non purus. Aliquam nec arcu id mi varius finibus. "
-            "Morbi elementum nunc convallis turpis vulputate sollicitudin.",
-            lorem_body_style
+            "Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, "
+            "vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim "
+            "qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.",
+            body_style
         ))
-        elements.append(Spacer(1, 10))
         
-        # Section 3
-        elements.append(Paragraph("3. Recommendations & Negotiation Position", lorem_title_style))
         elements.append(Paragraph(
-            "Curabitur finibus hendrerit rhoncus. Suspendisse pretium felis mi, volutpat lacinia urna "
-            "tincidunt et. Curabitur sed luctus diam. Etiam feugiat, nunc convallis laoreet "
-            "scelerisque, justo ex finibus erat, ut feugiat metus sem pellentesque lorem. "
-            "Sed interdum eleifend tellus, non convallis lacus faucibus in. Proin hendrerit "
-            "dolor lorem, a eleifend magna hendrerit a. Proin cursus metus sit amet diam tristique sodales.",
-            lorem_body_style
+            "Lorem ipsum dolor sit amet, cons ectetuer adipiscing elit, sed diam nonummy nibh "
+            "euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim "
+            "veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea "
+            "commodo consequat.",
+            body_style
         ))
         
         return elements
