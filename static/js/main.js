@@ -205,7 +205,7 @@ function energyBadge(rating) {
                 <div class="card-image-container" style="position: relative;">
                     ${imgHtml}
                     ${offMarketBadge}
-                    <div class="checkbox-container" onclick="event.stopPropagation();">
+                    <div class="checkbox-container">
                         <input type="checkbox" class="card-checkbox" value="${prop.id}" ${selectedPropertyIds.has(prop.id.toString()) || selectedPropertyIds.has(prop.id) ? 'checked' : ''}>
                     </div>
                     <div class="card-price-badge">${price}</div>
@@ -239,20 +239,40 @@ function energyBadge(rating) {
                 </div>
             `;
 
-            // Card click to show modal
+            // View Details button opens the modal
             const viewBtn = card.querySelector('.btn-view-details');
-            viewBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                showModal(prop);
-            });
+            if (viewBtn) {
+                viewBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showModal(prop);
+                });
+            }
 
-            card.addEventListener('click', () => {
-                // Clicking the card opens the details modal
-                showModal(prop);
+            // Clicking the card toggles selection (same as table rows)
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.card-checkbox')) {
+                    return;
+                }
+                const checkbox = card.querySelector('.card-checkbox');
+                if (checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                    checkbox.dispatchEvent(new Event('change'));
+                }
             });
 
             // Checkbox logic
             const checkbox = card.querySelector('.card-checkbox');
+            const checkboxContainer = card.querySelector('.checkbox-container');
+            if (checkboxContainer) {
+                checkboxContainer.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (e.target !== checkbox) {
+                        checkbox.checked = !checkbox.checked;
+                        checkbox.dispatchEvent(new Event('change'));
+                    }
+                });
+            }
+
             checkbox.addEventListener('change', (e) => {
                 e.stopPropagation();
                 if (e.target.checked) {
