@@ -1663,3 +1663,122 @@ def download_sample_tags_csv_endpoint():
         headers={'Content-Disposition': 'attachment;filename=sardo_property_tags_template.csv'}
     )
 
+@app.route('/api/tags', methods=['GET'])
+@login_required
+def get_tags_endpoint():
+    tags = db_manager.get_all_tags()
+    return jsonify({'tags': tags})
+
+@app.route('/api/tags/global', methods=['GET'])
+@login_required
+def get_global_tags_endpoint():
+    global_tags = db_manager.get_global_tags()
+    return jsonify({'global_tags': global_tags})
+
+@app.route('/api/tags/global', methods=['POST'])
+@login_required
+def create_global_tag_endpoint():
+    data = request.json or {}
+    name = data.get('name', '').strip()
+    category = data.get('category', 'General').strip()
+    color = data.get('color', '#4f46e5').strip()
+    description = data.get('description', '').strip()
+    res = db_manager.create_global_tag(name=name, category=category, color=color, description=description)
+    if not res.get('success'):
+        return jsonify(res), 400
+    return jsonify(res), 201
+
+@app.route('/api/tags/global/<tag_name>', methods=['DELETE'])
+@login_required
+def delete_global_tag_endpoint(tag_name):
+    res = db_manager.delete_global_tag(tag_name)
+    if not res.get('success'):
+        return jsonify(res), 400
+    return jsonify(res)
+
+@app.route('/api/properties/bulk-tags', methods=['POST'])
+@login_required
+def bulk_assign_tags_endpoint():
+    data = request.json or {}
+    property_ids = data.get('property_ids', [])
+    tag = data.get('tag', '').strip()
+    action = data.get('action', 'add').strip().lower()
+    if not property_ids:
+        return jsonify({'success': False, 'error': 'No properties selected'}), 400
+    if not tag:
+        return jsonify({'success': False, 'error': 'Tag name cannot be empty'}), 400
+    res = db_manager.bulk_assign_tag_to_properties(property_ids, tag, action=action)
+    if not res.get('success'):
+        return jsonify(res), 400
+    return jsonify(res)
+
+@app.route('/api/properties/<property_id>/tags', methods=['PUT'])
+@login_required
+def update_property_tags_endpoint(property_id):
+    data = request.json or {}
+    tags = data.get('tags', [])
+    res = db_manager.update_property_tags(property_id, tags)
+    if not res.get('success'):
+        return jsonify(res), 400
+    return jsonify(res)
+
+@app.route('/api/properties/tags/upload-csv', methods=['POST'])
+@login_required
+def upload_tags_csv_endpoint():
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+    
+    file = request.files['file']
+    if not file or file.filename == '':
+        return jsonify({'success': False, 'error': 'Empty filename'}), 400
+
+    if not file.filename.lower().endswith(('.csv', '.txt')):
+        return jsonify({'success': False, 'error': 'Invalid file format. Please upload a .csv file'}), 400
+
+    mode = request.form.get('mode', 'replace').lower()
+    if mode not in ('replace', 'append'):
+        mode = 'replace'
+
+    try:
+        import csv
+        import io
+        content = file.read().decode('utf-8-sig', errors='replace')
+        reader = csv.DictReader(io.StringIO(content))
+        csv_rows = list(reader)
+        
+        if not csv_rows:
+            return jsonify({'success': False, 'error': 'The uploaded CSV file is empty'}), 400
+
+        res = db_manager.bulk_update_tags_from_csv(csv_rows, mode=mode)
+        return jsonify(res)
+    except Exception as e:
+        logging.error(f"Error parsing tags CSV: {e}")
+        return jsonify({'success': False, 'error': f'Failed to parse CSV: {str(e)}'}), 500
+
+@app.route('/api/properties/tags/sample-csv', methods=['GET'])
+@login_required
+def download_sample_tags_csv_endpoint():
+    result = db_manager.get_properties({}, limit=100, offset=0)
+    props = assign_sardo_references(result.get('properties', []))
+    
+    import io
+    import csv
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['property_id', 'tags', 'property_title_hint'])
+    
+    for p in props:
+        tags_str = ", ".join(p.get('tags') or [])
+        ref = p.get('sardo_reference') or p.get('reference') or p.get('id')
+        price_val = p.get('property_price')
+        price_str = f"€{price_val:,}" if price_val and price_val > 0 else "P.O.A."
+        title_hint = f"{p.get('property_type', '')} in {p.get('location', '')} ({price_str})"
+        writer.writerow([ref, tags_str, title_hint])
+        
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment;filename=sardo_property_tags_template.csv'}
+    )
+

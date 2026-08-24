@@ -484,9 +484,24 @@ function energyBadge(rating) {
                 <p><strong>SARDO Ref:</strong> ${prop.sardo_reference || 'N/A'}</p>
                 <p><strong>Year Built:</strong> ${prop.construction_year || '—'}</p>
                 <p><strong>Energy Rating:</strong> ${energyBadge(prop.energy_rating)}</p>
-                <div style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 8px;">
-                    <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary);"><i class="fas fa-tags" style="color: var(--primary-color);"></i> Tags</span>
-                    ${renderTagsBadges(prop.tags) || '<p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; font-style: italic;">No tags assigned</p>'}
+                
+                <!-- Interactive Quick Preview Tag Editor -->
+                <div class="preview-tag-editor-box">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary);"><i class="fas fa-tags" style="color: #6366f1;"></i> Custom Tags</span>
+                        <span style="font-size: 10px; color: #94a3b8;">Click ✕ to remove</span>
+                    </div>
+                    <div id="preview-tags-cloud-${prop.id}" class="tags-cloud-container" style="min-height: 24px; margin-bottom: 8px;">
+                        ${(prop.tags && Array.isArray(prop.tags) && prop.tags.length > 0)
+                            ? prop.tags.map(t => `<span class="property-tag-chip" style="font-size: 11px; padding: 2px 8px;">${esc(t)} <i class="fas fa-times remove-tag-btn" onclick="handleRemovePreviewTag('${prop.id}', '${esc(t)}')" title="Remove tag"></i></span>`).join('')
+                            : '<span style="color: #94a3b8; font-size: 11px; font-style: italic;">No tags assigned</span>'}
+                    </div>
+                    <div style="display: flex; gap: 6px; position: relative;">
+                        <input type="text" id="preview-new-tag-input-${prop.id}" list="global-tags-datalist" placeholder="Add tag (e.g. Sea View)..." style="flex: 1; padding: 5px 8px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; background: white;" onkeypress="if(event.key==='Enter'){event.preventDefault(); handleAddPreviewTag('${prop.id}');}">
+                        <button type="button" onclick="handleAddPreviewTag('${prop.id}')" style="background: var(--primary-color); color: white; border: none; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;" title="Add Tag">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
@@ -566,7 +581,7 @@ function energyBadge(rating) {
                         <p><strong>Construction / Renovation:</strong> ${prop.construction_year || 'N/A'} / ${prop.renovation_year || 'N/A'}</p>
                         <p><strong>Energy Rating:</strong> ${energyBadge(prop.energy_rating)}</p>
                         
-                        <!-- Interactive Tags Section -->
+                        <!-- Interactive Tags Section in Property Modal -->
                         <div class="modal-tags-section" style="margin-top: 16px; padding: 14px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: 10px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                 <label style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.5px;"><i class="fas fa-tags" style="color: #6366f1;"></i> Custom Tags</label>
@@ -578,7 +593,7 @@ function energyBadge(rating) {
                                     : '<span style="color: #94a3b8; font-size: 12px; font-style: italic;">No tags assigned yet</span>'}
                             </div>
                             <div style="display: flex; gap: 8px;">
-                                <input type="text" id="modal-new-tag-input" placeholder="Add custom tag (e.g. Sea View, Prime Location)" style="flex: 1; padding: 7px 12px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; background: white;" onkeypress="if(event.key==='Enter'){event.preventDefault(); handleAddModalTag('${prop.id}');}">
+                                <input type="text" id="modal-new-tag-input" list="global-tags-datalist" placeholder="Add tag (e.g. Sea View, Golf Course Views)..." style="flex: 1; padding: 7px 12px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; background: white;" onkeypress="if(event.key==='Enter'){event.preventDefault(); handleAddModalTag('${prop.id}');}">
                                 <button type="button" onclick="handleAddModalTag('${prop.id}')" style="background: var(--primary-color); color: white; border: none; padding: 7px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;">
                                     <i class="fas fa-plus"></i> Add Tag
                                 </button>
@@ -591,6 +606,7 @@ function energyBadge(rating) {
             </div>
         `;
         propertyModal.style.display = 'flex';
+        updateGlobalTagsDatalist();
         if (isOffMarket && typeof loadPropertyDocumentsForModal === 'function') {
             loadPropertyDocumentsForModal(prop.id);
         }
@@ -1352,7 +1368,7 @@ function energyBadge(rating) {
         const newTag = input.value.trim();
         if (!newTag) return;
 
-        const prop = currentProperties.find(p => String(p.id) === String(propertyId));
+        const prop = currentProperties.find(p => String(p.id).toLowerCase() === String(propertyId).toLowerCase());
         const currentTags = (prop && Array.isArray(prop.tags)) ? [...prop.tags] : [];
 
         if (currentTags.some(t => t.toLowerCase() === newTag.toLowerCase())) {
@@ -1374,7 +1390,7 @@ function energyBadge(rating) {
 
             if (prop) prop.tags = data.tags;
             input.value = '';
-            showToast('Tag added successfully', 'success');
+            showToast(`Tag "${newTag}" added successfully!`, 'success');
 
             // Refresh tags in modal
             const tagsListEl = document.getElementById('modal-tags-list');
@@ -1382,17 +1398,24 @@ function energyBadge(rating) {
                 tagsListEl.innerHTML = data.tags.map(t => `<span class="property-tag-chip">${esc(t)} <i class="fas fa-times remove-tag-btn" onclick="handleRemoveModalTag('${propertyId}', '${esc(t)}')" title="Remove tag"></i></span>`).join('');
             }
 
+            // Refresh Quick Preview if open
+            const previewCloudEl = document.getElementById(`preview-tags-cloud-${propertyId}`);
+            if (previewCloudEl) {
+                previewCloudEl.innerHTML = data.tags.map(t => `<span class="property-tag-chip" style="font-size: 11px; padding: 2px 8px;">${esc(t)} <i class="fas fa-times remove-tag-btn" onclick="handleRemovePreviewTag('${propertyId}', '${esc(t)}')" title="Remove tag"></i></span>`).join('');
+            }
+
             // Refresh cards and table in background
             renderGrid();
             renderTable();
             refreshTagsFilter();
+            updateGlobalTagsDatalist();
         } catch (err) {
             showToast(`Error: ${err.message}`, 'error');
         }
     };
 
     window.handleRemoveModalTag = async (propertyId, tagToRemove) => {
-        const prop = currentProperties.find(p => String(p.id) === String(propertyId));
+        const prop = currentProperties.find(p => String(p.id).toLowerCase() === String(propertyId).toLowerCase());
         const currentTags = (prop && Array.isArray(prop.tags))
             ? prop.tags.filter(t => t.toLowerCase() !== tagToRemove.toLowerCase())
             : [];
@@ -1407,7 +1430,7 @@ function energyBadge(rating) {
             if (!data.success) throw new Error(data.error || 'Failed to update tags');
 
             if (prop) prop.tags = data.tags;
-            showToast('Tag removed', 'info');
+            showToast(`Tag "${tagToRemove}" removed`, 'info');
 
             // Refresh tags in modal
             const tagsListEl = document.getElementById('modal-tags-list');
@@ -1417,9 +1440,18 @@ function energyBadge(rating) {
                     : '<span style="color: #94a3b8; font-size: 12px; font-style: italic;">No tags assigned yet</span>';
             }
 
+            // Refresh Quick Preview if open
+            const previewCloudEl = document.getElementById(`preview-tags-cloud-${propertyId}`);
+            if (previewCloudEl) {
+                previewCloudEl.innerHTML = data.tags.length > 0
+                    ? data.tags.map(t => `<span class="property-tag-chip" style="font-size: 11px; padding: 2px 8px;">${esc(t)} <i class="fas fa-times remove-tag-btn" onclick="handleRemovePreviewTag('${propertyId}', '${esc(t)}')" title="Remove tag"></i></span>`).join('')
+                    : '<span style="color: #94a3b8; font-size: 11px; font-style: italic;">No tags assigned</span>';
+            }
+
             renderGrid();
             renderTable();
             refreshTagsFilter();
+            updateGlobalTagsDatalist();
         } catch (err) {
             showToast(`Error: ${err.message}`, 'error');
         }
@@ -1584,6 +1616,361 @@ function energyBadge(rating) {
             tModal.style.display = 'none';
         }
     });
+
+    // Quick Preview Tag Editor Handlers
+    window.handleAddPreviewTag = async (propertyId) => {
+        const input = document.getElementById(`preview-new-tag-input-${propertyId}`);
+        if (!input) return;
+        const newTag = input.value.trim();
+        if (!newTag) return;
+
+        const prop = currentProperties.find(p => String(p.id) === String(propertyId));
+        const currentTags = (prop && Array.isArray(prop.tags)) ? [...prop.tags] : [];
+
+        if (currentTags.some(t => t.toLowerCase() === newTag.toLowerCase())) {
+            showToast('Tag already exists on this property', 'info');
+            input.value = '';
+            return;
+        }
+
+        currentTags.push(newTag);
+
+        try {
+            const res = await fetch(`/api/properties/${propertyId}/tags`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tags: currentTags })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Failed to update tags');
+
+            if (prop) prop.tags = data.tags;
+            input.value = '';
+            showToast(`Tag "${newTag}" added!`, 'success');
+
+            // Refresh preview chips
+            const cloudEl = document.getElementById(`preview-tags-cloud-${propertyId}`);
+            if (cloudEl) {
+                cloudEl.innerHTML = data.tags.map(t => `<span class="property-tag-chip" style="font-size: 11px; padding: 2px 8px;">${esc(t)} <i class="fas fa-times remove-tag-btn" onclick="handleRemovePreviewTag('${propertyId}', '${esc(t)}')" title="Remove tag"></i></span>`).join('');
+            }
+
+            renderGrid();
+            renderTable();
+            refreshTagsFilter();
+            updateGlobalTagsDatalist();
+        } catch (err) {
+            showToast(`Error: ${err.message}`, 'error');
+        }
+    };
+
+    window.handleRemovePreviewTag = async (propertyId, tagToRemove) => {
+        const prop = currentProperties.find(p => String(p.id) === String(propertyId));
+        const currentTags = (prop && Array.isArray(prop.tags))
+            ? prop.tags.filter(t => t.toLowerCase() !== tagToRemove.toLowerCase())
+            : [];
+
+        try {
+            const res = await fetch(`/api/properties/${propertyId}/tags`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tags: currentTags })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Failed to update tags');
+
+            if (prop) prop.tags = data.tags;
+            showToast(`Tag "${tagToRemove}" removed`, 'info');
+
+            // Refresh preview chips
+            const cloudEl = document.getElementById(`preview-tags-cloud-${propertyId}`);
+            if (cloudEl) {
+                cloudEl.innerHTML = data.tags.length > 0
+                    ? data.tags.map(t => `<span class="property-tag-chip" style="font-size: 11px; padding: 2px 8px;">${esc(t)} <i class="fas fa-times remove-tag-btn" onclick="handleRemovePreviewTag('${propertyId}', '${esc(t)}')" title="Remove tag"></i></span>`).join('')
+                    : '<span style="color: #94a3b8; font-size: 11px; font-style: italic;">No tags assigned</span>';
+            }
+
+            renderGrid();
+            renderTable();
+            refreshTagsFilter();
+            updateGlobalTagsDatalist();
+        } catch (err) {
+            showToast(`Error: ${err.message}`, 'error');
+        }
+    };
+
+    // Global Tags Library Management
+    let globalTagsLibraryCache = [];
+
+    const updateGlobalTagsDatalist = async () => {
+        try {
+            let datalist = document.getElementById('global-tags-datalist');
+            if (!datalist) {
+                datalist = document.createElement('datalist');
+                datalist.id = 'global-tags-datalist';
+                document.body.appendChild(datalist);
+            }
+            if (globalTagsLibraryCache.length === 0) {
+                const res = await fetch('/api/tags/global');
+                if (res.ok) {
+                    const data = await res.json();
+                    globalTagsLibraryCache = data.global_tags || [];
+                }
+            }
+            datalist.innerHTML = globalTagsLibraryCache.map(t => `<option value="${esc(t.name)}">${esc(t.category || '')}</option>`).join('');
+        } catch (_) {}
+    };
+
+    window.switchTagsModalTab = (tabName) => {
+        const tabGlobal = document.getElementById('tags-tab-global');
+        const tabCsv = document.getElementById('tags-tab-csv');
+        const btnGlobal = document.getElementById('tab-btn-global-tags');
+        const btnCsv = document.getElementById('tab-btn-csv-upload');
+
+        if (tabName === 'global') {
+            if (tabGlobal) tabGlobal.style.display = 'block';
+            if (tabCsv) tabCsv.style.display = 'none';
+            if (btnGlobal) {
+                btnGlobal.style.color = '#4f46e5';
+                btnGlobal.style.borderBottom = '3px solid #4f46e5';
+                btnGlobal.style.fontWeight = '700';
+            }
+            if (btnCsv) {
+                btnCsv.style.color = '#64748b';
+                btnCsv.style.borderBottom = '3px solid transparent';
+                btnCsv.style.fontWeight = '600';
+            }
+            window.loadGlobalTagsLibrary();
+        } else {
+            if (tabGlobal) tabGlobal.style.display = 'none';
+            if (tabCsv) tabCsv.style.display = 'block';
+            if (btnCsv) {
+                btnCsv.style.color = '#4f46e5';
+                btnCsv.style.borderBottom = '3px solid #4f46e5';
+                btnCsv.style.fontWeight = '700';
+            }
+            if (btnGlobal) {
+                btnGlobal.style.color = '#64748b';
+                btnGlobal.style.borderBottom = '3px solid transparent';
+                btnGlobal.style.fontWeight = '600';
+            }
+        }
+    };
+
+    window.loadGlobalTagsLibrary = async () => {
+        const listEl = document.getElementById('global-tags-categories-list');
+        const selectionBanner = document.getElementById('global-tags-selection-banner');
+        const selectedCountEl = document.getElementById('global-tags-selected-count');
+
+        if (selectedPropertyIds.size > 0) {
+            if (selectionBanner) selectionBanner.style.display = 'flex';
+            if (selectedCountEl) selectedCountEl.innerText = selectedPropertyIds.size;
+        } else {
+            if (selectionBanner) selectionBanner.style.display = 'none';
+        }
+
+        try {
+            const res = await fetch('/api/tags/global');
+            if (!res.ok) throw new Error('Failed to load global tags');
+            const data = await res.json();
+            globalTagsLibraryCache = data.global_tags || [];
+            window.renderGlobalTagsLibrary(globalTagsLibraryCache);
+            updateGlobalTagsDatalist();
+        } catch (err) {
+            if (listEl) listEl.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 20px;">Error loading global tags: ${esc(err.message)}</div>`;
+        }
+    };
+
+    window.renderGlobalTagsLibrary = (tagsList) => {
+        const listEl = document.getElementById('global-tags-categories-list');
+        if (!listEl) return;
+
+        if (!tagsList || tagsList.length === 0) {
+            listEl.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 30px;">No tags found in library.</div>';
+            return;
+        }
+
+        // Group by category
+        const groups = {};
+        tagsList.forEach(t => {
+            const cat = t.category || 'General';
+            if (!groups[cat]) groups[cat] = [];
+            groups[cat].push(t);
+        });
+
+        const hasSelection = selectedPropertyIds.size > 0;
+
+        let html = '';
+        for (const [catName, tags] of Object.entries(groups)) {
+            html += `
+                <div class="global-category-block">
+                    <div class="global-category-title">
+                        <span><i class="fas fa-folder-open" style="color: #6366f1; margin-right: 6px;"></i> ${esc(catName)}</span>
+                        <span style="font-size: 11px; color: #94a3b8;">${tags.length} tags</span>
+                    </div>
+                    <div class="tags-cloud-container">
+                        ${tags.map(t => `
+                            <button type="button" class="global-tag-card-chip" onclick="handleGlobalTagClick('${esc(t.name)}')" title="${esc(t.description || t.name)} ${hasSelection ? '(Click to toggle on ' + selectedPropertyIds.size + ' selected properties)' : '(Click to filter)'}">
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: ${t.color || '#4f46e5'};"></span>
+                                <span>${esc(t.name)}</span>
+                                <span class="tag-count-badge">${t.usage_count || 0}</span>
+                                <span class="global-tag-delete-icon" onclick="handleDeleteGlobalTag(event, '${esc(t.name)}')" title="Delete '${esc(t.name)}' from library"><i class="fas fa-times"></i></span>
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        listEl.innerHTML = html;
+    };
+
+    window.handleDeleteGlobalTag = async (event, tagName) => {
+        if (event) event.stopPropagation();
+        
+        const confirmed = await sardoConfirm({
+            title: 'Delete Global Tag',
+            body: `Are you sure you want to remove the tag "<strong>${esc(tagName)}</strong>" from the Global Tags Library?`,
+            confirmText: 'Delete Tag',
+            type: 'danger'
+        });
+
+        if (!confirmed) return;
+
+        try {
+            const res = await fetch(`/api/tags/global/${encodeURIComponent(tagName)}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Failed to delete tag');
+
+            showToast(`Tag "${tagName}" deleted from library`, 'info');
+            window.loadGlobalTagsLibrary();
+            refreshTagsFilter();
+        } catch (err) {
+            showToast(`Error: ${err.message}`, 'error');
+        }
+    };
+
+    window.filterGlobalTagsLibrary = (query) => {
+        const q = (query || '').toLowerCase().trim();
+        if (!q) {
+            window.renderGlobalTagsLibrary(globalTagsLibraryCache);
+            return;
+        }
+        const filtered = globalTagsLibraryCache.filter(t => 
+            t.name.toLowerCase().includes(q) || (t.category && t.category.toLowerCase().includes(q))
+        );
+        window.renderGlobalTagsLibrary(filtered);
+    };
+
+    window.toggleCreateGlobalTagForm = (forceState) => {
+        const panel = document.getElementById('create-global-tag-panel');
+        const nameInput = document.getElementById('new-global-tag-name');
+        if (!panel) return;
+        
+        if (typeof forceState === 'boolean') {
+            panel.style.display = forceState ? 'block' : 'none';
+        } else {
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+
+        if (panel.style.display === 'block') {
+            if (nameInput) {
+                nameInput.value = '';
+                nameInput.focus();
+            }
+        } else {
+            if (nameInput) nameInput.value = '';
+        }
+    };
+
+    window.submitCreateGlobalTag = async () => {
+        const nameInput = document.getElementById('new-global-tag-name');
+        const catSelect = document.getElementById('new-global-tag-category');
+        const colorInput = document.getElementById('new-global-tag-color');
+
+        const name = nameInput ? nameInput.value.trim() : '';
+        const category = catSelect ? catSelect.value : 'General';
+        const color = colorInput ? colorInput.value : '#4f46e5';
+
+        if (!name) {
+            showToast('Tag name is required', 'error');
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/tags/global', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, category, color })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Failed to create global tag');
+
+            showToast(`Global Tag "${name}" created!`, 'success');
+            if (nameInput) nameInput.value = '';
+            window.toggleCreateGlobalTagForm();
+            window.loadGlobalTagsLibrary();
+            refreshTagsFilter();
+        } catch (err) {
+            showToast(`Error: ${err.message}`, 'error');
+        }
+    };
+
+    window.handleGlobalTagClick = async (tagName) => {
+        if (selectedPropertyIds.size > 0) {
+            const propIds = Array.from(selectedPropertyIds);
+            try {
+                showLoading(`Applying tag "${tagName}" to ${propIds.length} properties...`);
+                const res = await fetch('/api/properties/bulk-tags', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ property_ids: propIds, tag: tagName, action: 'add' })
+                });
+                const data = await res.json();
+                hideLoading();
+                if (!data.success) throw new Error(data.error || 'Failed to bulk assign tag');
+
+                showToast(`Tag "${tagName}" assigned to ${data.updated_count} properties!`, 'success');
+                window.loadGlobalTagsLibrary();
+                refreshTagsFilter();
+                fetchProperties(getFilters());
+            } catch (err) {
+                hideLoading();
+                showToast(`Error: ${err.message}`, 'error');
+            }
+        } else {
+            // Filter by this tag
+            if (filterTags) {
+                let found = false;
+                Array.from(filterTags.options).forEach(opt => {
+                    if (opt.value.toLowerCase() === tagName.toLowerCase()) {
+                        opt.selected = true;
+                        found = true;
+                    }
+                });
+                if (!found) {
+                    const opt = document.createElement('option');
+                    opt.value = tagName;
+                    opt.textContent = `${tagName}`;
+                    opt.selected = true;
+                    filterTags.appendChild(opt);
+                }
+                closeTagUploadModal();
+                btnSearch.click();
+            }
+        }
+    };
+
+    // Update openTagUploadModal to initialize Global Tags Library
+    const originalOpenTagUploadModal = window.openTagUploadModal;
+    window.openTagUploadModal = () => {
+        originalOpenTagUploadModal();
+        window.switchTagsModalTab('global');
+    };
+
+    // Initialize Global Tags datalist on startup
+    updateGlobalTagsDatalist();
 
     // Initialize
     loadMetadata();
