@@ -282,6 +282,8 @@ function energyBadge(rating) {
                     e.stopPropagation();
                     showModal(prop);
                 });
+            }
+
             // Clicking the card toggles selection (same as table rows)
             card.addEventListener('click', (e) => {
                 if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.card-checkbox')) {
@@ -391,6 +393,8 @@ function energyBadge(rating) {
                     e.preventDefault();
                     showModal(prop);
                 });
+            }
+
             row.addEventListener('click', () => {
                 const checkbox = row.querySelector('.row-checkbox');
                 checkbox.checked = !checkbox.checked;
