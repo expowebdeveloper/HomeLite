@@ -824,9 +824,16 @@ class DatabaseManager:
         
         base_query = """
                 FROM (
-                    SELECT *,
-                           'SARDO' || (1099 + ROW_NUMBER() OVER(ORDER BY COALESCE(source, ''), COALESCE(image_filename, ''))) as sardo_reference
-                    FROM properties
+                    SELECT p_inner.*,
+                           'SARDO' || (1099 + ROW_NUMBER() OVER(ORDER BY COALESCE(p_inner.source, ''), COALESCE(p_inner.image_filename, ''))) as sardo_reference,
+                           pgm.id as member_id,
+                           pgm.group_id,
+                           pgm.is_representative,
+                           pg.group_code,
+                           (SELECT COUNT(*) FROM property_group_members WHERE group_id = pgm.group_id) as duplicate_count
+                    FROM properties p_inner
+                    LEFT JOIN property_group_members pgm ON pgm.property_id = p_inner.id
+                    LEFT JOIN property_groups pg ON pg.id = pgm.group_id
                 ) as p
                 WHERE 1=1
             """
@@ -906,32 +913,32 @@ class DatabaseManager:
                 statuses = [statuses]
             statuses = [s for s in statuses if s in Config.PROPERTY_STATUSES]
             if statuses:
-                if isinstance(statuses, str):
-                    statuses = [statuses]
-                statuses = [s for s in statuses if s in Config.PROPERTY_STATUSES]
-                if statuses:
-                    placeholders = ', '.join(['%s'] * len(statuses))
-                    base_query += f" AND property_status IN ({placeholders})"
-                    params.extend(statuses)
+                placeholders = ', '.join(['%s'] * len(statuses))
+                base_query += f" AND property_status IN ({placeholders})"
+                params.extend(statuses)
 
-            # Hide delisted stock (opt-in, so existing callers are unaffected)
-            if filters.get('exclude_delisted'):
-                base_query += " AND property_status <> 'Delisted'"
+        # Hide delisted stock (opt-in, so existing callers are unaffected)
+        if filters.get('exclude_delisted'):
+            base_query += " AND property_status <> 'Delisted'"
 
-            # Market visibility filtering
-            vis = filters.get('market_visibility')
-            if vis and str(vis).strip().lower() in ('public', 'off_market'):
-                base_query += " AND market_visibility = %s"
-                params.append(str(vis).strip().lower())
+        # Market visibility filtering
+        vis = filters.get('market_visibility')
+        if vis and str(vis).strip().lower() in ('public', 'off_market'):
+            base_query += " AND market_visibility = %s"
+            params.append(str(vis).strip().lower())
 
-            # Source type filtering
-            stype = filters.get('source_type')
-            if stype and str(stype).strip().lower() in ('scraped', 'manual'):
-                base_query += " AND source_type = %s"
-                params.append(str(stype).strip().lower())
+        # Source type filtering
+        stype = filters.get('source_type')
+        if stype and str(stype).strip().lower() in ('scraped', 'manual'):
+            base_query += " AND source_type = %s"
+            params.append(str(stype).strip().lower())
 
-            # Agent / source filtering (exact match on the raw source value)
-            sources = filters.get('sources') or filters.get('source')
+        # Agent / source filtering (exact match on the raw source value)
+        sources = filters.get('sources') or filters.get('source')
+        if sources:
+            if isinstance(sources, str):
+                sources = [sources]
+            sources = [s.strip() for s in sources if s and s.strip()]
             if sources:
                 placeholders = ', '.join(['%s'] * len(sources))
                 base_query += f" AND source IN ({placeholders})"
@@ -1611,6 +1618,20 @@ class DatabaseManager:
         except Exception as e:
             logging.error(f"Error fetching statistics: {e}")
             return {}
+
+    def get_property_group_info(self, property_id: str) -> Optional[Dict]:
+        """Get duplicate group metadata and all agency listings for a property."""
+        from grouping_engine import GroupingEngine
+        engine = GroupingEngine(self.connection)
+        return engine.get_property_group_info(property_id)
+
+    def recalculate_unique_property_groups(self) -> Dict:
+        """Run the grouping engine to refresh all duplicate groups."""
+        from grouping_engine import GroupingEngine
+        engine = GroupingEngine(self.connection)
+        res = engine.run_grouping()
+        self._cache.pop('statistics', None)
+        return res
 
     def get_sources(self) -> List[str]:
         """Get the distinct agent/source values, for the source filter."""
