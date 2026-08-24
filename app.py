@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, session
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, session, Response
 import os
 import io
 import time
@@ -60,6 +60,12 @@ db_manager.ensure_login_activity_table()
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'auth_portal'
+
+@login_manager.unauthorized_handler
+def unauthorized():
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Unauthorized', 'authenticated': False}), 401
+    return redirect(url_for('auth_portal', next=request.path))
 
 @app.after_request
 def add_security_headers(response):
@@ -401,9 +407,9 @@ def _mask_email(email):
     return f"{masked}@{domain}"
 
 
-@app.route('/login', methods=['GET'])
 @app.route('/forgot-password', methods=['GET'])
 @app.route('/reset-password', methods=['GET'])
+@app.route('/login', methods=['GET'])
 def auth_portal():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
@@ -1104,11 +1110,13 @@ def metadata():
     # Agent/source options carry the raw value (used for filtering) and the
     # friendly label (shown in the UI).
     sources = [{'value': s, 'label': display_source_name(s)} for s in db_manager.get_sources()]
+    tags = db_manager.get_all_tags()
     return jsonify({
         'locations': locations,
         'property_types': property_types,
         'statuses': Config.PROPERTY_STATUSES,
         'sources': sources,
+        'tags': tags,
         'stats': stats,
         'app_title': Config.APP_TITLE
     })
@@ -1490,6 +1498,7 @@ def generate_excel_report(properties, client_name):
             'Plot (m²)': format_area_value(prop.get('land_area')),
             'Source': source,
             'Status': prop.get('property_status') or 'Unknown',
+            'Tags': ", ".join(prop.get('tags') or []),
             'SARDO Ref': prop.get('sardo_reference', 'N/A'),
             'Reference (with link to page source)': display_reference,
             'property_url': prop.get('property_url', '')
@@ -1499,7 +1508,7 @@ def generate_excel_report(properties, client_name):
     df = pd.DataFrame(selected_property_data)
     columns_order = [
         'Price', 'Location', 'Type', 'Beds', 'Baths',
-        'Build (m²)', 'Plot (m²)', 'Source', 'Status', 'SARDO Ref',
+        'Build (m²)', 'Plot (m²)', 'Source', 'Status', 'Tags', 'SARDO Ref',
         'Reference (with link to page source)'
     ]
     df_export = df[columns_order]
@@ -1578,3 +1587,79 @@ def export_excel():
 
 if __name__ == '__main__':
     app.run(debug=True, port=5002)
+@app.route('/api/tags', methods=['GET'])
+@login_required
+def get_tags_endpoint():
+    tags = db_manager.get_all_tags()
+    return jsonify({'tags': tags})
+
+@app.route('/api/properties/<property_id>/tags', methods=['PUT'])
+@login_required
+def update_property_tags_endpoint(property_id):
+    data = request.json or {}
+    tags = data.get('tags', [])
+    res = db_manager.update_property_tags(property_id, tags)
+    if not res.get('success'):
+        return jsonify(res), 400
+    return jsonify(res)
+
+@app.route('/api/properties/tags/upload-csv', methods=['POST'])
+@login_required
+def upload_tags_csv_endpoint():
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+    
+    file = request.files['file']
+    if not file or file.filename == '':
+        return jsonify({'success': False, 'error': 'Empty filename'}), 400
+
+    if not file.filename.lower().endswith(('.csv', '.txt')):
+        return jsonify({'success': False, 'error': 'Invalid file format. Please upload a .csv file'}), 400
+
+    mode = request.form.get('mode', 'replace').lower()
+    if mode not in ('replace', 'append'):
+        mode = 'replace'
+
+    try:
+        import csv
+        import io
+        content = file.read().decode('utf-8-sig', errors='replace')
+        reader = csv.DictReader(io.StringIO(content))
+        csv_rows = list(reader)
+        
+        if not csv_rows:
+            return jsonify({'success': False, 'error': 'The uploaded CSV file is empty'}), 400
+
+        res = db_manager.bulk_update_tags_from_csv(csv_rows, mode=mode)
+        return jsonify(res)
+    except Exception as e:
+        logging.error(f"Error parsing tags CSV: {e}")
+        return jsonify({'success': False, 'error': f'Failed to parse CSV: {str(e)}'}), 500
+
+@app.route('/api/properties/tags/sample-csv', methods=['GET'])
+@login_required
+def download_sample_tags_csv_endpoint():
+    result = db_manager.get_properties({}, limit=100, offset=0)
+    props = assign_sardo_references(result.get('properties', []))
+    
+    import io
+    import csv
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['property_id', 'tags', 'property_title_hint'])
+    
+    for p in props:
+        tags_str = ", ".join(p.get('tags') or [])
+        ref = p.get('sardo_reference') or p.get('reference') or p.get('id')
+        price_val = p.get('property_price')
+        price_str = f"€{price_val:,}" if price_val and price_val > 0 else "P.O.A."
+        title_hint = f"{p.get('property_type', '')} in {p.get('location', '')} ({price_str})"
+        writer.writerow([ref, tags_str, title_hint])
+        
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment;filename=sardo_property_tags_template.csv'}
+    )
+

@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentProperties = [];
     let selectedPropertyIds = new Set();
     let currentViewMode = 'table'; // 'grid' or 'table'
+    let currentStockMode = 'active'; // 'active' or 'unique'
     let currentPage = 1;
     let itemsPerPage = 10;
     let totalPropertiesCount = 0;
@@ -14,7 +15,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // DOM Elements
+    const cardActiveStock = document.getElementById('card-active-stock');
+    const cardUniqueStock = document.getElementById('card-unique-stock');
     const statTotal = document.getElementById('stat-total');
+    const statUnique = document.getElementById('stat-unique');
+    const badgeDuplicatesCount = document.getElementById('badge-duplicates-count');
     const statAvg = document.getElementById('stat-avg');
     const filterLocations = document.getElementById('filter-locations');
     const filterType = document.getElementById('filter-type');
@@ -27,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterRef = document.getElementById('filter-ref');
     const filterStatuses = document.getElementById('filter-statuses');
     const filterSources = document.getElementById('filter-sources');
+    const filterTags = document.getElementById('filter-tags');
     const filterHideDelisted = document.getElementById('filter-hide-delisted');
 
 
@@ -68,11 +74,18 @@ function energyBadge(rating) {
 }
 
     const statusBadge = (status) => {
-        // NULL from DB means the scraper didn't set a status yet — treat as For Sale
-        const value = (status && status !== 'null' && status !== 'undefined') ? status : 'For Sale';
-        const cls = 'status-badge status-' + value.toLowerCase().replace(/\s+/g, '-');
-        const icon = STATUS_ICONS[value] || 'fa-circle';
-        return `<span class="${cls}"><i class="fas ${icon}"></i> ${value}</span>`;
+        const canonical = status || 'For Sale';
+        const cls = 'status-badge status-' + canonical.toLowerCase().replace(/\s+/g, '-');
+        const icon = STATUS_ICONS[canonical] || 'fa-tag';
+        return `<span class="badge ${cls}"><i class="fas ${icon}"></i> ${canonical}</span>`;
+    };
+
+    // Helper: Render custom property tags badges
+    const renderTagsBadges = (tags) => {
+        if (!tags || !Array.isArray(tags) || tags.length === 0) return '';
+        return `<div class="tags-cloud-container" style="margin-top: 6px;">` +
+            tags.map(t => `<span class="property-tag-badge" title="Tag: ${esc(t)}"><i class="fas fa-tag" style="font-size: 9px; opacity: 0.8;"></i> ${esc(t)}</span>`).join('') +
+            `</div>`;
     };
 
     // Sold / Delisted / Withdrawn listings are no longer live stock
@@ -87,15 +100,14 @@ function energyBadge(rating) {
 
     // Utility: Format Currency
     const formatCurrency = (value) => {
-        if (!value) return 'N/A';
-        return new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value);
+        if (value === null || value === undefined || value === '' || isNaN(Number(value))) return 'N/A';
+        const num = Number(value);
+        return new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(num);
     };
 
     // Utility: Format a property price for display.
-    // Non-positive or missing prices (-1 sentinel, 0, null/undefined/empty)
-    // mean the price is not published, so we show "P.O.A." (Price on Application).
     const formatPrice = (value) => {
-        if (value === null || value === undefined || value === '' || Number(value) <= 0) {
+        if (value === null || value === undefined || value === '' || isNaN(Number(value)) || Number(value) <= 0) {
             return 'P.O.A.';
         }
         return formatCurrency(value);
@@ -129,6 +141,27 @@ function energyBadge(rating) {
     const closeModal = document.querySelector('.close-modal');
 
     const gridSortContainer = document.getElementById('grid-sort-container');
+
+    // Stock Mode Toggle (Active Stock vs Unique Stock)
+    if (cardActiveStock && cardUniqueStock) {
+        cardActiveStock.addEventListener('click', () => {
+            if (currentStockMode === 'active') return;
+            currentStockMode = 'active';
+            cardActiveStock.classList.add('active');
+            cardUniqueStock.classList.remove('active');
+            currentPage = 1;
+            fetchProperties(getFilters());
+        });
+
+        cardUniqueStock.addEventListener('click', () => {
+            if (currentStockMode === 'unique') return;
+            currentStockMode = 'unique';
+            cardUniqueStock.classList.add('active');
+            cardActiveStock.classList.remove('active');
+            currentPage = 1;
+            fetchProperties(getFilters());
+        });
+    }
 
     // View Toggle Logic
     const setViewMode = (mode) => {
@@ -217,9 +250,13 @@ function energyBadge(rating) {
                         <span title="Bathrooms"><i class="fas fa-bath"></i> ${prop.num_baths || '-'}</span>
                         <span title="Build Area"><i class="fas fa-ruler-combined"></i> ${prop.living_area ? parseFloat(prop.living_area).toFixed(0) + ' m²' : '-'}</span>
                     </div>
+                    ${renderTagsBadges(prop.tags)}
                     <div class="card-footer" style="flex-direction: column; align-items: stretch; gap: 10px;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span class="card-source">${prop.display_source || 'Unknown'}</span>
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <span class="card-source">${prop.display_source || 'Unknown'}</span>
+                                ${prop.duplicate_count && prop.duplicate_count > 1 ? `<span class="duplicate-group-badge" title="${prop.duplicate_count} agency listings for this property"><i class="fas fa-layer-group"></i> ${prop.duplicate_count} Agencies</span>` : ''}
+                            </div>
                             ${statusBadge(prop.property_status)}
                         </div>
                         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -245,6 +282,16 @@ function energyBadge(rating) {
                 viewBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     showModal(prop);
+                });
+            }
+
+            // Duplicate badge click opens multi-agency comparison
+            const dupBadge = card.querySelector('.duplicate-group-badge');
+            if (dupBadge) {
+                dupBadge.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    window.openDuplicateGroupModal(prop.id);
                 });
             }
 
@@ -312,26 +359,31 @@ function energyBadge(rating) {
 
         visibleProperties.forEach((prop, index) => {
             const row = document.createElement('tr');
-            if (selectedPropertyIds.has(prop.id.toString()) || selectedPropertyIds.has(prop.id)) {
+            const propIdStr = String(prop.id ?? index);
+            if (selectedPropertyIds.has(propIdStr) || selectedPropertyIds.has(prop.id)) {
                 row.classList.add('selected-row');
             }
             if (isInactiveStatus(prop.property_status)) {
                 row.classList.add('row-inactive');
             }
 
-            // Format values
+            // Format values safely
             const price = formatPrice(prop.property_price);
-            const livingArea = prop.living_area ? parseFloat(prop.living_area).toFixed(0) : '—';
-            const landArea = prop.land_area ? parseFloat(prop.land_area).toFixed(0) : '—';
+            const livingArea = (prop.living_area && !isNaN(parseFloat(prop.living_area))) ? parseFloat(prop.living_area).toFixed(0) : '—';
+            const landArea = (prop.land_area && !isNaN(parseFloat(prop.land_area))) ? parseFloat(prop.land_area).toFixed(0) : '—';
             const isOffMarket = prop.market_visibility === 'off_market' || prop.source_type === 'manual' || prop.website_source === 'Manual / Off-Market' || (prop.property_url && prop.property_url.startsWith('sardo://'));
             const offMarketTag = isOffMarket ? '<span style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 6px;"><i class="fas fa-user-secret"></i> VIP OFF-MARKET</span>' : '';
 
+            const duplicateBadge = (prop.duplicate_count && prop.duplicate_count > 1)
+                ? `<span class="duplicate-group-badge" title="${prop.duplicate_count} agency listings for this property"><i class="fas fa-layer-group"></i> ${prop.duplicate_count}</span>`
+                : '';
+
             row.innerHTML = `
                 <td onclick="event.stopPropagation();">
-                    <input type="checkbox" class="row-checkbox" value="${prop.id}" ${selectedPropertyIds.has(prop.id.toString()) || selectedPropertyIds.has(prop.id) ? 'checked' : ''}>
+                    <input type="checkbox" class="row-checkbox" value="${propIdStr}" ${selectedPropertyIds.has(propIdStr) || selectedPropertyIds.has(prop.id) ? 'checked' : ''}>
                 </td>
                 <td style="font-weight: 600; color: var(--primary-color);">${price}</td>
-                <td title="${esc(prop.location || 'N/A')}">${prop.location || 'N/A'} ${offMarketTag}</td>
+                <td title="${esc(prop.location || 'N/A')}">${prop.location || 'N/A'} ${offMarketTag} ${renderTagsBadges(prop.tags)}</td>
                 <td>${prop.property_type || 'N/A'}</td>
                 <td>${prop.num_beds || '-'}</td>
                 <td>${prop.num_baths || '-'}</td>
@@ -339,7 +391,7 @@ function energyBadge(rating) {
                 <td>${landArea}</td>
                 <td>${prop.construction_year || '—'}</td>
                 <td>${energyBadge(prop.energy_rating)}</td>
-                <td><span class="source-badge">${prop.display_source || 'N/A'}</span></td>
+                <td><span class="source-badge">${prop.display_source || 'N/A'}</span> ${duplicateBadge}</td>
                 <td>${statusBadge(prop.property_status)}</td>
                 <td>${prop.sardo_reference || 'N/A'}</td>
                 <td>
@@ -355,6 +407,16 @@ function energyBadge(rating) {
                     e.stopPropagation();
                     e.preventDefault();
                     showModal(prop);
+                });
+            }
+
+            // Duplicate badge click opens multi-agency comparison
+            const dupBadge = row.querySelector('.duplicate-group-badge');
+            if (dupBadge) {
+                dupBadge.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    window.openDuplicateGroupModal(prop.id);
                 });
             }
 
@@ -422,6 +484,10 @@ function energyBadge(rating) {
                 <p><strong>SARDO Ref:</strong> ${prop.sardo_reference || 'N/A'}</p>
                 <p><strong>Year Built:</strong> ${prop.construction_year || '—'}</p>
                 <p><strong>Energy Rating:</strong> ${energyBadge(prop.energy_rating)}</p>
+                <div style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 8px;">
+                    <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary);"><i class="fas fa-tags" style="color: var(--primary-color);"></i> Tags</span>
+                    ${renderTagsBadges(prop.tags) || '<p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; font-style: italic;">No tags assigned</p>'}
+                </div>
             </div>
         `;
     };
@@ -499,6 +565,26 @@ function energyBadge(rating) {
                         <p><strong>Original Ref:</strong> ${prop.display_reference || 'N/A'}</p>
                         <p><strong>Construction / Renovation:</strong> ${prop.construction_year || 'N/A'} / ${prop.renovation_year || 'N/A'}</p>
                         <p><strong>Energy Rating:</strong> ${energyBadge(prop.energy_rating)}</p>
+                        
+                        <!-- Interactive Tags Section -->
+                        <div class="modal-tags-section" style="margin-top: 16px; padding: 14px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <label style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.5px;"><i class="fas fa-tags" style="color: #6366f1;"></i> Custom Tags</label>
+                                <span style="font-size: 11px; color: var(--text-secondary);">Click (✕) to remove</span>
+                            </div>
+                            <div id="modal-tags-list" class="tags-cloud-container" style="min-height: 28px; margin-bottom: 10px;">
+                                ${(prop.tags && Array.isArray(prop.tags) && prop.tags.length > 0)
+                                    ? prop.tags.map(t => `<span class="property-tag-chip">${esc(t)} <i class="fas fa-times remove-tag-btn" onclick="handleRemoveModalTag('${prop.id}', '${esc(t)}')" title="Remove tag"></i></span>`).join('')
+                                    : '<span style="color: #94a3b8; font-size: 12px; font-style: italic;">No tags assigned yet</span>'}
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="text" id="modal-new-tag-input" placeholder="Add custom tag (e.g. Sea View, Prime Location)" style="flex: 1; padding: 7px 12px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; background: white;" onkeypress="if(event.key==='Enter'){event.preventDefault(); handleAddModalTag('${prop.id}');}">
+                                <button type="button" onclick="handleAddModalTag('${prop.id}')" style="background: var(--primary-color); color: white; border: none; padding: 7px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                                    <i class="fas fa-plus"></i> Add Tag
+                                </button>
+                            </div>
+                        </div>
+
                         ${extraManualFields}
                     </div>
                 </div>
@@ -550,11 +636,13 @@ function energyBadge(rating) {
             filters.exclude_delisted = true;
         }
 
-        // Agent / source (multi-select)
-        const selectedSources = filterSources
-            ? Array.from(filterSources.selectedOptions).map(opt => opt.value)
-            : [];
+        // Agent / Sources Filter
+        const selectedSources = filterSources ? Array.from(filterSources.selectedOptions).map(opt => opt.value) : [];
         if (selectedSources.length > 0) filters.sources = selectedSources;
+
+        // Tags Filter
+        const selectedTags = filterTags ? Array.from(filterTags.selectedOptions).map(opt => opt.value) : [];
+        if (selectedTags.length > 0) filters.tags = selectedTags;
 
         // Global reference search
         if (filterRef && filterRef.value.trim()) {
@@ -571,8 +659,13 @@ function energyBadge(rating) {
             filters.source_type = stype.value;
         }
 
-        filters.sort_by = currentSortBy;
-        filters.sort_dir = currentSortDir;
+        if (currentSortBy) {
+            filters.sort_by = currentSortBy;
+            filters.sort_dir = currentSortDir;
+        }
+
+        // Pass current stock mode ('active' or 'unique')
+        filters.stock_mode = currentStockMode;
 
         return filters;
     };
@@ -596,6 +689,7 @@ function energyBadge(rating) {
         if (filterRef) filterRef.value = '';
         if (filterStatuses) filterStatuses.selectedIndex = -1;
         if (filterSources) filterSources.selectedIndex = -1;
+        if (filterTags) filterTags.selectedIndex = -1;
         if (filterHideDelisted) filterHideDelisted.checked = true;
         const vis = document.getElementById('filter-visibility');
         if (vis) vis.value = 'all';
@@ -774,60 +868,104 @@ function energyBadge(rating) {
         try {
             showLoading('Loading configuration...');
             const response = await fetch('/api/metadata');
-            const data = await response.json();
-
-            // Populate Locations
-            data.locations.forEach(loc => {
-                const option = document.createElement('option');
-                option.value = loc;
-                option.textContent = loc;
-                filterLocations.appendChild(option);
-            });
-
-            // Populate Types
-            data.property_types.forEach(type => {
-                const option = document.createElement('option');
-                option.value = type;
-                option.textContent = type;
-                filterType.appendChild(option);
-            });
-
-            // Populate Statuses (canonical vocabulary from the server)
-            if (filterStatuses && Array.isArray(data.statuses)) {
-                data.statuses.forEach(status => {
-                    const option = document.createElement('option');
-                    option.value = status;
-                    option.textContent = status;
-                    filterStatuses.appendChild(option);
-                });
+            if (response.status === 401) {
+                window.location.href = '/login';
+                return;
             }
+            if (!response.ok) {
+                console.error(`Server returned HTTP ${response.status}`);
+            } else {
+                const data = await response.json();
 
-            // Populate Agents / Sources (raw value for filtering, friendly label for display)
-            if (filterSources && Array.isArray(data.sources)) {
-                data.sources.forEach(src => {
-                    const option = document.createElement('option');
-                    option.value = src.value;
-                    option.textContent = src.label;
-                    filterSources.appendChild(option);
-                });
+                // Populate Locations
+                if (filterLocations && Array.isArray(data.locations)) {
+                    filterLocations.innerHTML = '';
+                    data.locations.forEach(loc => {
+                        if (loc) {
+                            const option = document.createElement('option');
+                            option.value = loc;
+                            option.textContent = loc;
+                            filterLocations.appendChild(option);
+                        }
+                    });
+                }
+
+                // Populate Types
+                if (filterType && Array.isArray(data.property_types)) {
+                    data.property_types.forEach(type => {
+                        if (type) {
+                            const option = document.createElement('option');
+                            option.value = type;
+                            option.textContent = type;
+                            filterType.appendChild(option);
+                        }
+                    });
+                }
+
+                // Populate Statuses (canonical vocabulary from the server)
+                if (filterStatuses && Array.isArray(data.statuses)) {
+                    filterStatuses.innerHTML = '';
+                    data.statuses.forEach(status => {
+                        if (status) {
+                            const option = document.createElement('option');
+                            option.value = status;
+                            option.textContent = status;
+                            filterStatuses.appendChild(option);
+                        }
+                    });
+                }
+
+                // Populate Agents / Sources (raw value for filtering, friendly label for display)
+                if (filterSources && Array.isArray(data.sources)) {
+                    filterSources.innerHTML = '';
+                    data.sources.forEach(src => {
+                        if (src && src.value) {
+                            const option = document.createElement('option');
+                            option.value = src.value;
+                            option.textContent = src.label || src.value;
+                            filterSources.appendChild(option);
+                        }
+                    });
+                }
+
+                // Populate Custom Tags
+                if (filterTags && Array.isArray(data.tags)) {
+                    filterTags.innerHTML = '';
+                    data.tags.forEach(t => {
+                        if (t && t.tag) {
+                            const option = document.createElement('option');
+                            option.value = t.tag;
+                            option.textContent = `${t.tag} (${t.count})`;
+                            filterTags.appendChild(option);
+                        }
+                    });
+                }
+
+                // Set Stats safely
+                if (data.stats) {
+                    const activeCount = (data.stats.active_properties !== undefined)
+                        ? data.stats.active_properties
+                        : (data.stats.total_properties || 0);
+                    const uniqueCount = (data.stats.unique_properties !== undefined)
+                        ? data.stats.unique_properties
+                        : activeCount;
+                    const duplicatesCount = data.stats.duplicate_listings || 0;
+
+                    if (statTotal) statTotal.innerText = Number(activeCount).toLocaleString();
+                    if (statUnique) statUnique.innerText = Number(uniqueCount).toLocaleString();
+                    if (badgeDuplicatesCount) badgeDuplicatesCount.innerText = `${duplicatesCount} Consolidated`;
+                    if (statAvg) statAvg.innerText = formatCurrency(data.stats.avg_price);
+                }
+
+                // Document Title
+                if (data.app_title) document.title = data.app_title;
             }
-
-            // Set Stats — headline count is live stock, not sold/delisted
-            const headlineTotal = (data.stats.active_properties !== undefined)
-                ? data.stats.active_properties
-                : data.stats.total_properties;
-            statTotal.innerText = headlineTotal.toLocaleString();
-            statAvg.innerText = formatCurrency(data.stats.avg_price);
-
-            // Document Title
-            document.title = data.app_title || 'SARDO360';
-
-            // Initial Property Load (honours the default "hide delisted" filter)
-            fetchProperties(getFilters());
         } catch (error) {
             console.error('Error loading metadata:', error);
             if (statusText) statusText.innerText = 'Error loading metadata';
-            hideLoading();
+        } finally {
+            // Always fetch properties even if metadata loading had non-fatal warnings
+            fetchProperties(getFilters());
         }
     };
 
@@ -843,6 +981,13 @@ function energyBadge(rating) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(filters)
             });
+            if (response.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
+            if (!response.ok) {
+                throw new Error(`Server returned HTTP ${response.status}`);
+            }
             const data = await response.json();
             currentProperties = data.properties;
             totalPropertiesCount = data.total_count;
@@ -1107,6 +1252,338 @@ function energyBadge(rating) {
     };
     pollScraperActivity();
     setInterval(pollScraperActivity, 15000);
+
+    // Duplicate Group Modal Comparison
+    window.closeDuplicateModal = () => {
+        const modal = document.getElementById('duplicate-modal');
+        if (modal) modal.style.display = 'none';
+    };
+
+    window.openDuplicateGroupModal = async (propertyId) => {
+        const modal = document.getElementById('duplicate-modal');
+        const titleEl = document.getElementById('duplicate-modal-title');
+        const subtitleEl = document.getElementById('duplicate-modal-subtitle');
+        const bodyEl = document.getElementById('duplicate-modal-body');
+
+        if (!modal || !bodyEl) return;
+        modal.style.display = 'flex';
+        bodyEl.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-secondary);"><i class="fas fa-circle-notch fa-spin" style="font-size: 28px; margin-bottom: 12px; color: var(--primary-color);"></i><p>Loading multi-agency duplicate comparison...</p></div>';
+
+        try {
+            const res = await fetch(`/api/properties/${propertyId}/group`);
+            if (!res.ok) throw new Error('Failed to load duplicate group');
+            const data = await res.json();
+            if (!data.has_group || !data.group || !data.group.listings || data.group.listings.length === 0) {
+                bodyEl.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--text-secondary);">No duplicate group records found for this property.</div>';
+                return;
+            }
+
+            const group = data.group;
+            titleEl.textContent = `Duplicate Cluster (${group.total_agency_listings} Agencies)`;
+            subtitleEl.textContent = `Group Code: ${group.group_code} • Matched on Price, Plot Area & Bedrooms`;
+
+            let html = `
+                <div style="margin-bottom: 18px; background: #e0e7ff; border-left: 4px solid #4f46e5; padding: 12px 16px; border-radius: 8px; font-size: 13px; color: #312e81; line-height: 1.5;">
+                    <i class="fas fa-info-circle" style="color: #4f46e5;"></i> <strong>SARDO360 Deduplication Engine:</strong> The following <strong>${group.total_agency_listings} agency listings</strong> represent the exact same physical property based on identical pricing, plot size (${group.listings[0]?.land_area || '—'} m²), and bedrooms (${group.listings[0]?.bedrooms || '—'}).
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+            `;
+
+            group.listings.forEach((item) => {
+                const isRep = item.is_representative;
+                const repBadge = isRep
+                    ? `<span style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(16,185,129,0.3);"><i class="fas fa-star"></i> ⭐ Primary Representative</span>`
+                    : `<span style="background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;">Alternate Agency Listing</span>`;
+
+                const priceStr = formatPrice(item.price);
+                const buildStr = (item.living_area && !isNaN(parseFloat(item.living_area))) ? `${parseFloat(item.living_area).toFixed(0)} m²` : '—';
+                const plotStr = (item.land_area && !isNaN(parseFloat(item.land_area))) ? `${parseFloat(item.land_area).toFixed(0)} m²` : '—';
+
+                html += `
+                    <div style="background: white; border: 1.5px solid ${isRep ? '#6366f1' : '#e2e8f0'}; border-radius: 10px; padding: 16px 20px; box-shadow: ${isRep ? '0 4px 12px rgba(99, 102, 241, 0.12)' : '0 1px 3px rgba(0,0,0,0.04)'}; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 260px;">
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                                <span style="font-weight: 700; font-size: 15px; color: var(--text-primary);"><i class="fas fa-building" style="color: #6366f1;"></i> ${item.display_source || item.source}</span>
+                                ${repBadge}
+                                ${statusBadge(item.property_status)}
+                            </div>
+                            <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
+                                <strong>Ref:</strong> ${item.reference || 'N/A'} • <strong>Title:</strong> ${item.title || 'Property Listing'}
+                            </div>
+                            <div style="display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary); flex-wrap: wrap;">
+                                <span><i class="fas fa-bed" style="color: #6366f1;"></i> ${item.bedrooms || '-'} Beds</span>
+                                <span><i class="fas fa-bath" style="color: #6366f1;"></i> ${item.bathrooms || '-'} Baths</span>
+                                <span><i class="fas fa-ruler-combined" style="color: #6366f1;"></i> Build: ${buildStr}</span>
+                                <span><i class="fas fa-tree" style="color: #6366f1;"></i> Plot: ${plotStr}</span>
+                                <span><i class="fas fa-award" style="color: #f59e0b;"></i> Score: <strong>${Math.round(item.completeness_score || 0)}</strong></span>
+                            </div>
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                            <span style="font-size: 1.25rem; font-weight: 700; color: var(--accent-color);">${priceStr}</span>
+                            ${item.property_url ? `
+                                <a href="${item.property_url}" target="_blank" style="background: #4f46e5; color: white; padding: 7px 14px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(79, 70, 229, 0.25); transition: opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                                    <i class="fas fa-external-link-alt"></i> View on Agency Site
+                                </a>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            bodyEl.innerHTML = html;
+        } catch (err) {
+            bodyEl.innerHTML = `<div style="text-align: center; padding: 30px; color: #ef4444;"><i class="fas fa-exclamation-circle" style="font-size: 24px; margin-bottom: 8px;"></i><p>Error loading duplicate group: ${err.message}</p></div>`;
+        }
+    };
+
+    // Close duplicate modal when clicking outside
+    window.addEventListener('click', (event) => {
+        const dupModal = document.getElementById('duplicate-modal');
+        if (event.target === dupModal) {
+            dupModal.style.display = 'none';
+        }
+    });
+
+    // Modal Tag Editing Functions
+    window.handleAddModalTag = async (propertyId) => {
+        const input = document.getElementById('modal-new-tag-input');
+        if (!input) return;
+        const newTag = input.value.trim();
+        if (!newTag) return;
+
+        const prop = currentProperties.find(p => String(p.id) === String(propertyId));
+        const currentTags = (prop && Array.isArray(prop.tags)) ? [...prop.tags] : [];
+
+        if (currentTags.some(t => t.toLowerCase() === newTag.toLowerCase())) {
+            showToast('Tag already exists on this property', 'info');
+            input.value = '';
+            return;
+        }
+
+        currentTags.push(newTag);
+
+        try {
+            const res = await fetch(`/api/properties/${propertyId}/tags`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tags: currentTags })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Failed to update tags');
+
+            if (prop) prop.tags = data.tags;
+            input.value = '';
+            showToast('Tag added successfully', 'success');
+
+            // Refresh tags in modal
+            const tagsListEl = document.getElementById('modal-tags-list');
+            if (tagsListEl) {
+                tagsListEl.innerHTML = data.tags.map(t => `<span class="property-tag-chip">${esc(t)} <i class="fas fa-times remove-tag-btn" onclick="handleRemoveModalTag('${propertyId}', '${esc(t)}')" title="Remove tag"></i></span>`).join('');
+            }
+
+            // Refresh cards and table in background
+            renderGrid();
+            renderTable();
+            refreshTagsFilter();
+        } catch (err) {
+            showToast(`Error: ${err.message}`, 'error');
+        }
+    };
+
+    window.handleRemoveModalTag = async (propertyId, tagToRemove) => {
+        const prop = currentProperties.find(p => String(p.id) === String(propertyId));
+        const currentTags = (prop && Array.isArray(prop.tags))
+            ? prop.tags.filter(t => t.toLowerCase() !== tagToRemove.toLowerCase())
+            : [];
+
+        try {
+            const res = await fetch(`/api/properties/${propertyId}/tags`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tags: currentTags })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Failed to update tags');
+
+            if (prop) prop.tags = data.tags;
+            showToast('Tag removed', 'info');
+
+            // Refresh tags in modal
+            const tagsListEl = document.getElementById('modal-tags-list');
+            if (tagsListEl) {
+                tagsListEl.innerHTML = data.tags.length > 0
+                    ? data.tags.map(t => `<span class="property-tag-chip">${esc(t)} <i class="fas fa-times remove-tag-btn" onclick="handleRemoveModalTag('${propertyId}', '${esc(t)}')" title="Remove tag"></i></span>`).join('')
+                    : '<span style="color: #94a3b8; font-size: 12px; font-style: italic;">No tags assigned yet</span>';
+            }
+
+            renderGrid();
+            renderTable();
+            refreshTagsFilter();
+        } catch (err) {
+            showToast(`Error: ${err.message}`, 'error');
+        }
+    };
+
+    const refreshTagsFilter = async () => {
+        try {
+            const res = await fetch('/api/tags');
+            if (!res.ok) return;
+            const data = await res.json();
+            if (filterTags && Array.isArray(data.tags)) {
+                const currentSelected = Array.from(filterTags.selectedOptions).map(o => o.value);
+                filterTags.innerHTML = '';
+                data.tags.forEach(t => {
+                    if (t && t.tag) {
+                        const opt = document.createElement('option');
+                        opt.value = t.tag;
+                        opt.textContent = `${t.tag} (${t.count})`;
+                        if (currentSelected.includes(t.tag)) opt.selected = true;
+                        filterTags.appendChild(opt);
+                    }
+                });
+            }
+        } catch (_) {}
+    };
+
+    // CSV Tag Upload Modal Functions
+    window.openTagUploadModal = () => {
+        const modal = document.getElementById('tags-modal');
+        const resultsEl = document.getElementById('tags-upload-results');
+        const fileInput = document.getElementById('tags-csv-file');
+        const fileNameEl = document.getElementById('tags-file-name');
+        
+        if (fileInput) fileInput.value = '';
+        if (fileNameEl) fileNameEl.innerText = 'Click or drag & drop CSV file here';
+        if (resultsEl) {
+            resultsEl.style.display = 'none';
+            resultsEl.innerHTML = '';
+        }
+        if (modal) modal.style.display = 'flex';
+    };
+
+    window.closeTagUploadModal = () => {
+        const modal = document.getElementById('tags-modal');
+        if (modal) modal.style.display = 'none';
+    };
+
+    window.handleTagFileSelect = (event) => {
+        const file = event.target.files[0];
+        const fileNameEl = document.getElementById('tags-file-name');
+        if (file && fileNameEl) {
+            fileNameEl.innerHTML = `<strong>Selected:</strong> ${esc(file.name)} <span style="color:#64748b; font-size:12px;">(${(file.size / 1024).toFixed(1)} KB)</span>`;
+        }
+    };
+
+    window.handleTagFileDrop = (event) => {
+        event.preventDefault();
+        const dropzone = document.getElementById('tags-dropzone');
+        if (dropzone) {
+            dropzone.style.borderColor = '#cbd5e1';
+            dropzone.style.background = '#fdfdfd';
+        }
+        if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+            const fileInput = document.getElementById('tags-csv-file');
+            if (fileInput) {
+                fileInput.files = event.dataTransfer.files;
+                window.handleTagFileSelect({ target: fileInput });
+            }
+        }
+    };
+
+    window.submitTagUploadForm = async (event) => {
+        event.preventDefault();
+        const fileInput = document.getElementById('tags-csv-file');
+        const resultsEl = document.getElementById('tags-upload-results');
+        const submitBtn = document.getElementById('btn-submit-tags-upload');
+
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            showToast('Please select a CSV file first', 'error');
+            return;
+        }
+
+        const modeRadios = document.getElementsByName('tag_upload_mode');
+        let selectedMode = 'replace';
+        for (const r of modeRadios) {
+            if (r.checked) {
+                selectedMode = r.value;
+                break;
+            }
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('mode', selectedMode);
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Uploading & Tagging...';
+
+        try {
+            const res = await fetch('/api/properties/tags/upload-csv', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to upload tags');
+            }
+
+            let reportHtml = `
+                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px; margin-bottom: 12px; color: #166534;">
+                    <div style="font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                        <i class="fas fa-check-circle" style="color: #16a34a; font-size: 16px;"></i> Tags Applied Successfully!
+                    </div>
+                    <div style="font-size: 13px;">
+                        • Total CSV rows processed: <strong>${data.total_rows}</strong><br>
+                        • Properties matched and tagged: <strong>${data.matched_count}</strong><br>
+                        • Total distinct tags in CSV: <strong>${data.distinct_tags_count}</strong>
+                    </div>
+                </div>
+            `;
+
+            if (data.unmatched_rows && data.unmatched_rows.length > 0) {
+                reportHtml += `
+                    <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 12px; color: #92400e; font-size: 12px; max-height: 140px; overflow-y: auto;">
+                        <div style="font-weight: 700; margin-bottom: 4px;"><i class="fas fa-exclamation-triangle"></i> Unmatched Rows (${data.unmatched_rows.length}):</div>
+                        ${data.unmatched_rows.map(u => `<div>Row ${u.row}: <code>${esc(u.identifier)}</code> — ${esc(u.reason)}</div>`).join('')}
+                    </div>
+                `;
+            }
+
+            if (resultsEl) {
+                resultsEl.innerHTML = reportHtml;
+                resultsEl.style.display = 'block';
+            }
+
+            showToast(`Successfully updated tags for ${data.matched_count} properties!`, 'success');
+
+            // Refresh data and tag filters
+            refreshTagsFilter();
+            fetchProperties(getFilters());
+        } catch (err) {
+            if (resultsEl) {
+                resultsEl.innerHTML = `
+                    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 14px; color: #991b1b; font-size: 13px;">
+                        <i class="fas fa-times-circle" style="color: #dc2626;"></i> <strong>Upload Failed:</strong> ${esc(err.message)}
+                    </div>
+                `;
+                resultsEl.style.display = 'block';
+            }
+            showToast(`Error: ${err.message}`, 'error');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & Apply Tags';
+        }
+    };
+
+    // Close tag modal when clicking outside
+    window.addEventListener('click', (event) => {
+        const tModal = document.getElementById('tags-modal');
+        if (event.target === tModal) {
+            tModal.style.display = 'none';
+        }
+    });
 
     // Initialize
     loadMetadata();

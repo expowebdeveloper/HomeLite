@@ -5,6 +5,7 @@ import logging
 import time
 import datetime
 import uuid
+import re
 from config import Config
 
 class DatabaseManager:
@@ -821,8 +822,7 @@ class DatabaseManager:
             if not self.connect():
                 return {'properties': [], 'total_count': 0}
         
-        try:
-            base_query = """
+        base_query = """
                 FROM (
                     SELECT *,
                            'SARDO' || (1099 + ROW_NUMBER() OVER(ORDER BY COALESCE(source, ''), COALESCE(image_filename, ''))) as sardo_reference
@@ -830,72 +830,81 @@ class DatabaseManager:
                 ) as p
                 WHERE 1=1
             """
-            params = []
-            
-            # Price range filtering with NULL handling
-            if filters.get('min_price') is not None:
-                # If min_price is provided, exclude NULL prices and include properties with price >= min_price
-                base_query += " AND price >= %s AND price IS NOT NULL"
-                params.append(filters['min_price'])
-            
-            if filters.get('max_price') is not None:
-                # If max_price is provided, exclude NULL prices and include properties with price <= max_price
-                base_query += " AND price <= %s AND price IS NOT NULL"
-                params.append(filters['max_price'])
+        params = []
 
-            # Reference / SARDO ID search
-            if filters.get('reference'):
-                ref_query = f"%{filters['reference'].strip()}%"
-                base_query += " AND (reference ILIKE %s OR sardo_reference ILIKE %s OR title ILIKE %s)"
-                params.extend([ref_query, ref_query, ref_query])
+        # Stock Mode filter (active: all listings; unique: only 1 representative per duplicate group)
+        stock_mode = filters.get('stock_mode', 'active')
+        if stock_mode == 'unique':
+            base_query += " AND (p.member_id IS NULL OR p.is_representative = TRUE)"
             
-            # Location filtering - handle both single location and multiple locations
-            if filters.get('location'):
-                # Single location (backward compatibility)
-                location = filters['location'].strip()
-                base_query += " AND (LOWER(location) LIKE LOWER(%s) OR LOWER(location) LIKE LOWER(%s))"
-                params.append(f"%{location}%")
-                params.append(f"{location}%")
-            elif filters.get('locations'):
-                # Multiple locations
-                locations = filters['locations']
-                if locations:
-                    location_conditions = []
-                    for location in locations:
-                        location_conditions.append("(LOWER(location) LIKE LOWER(%s) OR LOWER(location) LIKE LOWER(%s))")
-                        params.append(f"%{location.strip()}%")
-                        params.append(f"{location.strip()}%")
-                    base_query += f" AND ({' OR '.join(location_conditions)})"
-            
-            # Property type filtering
-            if filters.get('property_type'):
-                base_query += " AND property_type = %s"
-                params.append(filters['property_type'])
-            
-            # Bedrooms filtering with NULL handling
-            if filters.get('min_beds') is not None:
-                # If min_beds is provided, exclude NULL bedrooms and include properties with bedrooms >= min_beds
-                base_query += " AND bedrooms >= %s AND bedrooms IS NOT NULL"
-                params.append(filters['min_beds'])
-            
-            if filters.get('max_beds') is not None:
-                # If max_beds is provided, exclude NULL bedrooms and include properties with bedrooms <= max_beds
-                base_query += " AND bedrooms <= %s AND bedrooms IS NOT NULL"
-                params.append(filters['max_beds'])
-            
-            # Bathrooms filtering with NULL handling
-            if filters.get('min_baths') is not None:
-                # If min_baths is provided, exclude NULL bathrooms and include properties with bathrooms >= min_baths
-                base_query += " AND bathrooms >= %s AND bathrooms IS NOT NULL"
-                params.append(filters['min_baths'])
-            
-            if filters.get('max_baths') is not None:
-                # If max_baths is provided, exclude NULL bathrooms and include properties with bathrooms <= max_baths
-                base_query += " AND bathrooms <= %s AND bathrooms IS NOT NULL"
-                params.append(filters['max_baths'])
+        # Price range filtering with NULL handling
+        if filters.get('min_price') is not None:
+            # If min_price is provided, exclude NULL prices and include properties with price >= min_price
+            base_query += " AND price >= %s AND price IS NOT NULL"
+            params.append(filters['min_price'])
+        
+        if filters.get('max_price') is not None:
+            # If max_price is provided, exclude NULL prices and include properties with price <= max_price
+            base_query += " AND price <= %s AND price IS NOT NULL"
+            params.append(filters['max_price'])
 
-            # Property status filtering (canonical SARDO360 statuses only)
-            statuses = filters.get('statuses') or filters.get('property_status')
+        # Reference / SARDO ID search
+        if filters.get('reference'):
+            ref_query = f"%{filters['reference'].strip()}%"
+            base_query += " AND (reference ILIKE %s OR sardo_reference ILIKE %s OR title ILIKE %s)"
+            params.extend([ref_query, ref_query, ref_query])
+        
+        # Location filtering - handle both single location and multiple locations
+        if filters.get('location'):
+            # Single location (backward compatibility)
+            location = filters['location'].strip()
+            base_query += " AND (LOWER(location) LIKE LOWER(%s) OR LOWER(location) LIKE LOWER(%s))"
+            params.append(f"%{location}%")
+            params.append(f"{location}%")
+        elif filters.get('locations'):
+            # Multiple locations
+            locations = filters['locations']
+            if locations:
+                location_conditions = []
+                for location in locations:
+                    location_conditions.append("(LOWER(location) LIKE LOWER(%s) OR LOWER(location) LIKE LOWER(%s))")
+                    params.append(f"%{location.strip()}%")
+                    params.append(f"{location.strip()}%")
+                base_query += f" AND ({' OR '.join(location_conditions)})"
+        
+        # Property type filtering
+        if filters.get('property_type'):
+            base_query += " AND property_type = %s"
+            params.append(filters['property_type'])
+        
+        # Bedrooms filtering with NULL handling
+        if filters.get('min_beds') is not None:
+            # If min_beds is provided, exclude NULL bedrooms and include properties with bedrooms >= min_beds
+            base_query += " AND bedrooms >= %s AND bedrooms IS NOT NULL"
+            params.append(filters['min_beds'])
+        
+        if filters.get('max_beds') is not None:
+            # If max_beds is provided, exclude NULL bedrooms and include properties with bedrooms <= max_beds
+            base_query += " AND bedrooms <= %s AND bedrooms IS NOT NULL"
+            params.append(filters['max_beds'])
+        
+        # Bathrooms filtering with NULL handling
+        if filters.get('min_baths') is not None:
+            # If min_baths is provided, exclude NULL bathrooms and include properties with bathrooms >= min_baths
+            base_query += " AND bathrooms >= %s AND bathrooms IS NOT NULL"
+            params.append(filters['min_baths'])
+        
+        if filters.get('max_baths') is not None:
+            # If max_baths is provided, exclude NULL bathrooms and include properties with bathrooms <= max_baths
+            base_query += " AND bathrooms <= %s AND bathrooms IS NOT NULL"
+            params.append(filters['max_baths'])
+
+        # Property status filtering (canonical SARDO360 statuses only)
+        statuses = filters.get('statuses') or filters.get('property_status')
+        if statuses:
+            if isinstance(statuses, str):
+                statuses = [statuses]
+            statuses = [s for s in statuses if s in Config.PROPERTY_STATUSES]
             if statuses:
                 if isinstance(statuses, str):
                     statuses = [statuses]
@@ -924,31 +933,37 @@ class DatabaseManager:
             # Agent / source filtering (exact match on the raw source value)
             sources = filters.get('sources') or filters.get('source')
             if sources:
-                if isinstance(sources, str):
-                    sources = [sources]
-                sources = [s.strip() for s in sources if s and s.strip()]
-                if sources:
-                    placeholders = ', '.join(['%s'] * len(sources))
-                    base_query += f" AND source IN ({placeholders})"
-                    params.extend(sources)
+                placeholders = ', '.join(['%s'] * len(sources))
+                base_query += f" AND source IN ({placeholders})"
+                params.extend(sources)
 
-            # Date range: when the listing was first seen by the scraper
-            if filters.get('first_seen_from'):
-                base_query += " AND first_seen_at >= %s::timestamp"
-                params.append(filters['first_seen_from'])
-            if filters.get('first_seen_to'):
-                # Inclusive of the whole end day
-                base_query += " AND first_seen_at < (%s::date + INTERVAL '1 day')"
-                params.append(filters['first_seen_to'])
+        # Tags filtering (match properties containing ANY of the selected tags)
+        tags = filters.get('tags')
+        if tags:
+            if isinstance(tags, str):
+                tags = [t.strip() for t in tags.split(',') if t.strip()]
+            tags = [t.strip() for t in tags if t and t.strip()]
+            if tags:
+                base_query += " AND tags && %s::text[]"
+                params.append(tags)
 
-            # Date range: when the status last changed
-            if filters.get('status_changed_from'):
-                base_query += " AND status_last_changed_at >= %s::timestamp"
-                params.append(filters['status_changed_from'])
-            if filters.get('status_changed_to'):
-                base_query += " AND status_last_changed_at < (%s::date + INTERVAL '1 day')"
-                params.append(filters['status_changed_to'])
+        # Date range: when the property was first seen
+        if filters.get('first_seen_from'):
+            base_query += " AND first_seen_at >= %s::timestamp"
+            params.append(filters['first_seen_from'])
+        if filters.get('first_seen_to'):
+            base_query += " AND first_seen_at < (%s::date + INTERVAL '1 day')"
+            params.append(filters['first_seen_to'])
 
+        # Date range: when the status last changed
+        if filters.get('status_changed_from'):
+            base_query += " AND status_last_changed_at >= %s::timestamp"
+            params.append(filters['status_changed_from'])
+        if filters.get('status_changed_to'):
+            base_query += " AND status_last_changed_at < (%s::date + INTERVAL '1 day')"
+            params.append(filters['status_changed_to'])
+
+        try:
             # First, get the total count for pagination
             count_query = "SELECT COUNT(*) " + base_query
             cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -983,6 +998,11 @@ class DatabaseManager:
                     created_at,
                     updated_at,
                     sardo_reference,
+                    group_id,
+                    group_code,
+                    is_representative,
+                    COALESCE(duplicate_count, 1) as duplicate_count,
+                    COALESCE(tags, '{}') as tags,
                     source_type,
                     market_visibility,
                     resort_area,
@@ -1116,6 +1136,7 @@ class DatabaseManager:
                     source_agent,
                     introduced_by,
                     date_introduced,
+                    COALESCE(tags, '{}') as tags,
                     notes
                 FROM properties
                 WHERE id = %s
@@ -1135,6 +1156,212 @@ class DatabaseManager:
         except Exception as e:
             logging.error(f"Error fetching property {property_id}: {e}")
             return None
+
+    def get_all_tags(self) -> List[Dict]:
+        """Get all distinct tags in use across all properties, sorted with counts."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return []
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                SELECT tag, COUNT(*) as count
+                FROM (
+                    SELECT unnest(tags) as tag FROM properties WHERE tags IS NOT NULL AND array_length(tags, 1) > 0
+                ) t
+                WHERE tag IS NOT NULL AND tag != ''
+                GROUP BY tag
+                ORDER BY count DESC, tag ASC;
+            """)
+            rows = cursor.fetchall()
+            cursor.close()
+            return [{'tag': row[0], 'count': row[1]} for row in rows]
+        except Exception as e:
+            logging.error(f"Error fetching tags: {e}")
+            return []
+
+    def update_property_tags(self, property_id: str, tags: List[str]) -> Dict:
+        """Update tags array for a single property."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return {'success': False, 'error': 'Database connection failed'}
+        try:
+            clean_tags = []
+            seen_lower = set()
+            for t in (tags or []):
+                t_clean = str(t).strip()
+                if t_clean and t_clean.lower() not in seen_lower:
+                    clean_tags.append(t_clean)
+                    seen_lower.add(t_clean.lower())
+
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                UPDATE properties 
+                SET tags = %s, updated_at = CURRENT_TIMESTAMP 
+                WHERE id = %s;
+            """, (clean_tags, property_id))
+            self.connection.commit()
+            cursor.close()
+            self._cache.pop('statistics', None)
+            return {'success': True, 'tags': clean_tags}
+        except Exception as e:
+            if self.connection:
+                self.connection.rollback()
+            logging.error(f"Error updating property tags for {property_id}: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def bulk_update_tags_from_csv(self, csv_rows: List[Dict], mode: str = 'replace') -> Dict:
+        """
+        Bulk update property tags from parsed CSV rows.
+        
+        Args:
+            csv_rows: List of dicts with property identifier and tags.
+            mode: 'replace' to overwrite existing tags, 'append' to merge with existing tags.
+        """
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return {'success': False, 'error': 'Database connection failed'}
+
+        if not csv_rows:
+            return {'success': False, 'error': 'CSV file is empty or contains no rows'}
+
+        try:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # Build an in-memory lookup map of all active properties
+            cursor.execute("""
+                SELECT 
+                    id, 
+                    reference, 
+                    'SARDO' || (1099 + ROW_NUMBER() OVER(ORDER BY COALESCE(source, ''), COALESCE(image_filename, ''))) as sardo_reference,
+                    COALESCE(tags, '{}') as current_tags
+                FROM properties;
+            """)
+            all_props = cursor.fetchall()
+            
+            id_map = {}
+            ref_map = {}
+            sardo_map = {}
+            numeric_sardo_map = {}
+            
+            for p in all_props:
+                p_id = str(p['id'])
+                id_map[p_id.lower()] = p
+                
+                if p.get('reference'):
+                    ref_map[str(p['reference']).strip().lower()] = p
+                    
+                sardo_ref = str(p.get('sardo_reference', '')).strip().lower()
+                if sardo_ref:
+                    sardo_map[sardo_ref] = p
+                    digits = ''.join(c for c in sardo_ref if c.isdigit())
+                    if digits:
+                        numeric_sardo_map[digits] = p
+
+            matched_count = 0
+            updated_count = 0
+            unmatched_rows = []
+            all_distinct_tags = set()
+            updates_to_perform = []
+
+            for row_idx, row in enumerate(csv_rows, start=1):
+                prop_key = None
+                for candidate in ['property_id', 'property id', 'id', 'sardo_reference', 'sardo ref', 'reference', 'ref']:
+                    for k in row.keys():
+                        if k and k.strip().lower() == candidate and row[k] is not None:
+                            prop_key = str(row[k]).strip()
+                            break
+                    if prop_key:
+                        break
+                
+                if not prop_key and len(row) > 0:
+                    first_val = list(row.values())[0]
+                    if first_val:
+                        prop_key = str(first_val).strip()
+
+                if not prop_key:
+                    unmatched_rows.append({'row': row_idx, 'identifier': '(empty)', 'reason': 'Missing Property ID'})
+                    continue
+
+                raw_tags_str = None
+                for candidate in ['tags', 'tag', 'property_tags', 'property tags', 'categories']:
+                    for k in row.keys():
+                        if k and k.strip().lower() == candidate and row[k] is not None:
+                            raw_tags_str = str(row[k]).strip()
+                            break
+                    if raw_tags_str is not None:
+                        break
+
+                if raw_tags_str is None and len(row) > 1:
+                    second_val = list(row.values())[1]
+                    if second_val is not None:
+                        raw_tags_str = str(second_val).strip()
+
+                if raw_tags_str is None:
+                    raw_tags_str = ''
+
+                norm_key = prop_key.lower()
+                matched_prop = (
+                    id_map.get(norm_key) or 
+                    sardo_map.get(norm_key) or 
+                    ref_map.get(norm_key) or 
+                    numeric_sardo_map.get(norm_key)
+                )
+
+                if not matched_prop:
+                    unmatched_rows.append({'row': row_idx, 'identifier': prop_key, 'reason': f"No property found matching ID '{prop_key}'"})
+                    continue
+
+                matched_count += 1
+
+                parsed_tags = []
+                for part in re.split(r'[,;\n\r]+', raw_tags_str):
+                    t = part.strip().strip('"').strip("'")
+                    if t:
+                        parsed_tags.append(t)
+
+                new_tags = []
+                seen_lower = set()
+                
+                if mode == 'append':
+                    for existing_t in matched_prop.get('current_tags', []):
+                        if existing_t and existing_t.lower() not in seen_lower:
+                            new_tags.append(existing_t)
+                            seen_lower.add(existing_t.lower())
+
+                for t in parsed_tags:
+                    if t.lower() not in seen_lower:
+                        new_tags.append(t)
+                        seen_lower.add(t.lower())
+                        all_distinct_tags.add(t)
+
+                updates_to_perform.append((new_tags, matched_prop['id']))
+
+            if updates_to_perform:
+                psycopg2.extras.execute_batch(
+                    cursor,
+                    "UPDATE properties SET tags = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s;",
+                    updates_to_perform
+                )
+                self.connection.commit()
+                updated_count = len(updates_to_perform)
+
+            cursor.close()
+            self._cache.pop('statistics', None)
+
+            return {
+                'success': True,
+                'total_rows': len(csv_rows),
+                'matched_count': matched_count,
+                'updated_count': updated_count,
+                'unmatched_rows': unmatched_rows,
+                'distinct_tags_count': len(all_distinct_tags)
+            }
+        except Exception as e:
+            if self.connection:
+                self.connection.rollback()
+            logging.error(f"Error in bulk_update_tags_from_csv: {e}")
+            return {'success': False, 'error': str(e)}
 
     def update_property_scraped_details(self, property_id: str, construction_year: str, energy_rating: str) -> bool:
         """Update construction year and energy rating in the database for a property"""

@@ -24,14 +24,28 @@
                 <div class="stat-card">
                     <span class="stat-label">Active Stock</span>
                     <span class="stat-value" id="stat-total">--</span>
+                    <span class="stat-subtext">All Agency Listings</span>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card clickable-stat-card" id="card-unique-stock" title="Click to view deduplicated unique properties">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span class="stat-label">Unique Stock</span>
+                        <span class="badge-unique-tag" id="badge-duplicates-count">-- Consolidated</span>
+                    </div>
+                    <span class="stat-value" id="stat-unique">--</span>
+                    <span class="stat-subtext">Physical Properties</span>
+                </div>
+                <div class="stat-card" id="card-avg-price">
                     <span class="stat-label">Avg Price</span>
                     <span class="stat-value" id="stat-avg">--</span>
                 </div>
 
-                <button class="btn btn-secondary" id="btn-add-off-market" onclick="openCreateManualModal()"
+                <button class="btn btn-secondary" id="btn-manage-tags" onclick="openTagUploadModal()"
                         style="display: flex; align-items: center; gap: 8px; margin-left: 15px;">
+                    <i class="fas fa-tags" style="color: #6366f1;"></i> Manage Tags
+                </button>
+
+                <button class="btn btn-secondary" id="btn-add-off-market" onclick="openCreateManualModal()"
+                        style="display: flex; align-items: center; gap: 8px; margin-left: 10px;">
                     <i class="fas fa-plus-circle" style="color: var(--accent-color);"></i> Add Off-Market Property
                 </button>
 
@@ -148,6 +162,14 @@
                 <div class="filter-section">
                     <label>Agent / Source</label>
                     <select id="filter-sources" multiple class="multi-select">
+                        <!-- Populated via JS -->
+                    </select>
+                    <small>Hold Ctrl/Cmd to select multiple</small>
+                </div>
+
+                <div class="filter-section">
+                    <label><i class="fas fa-tags" style="color: var(--primary-color);"></i> Tags</label>
+                    <select id="filter-tags" multiple class="multi-select">
                         <!-- Populated via JS -->
                     </select>
                     <small>Hold Ctrl/Cmd to select multiple</small>
@@ -597,7 +619,105 @@
         </div>
     </div>
 
-    <script src="/static/js/main.js?v=3.3"></script>
+    <!-- Duplicate Agency Listings Comparison Modal -->
+    <div id="duplicate-modal" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 99999; backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 20px;">
+        <div class="modal-content" style="background: white; width: 100%; max-width: 900px; border-radius: 14px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35); overflow: hidden; max-height: 88vh; display: flex; flex-direction: column; animation: modalFadeIn 0.25s ease-out;">
+            <div style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); color: white; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(99, 102, 241, 0.25); border: 1px solid rgba(165, 180, 252, 0.4); display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-layer-group" style="font-size: 20px; color: #a5b4fc;"></i>
+                    </div>
+                    <div>
+                        <h3 id="duplicate-modal-title" style="margin: 0; font-size: 1.2rem; font-weight: 700; color: #ffffff;">Multi-Agency Duplicate Breakdown</h3>
+                        <span id="duplicate-modal-subtitle" style="font-size: 0.82rem; color: #c7d2fe;">Group Code: UPG-000008 • 5 Active Agency Listings</span>
+                    </div>
+                </div>
+                <button onclick="closeDuplicateModal()" style="background: rgba(255,255,255,0.12); border: none; color: white; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="duplicate-modal-body" style="padding: 24px; overflow-y: auto; flex: 1; background: #f8fafc;">
+                <!-- Filled dynamically by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Property Tags Manager (CSV Upload) Modal -->
+    <div id="tags-modal" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 99999; backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 20px;">
+        <div class="modal-content" style="background: white; width: 100%; max-width: 680px; border-radius: 14px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35); overflow: hidden; max-height: 90vh; display: flex; flex-direction: column; animation: modalFadeIn 0.25s ease-out;">
+            <div style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); color: white; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(99, 102, 241, 0.25); border: 1px solid rgba(165, 180, 252, 0.4); display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-tags" style="font-size: 20px; color: #a5b4fc;"></i>
+                    </div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.2rem; font-weight: 700; color: #ffffff;">Property Tags Manager</h3>
+                        <span style="font-size: 0.82rem; color: #c7d2fe;">Upload CSV or manage property tags</span>
+                    </div>
+                </div>
+                <button onclick="closeTagUploadModal()" style="background: rgba(255,255,255,0.12); border: none; color: white; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div style="padding: 24px; overflow-y: auto; flex: 1; background: #ffffff;">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;">
+                    <div style="font-size: 13px; color: #334155; line-height: 1.5; margin-bottom: 8px;">
+                        <i class="fas fa-info-circle" style="color: #6366f1;"></i> <strong>CSV Upload Format:</strong> Upload a <code>.csv</code> file with columns <code>property_id</code> (or SARDO ID) and <code>tags</code>.
+                    </div>
+                    <div style="background: #ffffff; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 8px 12px; font-family: monospace; font-size: 12px; color: #475569;">
+                        property_id,tags<br>
+                        SARDO1099,"micro location, macro location, sea view, golf course views"<br>
+                        405,"macro location, golf course views"<br>
+                        1004,"sea view"
+                    </div>
+                    <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
+                        <a href="/api/properties/tags/sample-csv" target="_blank" style="font-size: 12px; font-weight: 600; color: #4f46e5; text-decoration: underline; display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="fas fa-file-download"></i> Download CSV Template with Current Properties
+                        </a>
+                    </div>
+                </div>
+
+                <form id="tags-upload-form" onsubmit="submitTagUploadForm(event)">
+                    <!-- File drop area -->
+                    <div id="tags-dropzone" style="border: 2px dashed #cbd5e1; border-radius: 10px; padding: 28px; text-align: center; background: #fdfdfd; cursor: pointer; transition: all 0.2s;" onclick="document.getElementById('tags-csv-file').click()" ondragover="event.preventDefault(); this.style.borderColor='#6366f1'; this.style.background='#f5f3ff';" ondragleave="this.style.borderColor='#cbd5e1'; this.style.background='#fdfdfd';" ondrop="handleTagFileDrop(event)">
+                        <input type="file" id="tags-csv-file" accept=".csv,.txt" style="display: none;" onchange="handleTagFileSelect(event)">
+                        <i class="fas fa-file-csv" style="font-size: 36px; color: #6366f1; margin-bottom: 10px;"></i>
+                        <div id="tags-file-name" style="font-weight: 600; font-size: 14px; color: var(--text-primary);">Click or drag & drop CSV file here</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Supports .csv files with multiple tags per property</div>
+                    </div>
+
+                    <!-- Upload Mode Options -->
+                    <div style="margin-top: 18px;">
+                        <label style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; display: block;">Upload Mode</label>
+                        <div style="display: flex; gap: 20px;">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer;">
+                                <input type="radio" name="tag_upload_mode" value="replace" checked> Overwrite existing tags
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer;">
+                                <input type="radio" name="tag_upload_mode" value="append"> Append to existing tags
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Action buttons -->
+                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 18px;">
+                        <button type="button" onclick="closeTagUploadModal()" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" id="btn-submit-tags-upload" class="btn btn-primary" style="display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-upload"></i> Upload & Apply Tags
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Results Report Container -->
+                <div id="tags-upload-results" style="display: none; margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+                    <!-- Filled dynamically via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js?v=5.0"></script>
     <script>
         // Simple Toast logic
         function showToast(title, message, type = 'info') {
