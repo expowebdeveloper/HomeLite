@@ -255,7 +255,6 @@ function energyBadge(rating) {
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div style="display: flex; align-items: center; gap: 4px;">
                                 <span class="card-source">${prop.display_source || 'Unknown'}</span>
-                                ${prop.duplicate_count && prop.duplicate_count > 1 ? `<span class="duplicate-group-badge" title="${prop.duplicate_count} agency listings for this property"><i class="fas fa-layer-group"></i> ${prop.duplicate_count} Agencies</span>` : ''}
                             </div>
                             ${statusBadge(prop.property_status)}
                         </div>
@@ -374,10 +373,6 @@ function energyBadge(rating) {
             const isOffMarket = prop.market_visibility === 'off_market' || prop.source_type === 'manual' || prop.website_source === 'Manual / Off-Market' || (prop.property_url && prop.property_url.startsWith('sardo://'));
             const offMarketTag = isOffMarket ? '<span style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 6px;"><i class="fas fa-user-secret"></i> VIP OFF-MARKET</span>' : '';
 
-            const duplicateBadge = (prop.duplicate_count && prop.duplicate_count > 1)
-                ? `<span class="duplicate-group-badge" title="${prop.duplicate_count} agency listings for this property"><i class="fas fa-layer-group"></i> ${prop.duplicate_count}</span>`
-                : '';
-
             row.innerHTML = `
                 <td onclick="event.stopPropagation();">
                     <input type="checkbox" class="row-checkbox" value="${propIdStr}" ${selectedPropertyIds.has(propIdStr) || selectedPropertyIds.has(prop.id) ? 'checked' : ''}>
@@ -391,7 +386,7 @@ function energyBadge(rating) {
                 <td>${landArea}</td>
                 <td>${prop.construction_year || '—'}</td>
                 <td>${energyBadge(prop.energy_rating)}</td>
-                <td><span class="source-badge">${prop.display_source || 'N/A'}</span> ${duplicateBadge}</td>
+                <td><span class="source-badge">${prop.display_source || 'N/A'}</span></td>
                 <td>${statusBadge(prop.property_status)}</td>
                 <td>${prop.sardo_reference || 'N/A'}</td>
                 <td>
@@ -962,14 +957,8 @@ function energyBadge(rating) {
                     const activeCount = (data.stats.active_properties !== undefined)
                         ? data.stats.active_properties
                         : (data.stats.total_properties || 0);
-                    const uniqueCount = (data.stats.unique_properties !== undefined)
-                        ? data.stats.unique_properties
-                        : activeCount;
-                    const duplicatesCount = data.stats.duplicate_listings || 0;
 
                     if (statTotal) statTotal.innerText = Number(activeCount).toLocaleString();
-                    if (statUnique) statUnique.innerText = Number(uniqueCount).toLocaleString();
-                    if (badgeDuplicatesCount) badgeDuplicatesCount.innerText = `${duplicatesCount} Consolidated`;
                     if (statAvg) statAvg.innerText = formatCurrency(data.stats.avg_price);
                 }
 
