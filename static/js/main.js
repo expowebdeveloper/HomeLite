@@ -282,18 +282,6 @@ function energyBadge(rating) {
                     e.stopPropagation();
                     showModal(prop);
                 });
-            }
-
-            // Duplicate badge click opens multi-agency comparison
-            const dupBadge = card.querySelector('.duplicate-group-badge');
-            if (dupBadge) {
-                dupBadge.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    window.openDuplicateGroupModal(prop.id);
-                });
-            }
-
             // Clicking the card toggles selection (same as table rows)
             card.addEventListener('click', (e) => {
                 if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.card-checkbox')) {
@@ -403,18 +391,6 @@ function energyBadge(rating) {
                     e.preventDefault();
                     showModal(prop);
                 });
-            }
-
-            // Duplicate badge click opens multi-agency comparison
-            const dupBadge = row.querySelector('.duplicate-group-badge');
-            if (dupBadge) {
-                dupBadge.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    window.openDuplicateGroupModal(prop.id);
-                });
-            }
-
             row.addEventListener('click', () => {
                 const checkbox = row.querySelector('.row-checkbox');
                 checkbox.checked = !checkbox.checked;
