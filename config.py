@@ -118,3 +118,42 @@ class Config:
         "LibertyrealestateScraper": "Liberty",
         "AlgarvePropScraper": "Gatehouse"
     }
+
+    @staticmethod
+    def normalize_property_status(raw_text: str = None, is_live_page: bool = True) -> str:
+        """
+        Properly canonicalize property status from live badge/raw text.
+        
+        Step 1: If the page was removed or dead (404/delisted), return 'Delisted'.
+        Step 2: Check for explicit status badges (Sold, Reserved, Under Offer, Exclusive, New Listing, etc.).
+        Step 3: If live and no special badge exists (or generic feature text), return 'For Sale'.
+        """
+        if not is_live_page:
+            return "Delisted"
+
+        if not raw_text:
+            return "For Sale"
+
+        txt = str(raw_text).strip().lower()
+
+        # Check for inactive / sold badges first
+        if any(k in txt for k in ["sold", "vendid", "vendido"]):
+            return "Sold"
+        if any(k in txt for k in ["withdrawn", "retirado"]):
+            return "Withdrawn"
+        if any(k in txt for k in ["off market", "private listing"]):
+            return "Off Market"
+
+        # Check for transaction / conditional badges
+        if any(k in txt for k in ["under offer", "under contract", "sob proposta", "sale agreed", "under proposal", "promessa"]):
+            return "Under Offer"
+        if any(k in txt for k in ["reserved", "reservado", "reservation", "reserva"]):
+            return "Reserved"
+        if any(k in txt for k in ["exclusive", "exclusivo", "sole agency"]):
+            return "Exclusive"
+        if any(k in txt for k in ["new listing", "novo", "new development", "just listed", "newly built"]):
+            return "New Listing"
+
+        # Live property with standard features or unmapped badge -> For Sale
+        return "For Sale"
+

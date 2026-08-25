@@ -66,7 +66,7 @@ function energyBadge(rating) {
     else if (r.startsWith('G')) { bg = '#991b1b'; color = '#fff'; }
     else if (r === 'ELECTRIC') { bg = '#0284c7'; color = '#fff'; }
     else if (r === 'SOLAR') { bg = '#fbbf24'; color = '#000'; }
-    else if (r === 'GAS') { bg = '#4f46e5'; color = '#fff'; }
+    else if (r.startsWith('IN PROGRESS')) { bg = '#fef3c7'; color = '#b45309'; }
     else if (r === 'EXEMPT' || r === 'ISENTO') { bg = '#94a3b8'; color = '#fff'; }
     else { bg = '#334155'; color = '#fff'; }
     
@@ -74,7 +74,7 @@ function energyBadge(rating) {
 }
 
     const statusBadge = (status) => {
-        const canonical = status || 'For Sale';
+        const canonical = (!status || status === 'Unknown') ? 'For Sale' : status;
         const cls = 'status-badge status-' + canonical.toLowerCase().replace(/\s+/g, '-');
         const icon = STATUS_ICONS[canonical] || 'fa-tag';
         return `<span class="badge ${cls}"><i class="fas ${icon}"></i> ${canonical}</span>`;
@@ -258,6 +258,7 @@ function energyBadge(rating) {
                             </div>
                             ${statusBadge(prop.property_status)}
                         </div>
+                        ${prop.duplicate_count > 1 ? `<button class="btn-duplicate-card" onclick="event.stopPropagation(); window.openDuplicateGroupModal('${prop.id}')"><i class="fas fa-copy"></i> +${prop.duplicate_count - 1}</button>` : ''}
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Ref: ${prop.sardo_reference || 'N/A'}</span>
                             ${isOffMarket ? `<span style="color: #f59e0b; font-size: 0.8rem; font-weight: 700;"><i class="fas fa-lock"></i> Confidential</span>` : ''}
@@ -376,7 +377,7 @@ function energyBadge(rating) {
                 <td>${landArea}</td>
                 <td>${prop.construction_year || '—'}</td>
                 <td>${energyBadge(prop.energy_rating)}</td>
-                <td><span class="source-badge">${prop.display_source || 'N/A'}</span></td>
+                <td><span class="source-badge">${prop.display_source || 'N/A'}</span> ${prop.duplicate_count > 1 ? `<button class="btn-duplicate" onclick="event.stopPropagation(); window.openDuplicateGroupModal('${prop.id}')"><i class="fas fa-copy"></i> +${prop.duplicate_count - 1}</button>` : ''}</td>
                 <td>${statusBadge(prop.property_status)}</td>
                 <td>${prop.sardo_reference || 'N/A'}</td>
                 <td>
@@ -939,6 +940,16 @@ function energyBadge(rating) {
                         : (data.stats.total_properties || 0);
 
                     if (statTotal) statTotal.innerText = Number(activeCount).toLocaleString();
+                    
+                    if (statUnique && data.stats.unique_properties !== undefined) {
+                        statUnique.innerText = Number(data.stats.unique_properties).toLocaleString();
+                    }
+                    
+                    const statDuplicates = document.getElementById('stat-duplicates');
+                    if (statDuplicates && data.stats.duplicate_listings !== undefined) {
+                        statDuplicates.innerText = `Identified Duplicates: ${Number(data.stats.duplicate_listings).toLocaleString()}`;
+                    }
+
                     if (statAvg) statAvg.innerText = formatCurrency(data.stats.avg_price);
                 }
 
@@ -976,6 +987,24 @@ function energyBadge(rating) {
             const data = await response.json();
             currentProperties = data.properties;
             totalPropertiesCount = data.total_count;
+            
+            // Set Stats dynamically from search results
+            if (data.stats) {
+                const activeCount = (data.stats.active_properties !== undefined)
+                    ? data.stats.active_properties
+                    : (data.stats.total_properties || 0);
+
+                if (statTotal) statTotal.innerText = Number(activeCount).toLocaleString();
+                
+                if (statUnique && data.stats.unique_properties !== undefined) {
+                    statUnique.innerText = Number(data.stats.unique_properties).toLocaleString();
+                }
+                
+                const statDuplicates = document.getElementById('stat-duplicates');
+                if (statDuplicates && data.stats.duplicate_listings !== undefined) {
+                    statDuplicates.innerText = `Identified Duplicates: ${Number(data.stats.duplicate_listings).toLocaleString()}`;
+                }
+            }
 
             // Clear selections
             selectedPropertyIds.clear();

@@ -163,8 +163,9 @@ class DatabaseManager:
             if not self.connect():
                 return None
         
-        return self._fetch_user("username = %s OR email = %s",
-                                (identifier, identifier), f"by identifier {identifier!r}")
+        ident = identifier.strip().lower()
+        return self._fetch_user("LOWER(username) = %s OR LOWER(email) = %s",
+                                (ident, ident), f"by identifier {ident!r}")
 
     def get_user_by_id(self, user_id: int) -> Optional[Dict]:
         """Fetch a user by their ID"""
@@ -839,11 +840,8 @@ class DatabaseManager:
             """
         params = []
 
-        # Stock Mode filter (active: all listings; unique: only 1 representative per duplicate group)
+        # We defer stock_mode filtering to AFTER the count query, so the count query can dynamically return both active and unique stats.
         stock_mode = filters.get('stock_mode', 'active')
-        if stock_mode == 'unique':
-            base_query += " AND (p.member_id IS NULL OR p.is_representative = TRUE)"
-            
         # Price range filtering with NULL handling
         if filters.get('min_price') is not None:
             # If min_price is provided, exclude NULL prices and include properties with price >= min_price
@@ -913,9 +911,16 @@ class DatabaseManager:
                 statuses = [statuses]
             statuses = [s for s in statuses if s in Config.PROPERTY_STATUSES]
             if statuses:
-                placeholders = ', '.join(['%s'] * len(statuses))
-                base_query += f" AND property_status IN ({placeholders})"
-                params.extend(statuses)
+                query_statuses = list(statuses)
+                if 'For Sale' in query_statuses and 'Unknown' not in query_statuses:
+                    query_statuses.append('Unknown')
+                placeholders = ', '.join(['%s'] * len(query_statuses))
+                base_query += f" AND (property_status IN ({placeholders})"
+                if 'For Sale' in query_statuses:
+                    base_query += " OR property_status IS NULL)"
+                else:
+                    base_query += ")"
+                params.extend(query_statuses)
 
         # Hide delisted stock (opt-in, so existing callers are unaffected)
         if filters.get('exclude_delisted'):
@@ -971,12 +976,20 @@ class DatabaseManager:
             params.append(filters['status_changed_to'])
 
         try:
-            # First, get the total count for pagination
-            count_query = "SELECT COUNT(*) " + base_query
+            # Get the dynamic stats for the current filters
+            count_query = "SELECT COUNT(*) as active_properties, COUNT(*) FILTER (WHERE p.member_id IS NULL OR p.is_representative = TRUE) as unique_properties " + base_query
             cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             cursor.execute(count_query, params)
-            total_count_row = cursor.fetchone()
-            total_count = list(total_count_row.values())[0] if total_count_row else 0
+            stats_row = cursor.fetchone()
+            
+            active_properties = stats_row['active_properties'] if stats_row else 0
+            unique_properties = stats_row['unique_properties'] if stats_row else 0
+            
+            # Now append stock mode for the actual paginated query
+            if stock_mode == 'unique':
+                base_query += " AND (p.member_id IS NULL OR p.is_representative = TRUE)"
+                
+            total_count = unique_properties if stock_mode == 'unique' else active_properties
             
             # Then get the actual paginated records
             query = """
@@ -1081,7 +1094,12 @@ class DatabaseManager:
             
             return {
                 'properties': [dict(record) for record in records],
-                'total_count': total_count
+                'total_count': total_count,
+                'stats': {
+                    'active_properties': active_properties,
+                    'unique_properties': unique_properties,
+                    'duplicate_listings': max(0, active_properties - unique_properties)
+                }
             }
             
         except Exception as e:

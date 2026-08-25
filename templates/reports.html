@@ -302,12 +302,15 @@
 
         const STATUS_ORDER = ['For Sale', 'New Listing', 'Reserved', 'Under Offer', 'Exclusive', 'Sold', 'Delisted', 'Unknown'];
 
-        const statusClass = (status) => 'status-badge status-' + String(status || 'Unknown')
-            .toLowerCase().replace(/\s+/g, '-');
+        const statusClass = (status) => {
+            const canonical = (!status || status === 'Unknown') ? 'For Sale' : status;
+            return 'status-badge status-' + canonical.toLowerCase().replace(/\s+/g, '-');
+        };
 
-        const badge = (status) => status
-            ? `<span class="${statusClass(status)}">${status}</span>`
-            : '<span class="status-badge status-unknown">—</span>';
+        const badge = (status) => {
+            const canonical = (!status || status === 'Unknown') ? 'For Sale' : status;
+            return `<span class="${statusClass(canonical)}">${canonical}</span>`;
+        };
 
         const fmtDate = (value) => {
             if (!value) return '—';

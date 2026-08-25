@@ -174,6 +174,18 @@ body {
     font-weight: 600;
 }
 
+#stat-duplicates {
+    font-size: 0.68rem;
+    color: #b91c1c;
+    background: #fee2e2;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 700;
+    margin-top: 4px;
+    display: inline-block;
+    border: 1px solid rgba(239, 68, 68, 0.15);
+}
+
 .badge-unique-tag {
     background: #10b981;
     color: white;
@@ -1707,10 +1719,17 @@ thead tr th:hover {
 }
 
 .global-category-block {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 14px 18px;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 22px;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition-smooth);
+}
+
+.global-category-block:hover {
+    box-shadow: var(--shadow-md);
+    border-color: rgba(99, 102, 241, 0.2);
 }
 
 .global-category-title {
@@ -1718,8 +1737,8 @@ thead tr th:hover {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: #475569;
-    margin-bottom: 10px;
+    color: var(--primary-color);
+    margin-bottom: 14px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -1729,7 +1748,7 @@ thead tr th:hover {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: white;
+    background: #ffffff;
     border: 1px solid #cbd5e1;
     padding: 5px 12px;
     border-radius: 20px;
@@ -1742,9 +1761,9 @@ thead tr th:hover {
 }
 
 .global-tag-card-chip:hover {
-    border-color: #6366f1;
+    border-color: var(--accent-color);
     background: #f5f3ff;
-    color: #4f46e5;
+    color: var(--accent-hover);
     transform: translateY(-1px);
     box-shadow: 0 3px 6px rgba(99, 102, 241, 0.15);
 }
@@ -1782,4 +1801,84 @@ thead tr th:hover {
     background: #f8fafc;
     border: 1px solid var(--border-color);
     border-radius: 8px;
+}
+
+/* Ultimate Premium Duplicate Badge (Table) */
+.btn-duplicate {
+    position: relative;
+    background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+    color: var(--accent-hover);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 800;
+    margin-left: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    box-shadow: 
+        2px 2px 0px 0px rgba(99, 102, 241, 0.2), 
+        4px 4px 0px 0px rgba(99, 102, 241, 0.1);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-duplicate:hover {
+    background: var(--accent-hover);
+    color: #ffffff;
+    border-color: var(--accent-hover);
+    transform: translate(-2px, -2px);
+    box-shadow: 
+        4px 4px 0px 0px rgba(99, 102, 241, 0.3), 
+        8px 8px 0px 0px rgba(99, 102, 241, 0.1);
+}
+
+.btn-duplicate i {
+    font-size: 9px;
+    transition: transform 0.3s ease;
+}
+
+.btn-duplicate:hover i {
+    transform: rotate(-12deg) scale(1.15);
+}
+
+/* Premium Duplicate Card Button (Grid Card) */
+.btn-duplicate-card {
+    background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+    color: var(--accent-hover);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    width: calc(100% - 6px);
+    margin-right: 6px;
+    box-shadow: 
+        2px 2px 0px 0px rgba(99, 102, 241, 0.15), 
+        4px 4px 0px 0px rgba(99, 102, 241, 0.08);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-duplicate-card:hover {
+    background: var(--accent-hover);
+    color: #ffffff;
+    border-color: var(--accent-hover);
+    transform: translate(-2px, -2px);
+    box-shadow: 
+        4px 4px 0px 0px rgba(99, 102, 241, 0.25), 
+        8px 8px 0px 0px rgba(99, 102, 241, 0.12);
+}
+
+.btn-duplicate-card i {
+    transition: transform 0.3s ease;
+}
+
+.btn-duplicate-card:hover i {
+    transform: rotate(-12deg) scale(1.15);
 }

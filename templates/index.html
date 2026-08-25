@@ -21,10 +21,15 @@
                 <h1 id="logo-text" style="display:none;">SARDO360</h1>
             </div>
             <div class="stats-container">
-                <div class="stat-card" id="card-active-stock">
+                <div class="stat-card clickable-stat-card active" id="card-active-stock">
                     <span class="stat-label">Active Stock</span>
                     <span class="stat-value" id="stat-total">--</span>
                     <span class="stat-subtext">All Agency Listings</span>
+                </div>
+                <div class="stat-card clickable-stat-card" id="card-unique-stock">
+                    <span class="stat-label">Unique Stock</span>
+                    <span class="stat-value" id="stat-unique">--</span>
+                    <span class="stat-subtext" id="stat-duplicates">Identified Duplicates: 0</span>
                 </div>
                 <div class="stat-card" id="card-avg-price">
                     <span class="stat-label">Avg Price</span>
@@ -370,11 +375,35 @@
         </div>
     </div>
 
-    <!-- Property Modal Details (Instead of right panel) -->
     <div id="property-modal" class="modal-overlay" style="display:none;">
         <div class="modal-content">
             <span class="close-modal">&times;</span>
             <div id="modal-body"></div>
+        </div>
+    </div>
+    
+    <!-- Duplicate Group Modal -->
+    <div id="duplicate-modal" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 99999; backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 20px;">
+        <div class="modal-content" style="background: white; width: 100%; max-width: 820px; border-radius: 14px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35); overflow: hidden; max-height: 90vh; display: flex; flex-direction: column; animation: modalFadeIn 0.25s ease-out;">
+            <!-- Modal Header -->
+            <div style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); color: white; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(99, 102, 241, 0.25); border: 1px solid rgba(165, 180, 252, 0.4); display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-layer-group" style="font-size: 20px; color: #a5b4fc;"></i>
+                    </div>
+                    <div>
+                        <h2 id="duplicate-modal-title" style="margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.3px;">Duplicate Cluster</h2>
+                        <div id="duplicate-modal-subtitle" style="font-size: 13px; color: #cbd5e1; margin-top: 4px;"></div>
+                    </div>
+                </div>
+                <button onclick="closeDuplicateModal()" style="background: rgba(255,255,255,0.12); border: none; color: white; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Body -->
+            <div id="duplicate-modal-body" style="padding: 24px; overflow-y: auto; flex: 1; background: #f8fafc;">
+            </div>
         </div>
     </div>
 
@@ -607,69 +636,66 @@
                         <i class="fas fa-save"></i> Save VIP Asset
                     </button>
                 </div>
-            </form>
         </div>
     </div>
 
     <!-- Property Tags Manager (Global Tags Library & CSV Upload) Modal -->
-    <div id="tags-modal" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 99999; backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 20px;">
-        <div class="modal-content" style="background: white; width: 100%; max-width: 820px; border-radius: 14px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35); overflow: hidden; max-height: 90vh; display: flex; flex-direction: column; animation: modalFadeIn 0.25s ease-out;">
-            <div style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); color: white; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(99, 102, 241, 0.25); border: 1px solid rgba(165, 180, 252, 0.4); display: flex; align-items: center; justify-content: center;">
-                        <i class="fas fa-tags" style="font-size: 20px; color: #a5b4fc;"></i>
+    <div id="tags-modal" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); z-index: 99999; backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); align-items: center; justify-content: center; padding: 20px;">
+        <div class="modal-content" style="background: #ffffff; color: var(--text-primary); border-radius: var(--border-radius-lg); border: 1px solid var(--border-color); box-shadow: var(--shadow-hover); overflow: hidden; max-height: 90vh; display: flex; flex-direction: column; width: 100%; max-width: 820px; animation: modalFadeIn 0.25s ease-out;">
+            <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 24px 30px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; position: relative;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div style="width: 48px; height: 48px; border-radius: 12px; background: var(--primary-color); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: var(--shadow-md);">
+                        <i class="fas fa-tags"></i>
                     </div>
                     <div>
-                        <h3 style="margin: 0; font-size: 1.2rem; font-weight: 700; color: #ffffff;">Property Tags Manager</h3>
-                        <span style="font-size: 0.82rem; color: #c7d2fe;">Global Tags Library, Bulk Assignments & CSV Upload</span>
+                        <h2 style="margin: 0; font-size: 22px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.5px;">Property Tags Manager</h2>
+                        <p style="margin: 4px 0 0; font-size: 13px; color: var(--text-secondary);">Global Tags Library, Bulk Assignments & CSV Upload</p>
                     </div>
                 </div>
-                <button onclick="closeTagUploadModal()" style="background: rgba(255,255,255,0.12); border: none; color: white; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">
-                    <i class="fas fa-times"></i>
-                </button>
+                <span class="close-modal" onclick="closeTagUploadModal()" style="color: var(--text-secondary); font-size: 28px; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='var(--danger-color)'" onmouseout="this.style.color='var(--text-secondary)'">&times;</span>
             </div>
             
             <!-- Modal Navigation Tabs -->
-            <div style="display: flex; background: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 0 24px;">
-                <button id="tab-btn-global-tags" onclick="switchTagsModalTab('global')" style="padding: 14px 20px; font-weight: 700; font-size: 13px; color: #4f46e5; border: none; background: transparent; border-bottom: 3px solid #4f46e5; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+            <div style="display: flex; background: #f8fafc; border-bottom: 1px solid var(--border-color); padding: 0 24px;">
+                <button id="tab-btn-global-tags" onclick="switchTagsModalTab('global')" style="padding: 16px 20px; font-weight: 700; font-size: 13px; color: var(--accent-hover); border: none; background: transparent; border-bottom: 3px solid var(--accent-hover); cursor: pointer; display: flex; align-items: center; gap: 8px;">
                     <i class="fas fa-layer-group"></i> Global Tags Library
                 </button>
-                <button id="tab-btn-csv-upload" onclick="switchTagsModalTab('csv')" style="padding: 14px 20px; font-weight: 600; font-size: 13px; color: #64748b; border: none; background: transparent; border-bottom: 3px solid transparent; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                <button id="tab-btn-csv-upload" onclick="switchTagsModalTab('csv')" style="padding: 16px 20px; font-weight: 600; font-size: 13px; color: var(--text-secondary); border: none; background: transparent; border-bottom: 3px solid transparent; cursor: pointer; display: flex; align-items: center; gap: 8px;">
                     <i class="fas fa-file-csv"></i> Bulk CSV Upload
                 </button>
             </div>
-
+ 
             <!-- Tab 1: Global Tags Library View -->
             <div id="tags-tab-global" style="padding: 24px; overflow-y: auto; flex: 1; background: #ffffff;">
                 <!-- Selected properties banner -->
-                <div id="global-tags-selection-banner" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 16px; margin-bottom: 18px; justify-content: space-between; align-items: center;">
-                    <div style="font-size: 13px; color: #1e40af; font-weight: 600;">
+                <div id="global-tags-selection-banner" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--border-radius); padding: 12px 18px; margin-bottom: 18px; justify-content: space-between; align-items: center; box-shadow: var(--shadow-sm);">
+                    <div style="font-size: 13px; color: #1e40af; font-weight: 700;">
                         <i class="fas fa-check-square"></i> <span id="global-tags-selected-count">0</span> properties selected in table/grid. Click any tag below to apply or remove.
                     </div>
                 </div>
-
+ 
                 <!-- Search and Add new Tag Bar -->
                 <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
                     <div style="flex: 1; min-width: 240px; position: relative;">
-                        <i class="fas fa-search" style="position: absolute; left: 12px; top: 11px; color: #94a3b8; font-size: 13px;"></i>
-                        <input type="text" id="global-tag-search-input" placeholder="Search tags in library..." style="width: 100%; padding: 8px 12px 8px 34px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px;" oninput="filterGlobalTagsLibrary(this.value)">
+                        <i class="fas fa-search" style="position: absolute; left: 12px; top: 11px; color: var(--text-secondary); font-size: 13px;"></i>
+                        <input type="text" id="global-tag-search-input" placeholder="Search tags in library..." style="width: 100%; padding: 9px 12px 9px 34px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; outline: none; background: #ffffff;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='#cbd5e1'">
                     </div>
-                    <button type="button" onclick="toggleCreateGlobalTagForm()" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; font-size: 13px;">
+                    <button type="button" onclick="toggleCreateGlobalTagForm()" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; font-size: 13px; background: #ffffff; border: 1px solid #cbd5e1; color: var(--text-secondary); box-shadow: var(--shadow-sm);">
                         <i class="fas fa-plus"></i> New Global Tag
                     </button>
                 </div>
-
+ 
                 <!-- Create Global Tag Form (collapsible) -->
-                <div id="create-global-tag-panel" style="display: none; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-bottom: 20px;">
-                    <h4 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; color: #1e293b;">Create New Global Tag</h4>
-                    <div style="display: grid; grid-template-columns: 2fr 1.5fr 1fr auto; gap: 10px; align-items: end;">
+                <div id="create-global-tag-panel" style="display: none; background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 18px; margin-bottom: 20px; box-shadow: var(--shadow-sm);">
+                    <h4 style="margin: 0 0 14px 0; font-size: 14px; font-weight: 700; color: var(--primary-color);">Create New Global Tag</h4>
+                    <div style="display: grid; grid-template-columns: 2fr 1.5fr 1fr auto; gap: 12px; align-items: end;">
                         <div>
-                            <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 4px; display: block;">Tag Name</label>
-                            <input type="text" id="new-global-tag-name" placeholder="e.g. Sunset Views" style="width: 100%; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+                            <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 4px; display: block; letter-spacing: 0.5px;">Tag Name</label>
+                            <input type="text" id="new-global-tag-name" placeholder="e.g. Sunset Views" style="width: 100%; padding: 8px 11px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 13px; outline: none; background: rgba(255, 255, 255, 0.85);" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='var(--border-color)'">
                         </div>
                         <div>
-                            <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 4px; display: block;">Category</label>
-                            <select id="new-global-tag-category" style="width: 100%; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; background: white;">
+                            <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 4px; display: block; letter-spacing: 0.5px;">Category</label>
+                            <select id="new-global-tag-category" style="width: 100%; padding: 8px 11px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 13px; background: rgba(255, 255, 255, 0.85); outline: none; cursor: pointer;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='var(--border-color)'">
                                 <option value="Views & Location">Views & Location</option>
                                 <option value="Features & Amenities">Features & Amenities</option>
                                 <option value="Investment & Legal">Investment & Legal</option>
@@ -678,36 +704,35 @@
                             </select>
                         </div>
                         <div>
-                            <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 4px; display: block;">Color</label>
-                            <input type="color" id="new-global-tag-color" value="#4f46e5" style="width: 100%; height: 35px; padding: 2px; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;">
+                            <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 4px; display: block; letter-spacing: 0.5px;">Color</label>
+                            <input type="color" id="new-global-tag-color" value="#6366f1" style="width: 100%; height: 36px; padding: 2px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; background: transparent;">
                         </div>
                         <div style="display: flex; gap: 8px;">
-                            <button type="button" onclick="submitCreateGlobalTag()" class="btn btn-primary" style="padding: 8px 16px; font-size: 13px;">Save Tag</button>
-                            <button type="button" onclick="toggleCreateGlobalTagForm(false)" class="btn btn-secondary" style="padding: 8px 14px; font-size: 13px;">Cancel</button>
+                            <button type="button" onclick="submitCreateGlobalTag()" class="btn btn-primary" style="padding: 9px 18px; font-size: 13px;">Save Tag</button>
+                            <button type="button" onclick="toggleCreateGlobalTagForm(false)" class="btn btn-secondary" style="padding: 9px 16px; font-size: 13px; background: transparent; border: 1px solid var(--border-color);">Cancel</button>
                         </div>
                     </div>
                 </div>
-
+ 
                 <!-- Categorized Tags Container -->
                 <div id="global-tags-categories-list" style="display: flex; flex-direction: column; gap: 16px;">
-                    <div style="text-align: center; color: #94a3b8; padding: 30px;"><i class="fas fa-circle-notch fa-spin"></i> Loading Global Tags Library...</div>
+                    <div style="text-align: center; color: var(--text-secondary); padding: 30px;"><i class="fas fa-circle-notch fa-spin"></i> Loading Global Tags Library...</div>
                 </div>
             </div>
-
             <!-- Tab 2: Bulk CSV Upload View -->
-            <div id="tags-tab-csv" style="display: none; padding: 24px; overflow-y: auto; flex: 1; background: #ffffff;">
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;">
+            <div id="tags-tab-csv" style="display: none; padding: 24px; overflow-y: auto; flex: 1; background: transparent;">
+                <div style="background: rgba(255, 255, 255, 0.45); border: 1px solid rgba(255, 255, 255, 0.6); border-radius: var(--border-radius); padding: 14px 18px; margin-bottom: 20px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
                     <div style="font-size: 13px; color: #334155; line-height: 1.5; margin-bottom: 8px;">
                         <i class="fas fa-info-circle" style="color: #6366f1;"></i> <strong>CSV Upload Format:</strong> Upload a <code>.csv</code> file with columns <code>property_id</code> (or SARDO ID) and <code>tags</code>.
                     </div>
-                    <div style="background: #ffffff; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 8px 12px; font-family: monospace; font-size: 12px; color: #475569;">
+                    <div style="background: rgba(255, 255, 255, 0.7); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px; font-family: monospace; font-size: 12px; color: var(--text-primary);">
                         property_id,tags<br>
                         SARDO1099,"micro location, macro location, sea view, golf course views"<br>
                         405,"macro location, golf course views"<br>
                         1004,"sea view"
                     </div>
                     <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
-                        <a href="/api/properties/tags/sample-csv" target="_blank" style="font-size: 12px; font-weight: 600; color: #4f46e5; text-decoration: underline; display: inline-flex; align-items: center; gap: 4px;">
+                        <a href="/api/properties/tags/sample-csv" target="_blank" style="font-size: 12px; font-weight: 600; color: var(--accent-hover); text-decoration: underline; display: inline-flex; align-items: center; gap: 4px;">
                             <i class="fas fa-file-download"></i> Download CSV Template with Current Properties
                         </a>
                     </div>
@@ -715,10 +740,10 @@
 
                 <form id="tags-upload-form" onsubmit="submitTagUploadForm(event)">
                     <!-- File drop area -->
-                    <div id="tags-dropzone" style="border: 2px dashed #cbd5e1; border-radius: 10px; padding: 28px; text-align: center; background: #fdfdfd; cursor: pointer; transition: all 0.2s;" onclick="document.getElementById('tags-csv-file').click()" ondragover="event.preventDefault(); this.style.borderColor='#6366f1'; this.style.background='#f5f3ff';" ondragleave="this.style.borderColor='#cbd5e1'; this.style.background='#fdfdfd';" ondrop="handleTagFileDrop(event)">
+                    <div id="tags-dropzone" style="border: 2px dashed var(--border-color); border-radius: var(--border-radius); padding: 32px; text-align: center; background: rgba(255, 255, 255, 0.5); cursor: pointer; transition: var(--transition-smooth);" onclick="document.getElementById('tags-csv-file').click()" ondragover="event.preventDefault(); this.style.borderColor='var(--accent-color)'; this.style.background='rgba(99, 102, 241, 0.05)';" ondragleave="this.style.borderColor='var(--border-color)'; this.style.background='rgba(255, 255, 255, 0.5)';" ondrop="handleTagFileDrop(event)">
                         <input type="file" id="tags-csv-file" accept=".csv,.txt" style="display: none;" onchange="handleTagFileSelect(event)">
-                        <i class="fas fa-file-csv" style="font-size: 36px; color: #6366f1; margin-bottom: 10px;"></i>
-                        <div id="tags-file-name" style="font-weight: 600; font-size: 14px; color: var(--text-primary);">Click or drag & drop CSV file here</div>
+                        <i class="fas fa-file-csv" style="font-size: 36px; color: var(--accent-color); margin-bottom: 10px;"></i>
+                        <div id="tags-file-name" style="font-weight: 700; font-size: 14px; color: var(--text-primary);">Click or drag & drop CSV file here</div>
                         <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Supports .csv files with multiple tags per property</div>
                     </div>
 
@@ -726,18 +751,18 @@
                     <div style="margin-top: 18px;">
                         <label style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; display: block;">Upload Mode</label>
                         <div style="display: flex; gap: 20px;">
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer;">
-                                <input type="radio" name="tag_upload_mode" value="replace" checked> Overwrite existing tags
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; color: var(--text-secondary); font-weight: 500;">
+                                <input type="radio" name="tag_upload_mode" value="replace" checked style="accent-color: var(--accent-color);"> Overwrite existing tags
                             </label>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer;">
-                                <input type="radio" name="tag_upload_mode" value="append"> Append to existing tags
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; color: var(--text-secondary); font-weight: 500;">
+                                <input type="radio" name="tag_upload_mode" value="append" style="accent-color: var(--accent-color);"> Append to existing tags
                             </label>
                         </div>
                     </div>
 
                     <!-- Action buttons -->
-                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 18px;">
-                        <button type="button" onclick="closeTagUploadModal()" class="btn btn-secondary">Cancel</button>
+                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 18px;">
+                        <button type="button" onclick="closeTagUploadModal()" class="btn btn-secondary" style="background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary);">Cancel</button>
                         <button type="submit" id="btn-submit-tags-upload" class="btn btn-primary" style="display: flex; align-items: center; gap: 8px;">
                             <i class="fas fa-upload"></i> Upload & Apply Tags
                         </button>

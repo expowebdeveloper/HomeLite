@@ -1179,11 +1179,11 @@ def search_properties():
         reference = prop.get('reference', 'N/A')
         prop['display_reference'] = title if is_waratah and title and title.strip() else reference
 
-        # Coerce NULL/missing property_status to 'For Sale'.
+        # Coerce NULL/missing/Unknown property_status to 'For Sale'.
         # Per spec §4: "No status detected at all → For Sale".
         # This prevents the frontend from showing 'Unknown' for properties
-        # where the scraper hasn't written a status yet.
-        if not prop.get('property_status'):
+        # where the scraper hasn't written a status yet or extracted non-status feature text.
+        if not prop.get('property_status') or prop.get('property_status') == 'Unknown':
             prop['property_status'] = 'For Sale'
 
     return jsonify({
@@ -1210,8 +1210,8 @@ def get_property_detail(property_id):
             prop['image_url'] = s3_manager.get_image_url(s3_key)
     else:
         prop['image_url'] = None
-    # Coerce NULL property_status → 'For Sale' (same rule as the list endpoint)
-    if not prop.get('property_status'):
+    # Coerce NULL/Unknown property_status → 'For Sale' (same rule as the list endpoint)
+    if not prop.get('property_status') or prop.get('property_status') == 'Unknown':
         prop['property_status'] = 'For Sale'
     return jsonify(prop)
 
@@ -1224,6 +1224,8 @@ def get_property_group_breakdown(property_id):
 
     for item in info.get('listings', []):
         item['display_source'] = display_source_name(item.get('source'))
+        if not item.get('property_status') or item.get('property_status') == 'Unknown':
+            item['property_status'] = 'For Sale'
         if item.get('image_filename'):
             source = item.get('source')
             if source:
@@ -1646,7 +1648,7 @@ def generate_excel_report(properties, client_name):
             'Build (m²)': format_area_value(prop.get('living_area')),
             'Plot (m²)': format_area_value(prop.get('land_area')),
             'Source': source,
-            'Status': prop.get('property_status') or 'Unknown',
+            'Status': prop.get('property_status') if (prop.get('property_status') and prop.get('property_status') != 'Unknown') else 'For Sale',
             'Tags': ", ".join(prop.get('tags') or []),
             'SARDO Ref': prop.get('sardo_reference', 'N/A'),
             'Reference (with link to page source)': display_reference,
