@@ -738,7 +738,7 @@
                     </div>
                 </div>
 
-                <form id="tags-upload-form" onsubmit="submitTagUploadForm(event)">
+                <form id="tags-upload-form">
                     <!-- File drop area -->
                     <div id="tags-dropzone" style="border: 2px dashed var(--border-color); border-radius: var(--border-radius); padding: 32px; text-align: center; background: rgba(255, 255, 255, 0.5); cursor: pointer; transition: var(--transition-smooth);" onclick="document.getElementById('tags-csv-file').click()" ondragover="event.preventDefault(); this.style.borderColor='var(--accent-color)'; this.style.background='rgba(99, 102, 241, 0.05)';" ondragleave="this.style.borderColor='var(--border-color)'; this.style.background='rgba(255, 255, 255, 0.5)';" ondrop="handleTagFileDrop(event)">
                         <input type="file" id="tags-csv-file" accept=".csv,.txt" style="display: none;" onchange="handleTagFileSelect(event)">
@@ -777,7 +777,7 @@
         </div>
     </div>
 
-    <script src="/static/js/main.js?v=5.7"></script>
+    <script src="/static/js/main.js?v=5.8"></script>
     <script>
         // Simple Toast logic
         // Supports both: showToast(title, message, type) and showToast(message, type)

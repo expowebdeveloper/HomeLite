@@ -1661,6 +1661,7 @@ function energyBadge(rating) {
             refreshTagsFilter();
             fetchProperties(getFilters());
         } catch (err) {
+            console.error('Upload Error:', err);
             if (resultsEl) {
                 resultsEl.innerHTML = `
                     <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 14px; color: #991b1b; font-size: 13px;">
@@ -1675,6 +1676,11 @@ function energyBadge(rating) {
             submitBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & Apply Tags';
         }
     };
+
+    const tagsUploadFormEl = document.getElementById('tags-upload-form');
+    if (tagsUploadFormEl) {
+        tagsUploadFormEl.addEventListener('submit', window.submitTagUploadForm);
+    }
 
     // Close tag modal when clicking outside
     window.addEventListener('click', (event) => {
