@@ -1601,14 +1601,8 @@ function energyBadge(rating) {
             return;
         }
 
-        const modeRadios = document.getElementsByName('tag_upload_mode');
-        let selectedMode = 'replace';
-        for (const r of modeRadios) {
-            if (r.checked) {
-                selectedMode = r.value;
-                break;
-            }
-        }
+        const checkedRadio = document.querySelector('input[name="tag_upload_mode"]:checked');
+        let selectedMode = checkedRadio ? checkedRadio.value : 'replace';
 
         const formData = new FormData();
         formData.append('file', fileInput.files[0]);
