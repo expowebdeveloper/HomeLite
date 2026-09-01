@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnClear = document.getElementById('btn-clear');
     const btnExportPdf = document.getElementById('btn-export-pdf');
     const btnExportExcel = document.getElementById('btn-export-excel');
+    const btnDownloadCsvTemplate = document.getElementById('btn-download-csv-template');
     const filterRef = document.getElementById('filter-ref');
     const filterStatuses = document.getElementById('filter-statuses');
     const filterSources = document.getElementById('filter-sources');
@@ -469,7 +470,7 @@ function energyBadge(rating) {
                     </div>
                     <div id="preview-tags-cloud-${prop.id}" class="tags-cloud-container" style="min-height: 24px; margin-bottom: 8px;">
                         ${(prop.tags && Array.isArray(prop.tags) && prop.tags.length > 0)
-                            ? prop.tags.map(t => `<span class="property-tag-chip" style="font-size: 11px; padding: 2px 8px;">${esc(t)} <i class="fas fa-times remove-tag-btn" onclick="handleRemovePreviewTag('${prop.id}', '${esc(t)}')" title="Remove tag"></i></span>`).join('')
+                            ? prop.tags.map(t => `<span class="property-tag-chip" style="font-size: 11px; padding: 2px 8px;">${esc(t)} <i class="fas fa-times remove-preview-tag-btn" data-property-id="${prop.id}" data-tag="${esc(t)}" title="Remove tag"></i></span>`).join('')
                             : '<span style="color: #94a3b8; font-size: 11px; font-style: italic;">No tags assigned</span>'}
                     </div>
                     <div style="display: flex; gap: 6px; position: relative;">
@@ -565,7 +566,7 @@ function energyBadge(rating) {
                             </div>
                             <div id="modal-tags-list" class="tags-cloud-container" style="min-height: 28px; margin-bottom: 10px;">
                                 ${(prop.tags && Array.isArray(prop.tags) && prop.tags.length > 0)
-                                    ? prop.tags.map(t => `<span class="property-tag-chip">${esc(t)} <i class="fas fa-times remove-tag-btn" onclick="handleRemoveModalTag('${prop.id}', '${esc(t)}')" title="Remove tag"></i></span>`).join('')
+                                    ? prop.tags.map(t => `<span class="property-tag-chip">${esc(t)} <i class="fas fa-times remove-modal-tag-btn" data-property-id="${prop.id}" data-tag="${esc(t)}" title="Remove tag"></i></span>`).join('')
                                     : '<span style="color: #94a3b8; font-size: 12px; font-style: italic;">No tags assigned yet</span>'}
                             </div>
                             <div style="display: flex; gap: 8px;">
@@ -854,6 +855,36 @@ function energyBadge(rating) {
 
     btnExportPdf.addEventListener('click', () => downloadExport('/api/export/pdf', 'pdf'));
     btnExportExcel.addEventListener('click', () => downloadExport('/api/export/excel', 'xlsx'));
+
+    if (btnDownloadCsvTemplate) {
+        btnDownloadCsvTemplate.addEventListener('click', async (e) => {
+            e.preventDefault();
+            showLoading('Generating CSV Template...');
+            try {
+                const response = await fetch('/api/properties/tags/sample-csv', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(getFilters())
+                });
+                if (!response.ok) throw new Error('Failed to generate template');
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'sardo_property_tags_template.csv';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                showToast('CSV Template downloaded successfully!', 'success');
+            } catch (error) {
+                console.error('CSV template error:', error);
+                showToast(`Failed to download template: ${error.message}`, 'error');
+            } finally {
+                hideLoading();
+            }
+        });
+    }
 
     // Load Metadata on Startup
     const loadMetadata = async () => {
@@ -1357,6 +1388,44 @@ function energyBadge(rating) {
         if (event.target === dupModal) {
             dupModal.style.display = 'none';
         }
+
+        // Event delegation for Modal tag deletion
+        const modalRemoveBtn = event.target.closest('.remove-modal-tag-btn');
+        if (modalRemoveBtn) {
+            event.stopPropagation();
+            const propertyId = modalRemoveBtn.dataset.propertyId;
+            const tag = modalRemoveBtn.dataset.tag;
+            handleRemoveModalTag(propertyId, tag);
+            return;
+        }
+
+        // Event delegation for Preview tag deletion
+        const previewRemoveBtn = event.target.closest('.remove-preview-tag-btn');
+        if (previewRemoveBtn) {
+            event.stopPropagation();
+            const propertyId = previewRemoveBtn.dataset.propertyId;
+            const tag = previewRemoveBtn.dataset.tag;
+            handleRemovePreviewTag(propertyId, tag);
+            return;
+        }
+
+        // Event delegation for Global tag deletion
+        const globalDeleteBtn = event.target.closest('.global-tag-delete-icon');
+        if (globalDeleteBtn) {
+            event.stopPropagation();
+            const tagName = globalDeleteBtn.dataset.tagName;
+            handleDeleteGlobalTag(event, tagName);
+            return;
+        }
+
+        // Event delegation for Global tag click
+        const globalTagChip = event.target.closest('.global-tag-card-chip');
+        if (globalTagChip) {
+            event.stopPropagation();
+            const tagName = globalTagChip.dataset.tagName;
+            handleGlobalTagClick(tagName);
+            return;
+        }
     });
 
     // Modal Tag Editing Functions
@@ -1393,13 +1462,13 @@ function energyBadge(rating) {
             // Refresh tags in modal
             const tagsListEl = document.getElementById('modal-tags-list');
             if (tagsListEl) {
-                tagsListEl.innerHTML = data.tags.map(t => `<span class="property-tag-chip">${esc(t)} <i class="fas fa-times remove-tag-btn" onclick="handleRemoveModalTag('${propertyId}', '${esc(t)}')" title="Remove tag"></i></span>`).join('');
+                tagsListEl.innerHTML = data.tags.map(t => `<span class="property-tag-chip">${esc(t)} <i class="fas fa-times remove-modal-tag-btn" data-property-id="${propertyId}" data-tag="${esc(t)}" title="Remove tag"></i></span>`).join('');
             }
 
             // Refresh Quick Preview if open
             const previewCloudEl = document.getElementById(`preview-tags-cloud-${propertyId}`);
             if (previewCloudEl) {
-                previewCloudEl.innerHTML = data.tags.map(t => `<span class="property-tag-chip" style="font-size: 11px; padding: 2px 8px;">${esc(t)} <i class="fas fa-times remove-tag-btn" onclick="handleRemovePreviewTag('${propertyId}', '${esc(t)}')" title="Remove tag"></i></span>`).join('');
+                previewCloudEl.innerHTML = data.tags.map(t => `<span class="property-tag-chip" style="font-size: 11px; padding: 2px 8px;">${esc(t)} <i class="fas fa-times remove-preview-tag-btn" data-property-id="${propertyId}" data-tag="${esc(t)}" title="Remove tag"></i></span>`).join('');
             }
 
             // Refresh cards and table in background
@@ -1434,7 +1503,7 @@ function energyBadge(rating) {
             const tagsListEl = document.getElementById('modal-tags-list');
             if (tagsListEl) {
                 tagsListEl.innerHTML = data.tags.length > 0
-                    ? data.tags.map(t => `<span class="property-tag-chip">${esc(t)} <i class="fas fa-times remove-tag-btn" onclick="handleRemoveModalTag('${propertyId}', '${esc(t)}')" title="Remove tag"></i></span>`).join('')
+                    ? data.tags.map(t => `<span class="property-tag-chip">${esc(t)} <i class="fas fa-times remove-modal-tag-btn" data-property-id="${propertyId}" data-tag="${esc(t)}" title="Remove tag"></i></span>`).join('')
                     : '<span style="color: #94a3b8; font-size: 12px; font-style: italic;">No tags assigned yet</span>';
             }
 
@@ -1442,7 +1511,7 @@ function energyBadge(rating) {
             const previewCloudEl = document.getElementById(`preview-tags-cloud-${propertyId}`);
             if (previewCloudEl) {
                 previewCloudEl.innerHTML = data.tags.length > 0
-                    ? data.tags.map(t => `<span class="property-tag-chip" style="font-size: 11px; padding: 2px 8px;">${esc(t)} <i class="fas fa-times remove-tag-btn" onclick="handleRemovePreviewTag('${propertyId}', '${esc(t)}')" title="Remove tag"></i></span>`).join('')
+                    ? data.tags.map(t => `<span class="property-tag-chip" style="font-size: 11px; padding: 2px 8px;">${esc(t)} <i class="fas fa-times remove-preview-tag-btn" data-property-id="${propertyId}" data-tag="${esc(t)}" title="Remove tag"></i></span>`).join('')
                     : '<span style="color: #94a3b8; font-size: 11px; font-style: italic;">No tags assigned</span>';
             }
 
@@ -1649,7 +1718,7 @@ function energyBadge(rating) {
             // Refresh preview chips
             const cloudEl = document.getElementById(`preview-tags-cloud-${propertyId}`);
             if (cloudEl) {
-                cloudEl.innerHTML = data.tags.map(t => `<span class="property-tag-chip" style="font-size: 11px; padding: 2px 8px;">${esc(t)} <i class="fas fa-times remove-tag-btn" onclick="handleRemovePreviewTag('${propertyId}', '${esc(t)}')" title="Remove tag"></i></span>`).join('');
+                cloudEl.innerHTML = data.tags.map(t => `<span class="property-tag-chip" style="font-size: 11px; padding: 2px 8px;">${esc(t)} <i class="fas fa-times remove-preview-tag-btn" data-property-id="${propertyId}" data-tag="${esc(t)}" title="Remove tag"></i></span>`).join('');
             }
 
             renderGrid();
@@ -1683,7 +1752,7 @@ function energyBadge(rating) {
             const cloudEl = document.getElementById(`preview-tags-cloud-${propertyId}`);
             if (cloudEl) {
                 cloudEl.innerHTML = data.tags.length > 0
-                    ? data.tags.map(t => `<span class="property-tag-chip" style="font-size: 11px; padding: 2px 8px;">${esc(t)} <i class="fas fa-times remove-tag-btn" onclick="handleRemovePreviewTag('${propertyId}', '${esc(t)}')" title="Remove tag"></i></span>`).join('')
+                    ? data.tags.map(t => `<span class="property-tag-chip" style="font-size: 11px; padding: 2px 8px;">${esc(t)} <i class="fas fa-times remove-preview-tag-btn" data-property-id="${propertyId}" data-tag="${esc(t)}" title="Remove tag"></i></span>`).join('')
                     : '<span style="color: #94a3b8; font-size: 11px; font-style: italic;">No tags assigned</span>';
             }
 
@@ -1807,12 +1876,12 @@ function energyBadge(rating) {
                     </div>
                     <div class="tags-cloud-container">
                         ${tags.map(t => `
-                            <button type="button" class="global-tag-card-chip" onclick="handleGlobalTagClick('${esc(t.name)}')" title="${esc(t.description || t.name)} ${hasSelection ? '(Click to toggle on ' + selectedPropertyIds.size + ' selected properties)' : '(Click to filter)'}">
+                            <div class="global-tag-card-chip" data-tag-name="${esc(t.name)}" title="${esc(t.description || t.name)} ${hasSelection ? '(Click to toggle on ' + selectedPropertyIds.size + ' selected properties)' : '(Click to filter)'}">
                                 <span style="width: 8px; height: 8px; border-radius: 50%; background: ${t.color || '#4f46e5'};"></span>
                                 <span>${esc(t.name)}</span>
                                 <span class="tag-count-badge">${t.usage_count || 0}</span>
-                                <span class="global-tag-delete-icon" onclick="handleDeleteGlobalTag(event, '${esc(t.name)}')" title="Delete '${esc(t.name)}' from library"><i class="fas fa-times"></i></span>
-                            </button>
+                                <span class="global-tag-delete-icon" data-tag-name="${esc(t.name)}" title="Delete '${esc(t.name)}' from library"><i class="fas fa-times"></i></span>
+                            </div>
                         `).join('')}
                     </div>
                 </div>

@@ -1339,10 +1339,16 @@ def upload_tags_csv_endpoint():
         logging.error(f"Error parsing tags CSV: {e}")
         return jsonify({'success': False, 'error': f'Failed to parse CSV: {str(e)}'}), 500
 
-@app.route('/api/properties/tags/sample-csv', methods=['GET'])
+@app.route('/api/properties/tags/sample-csv', methods=['GET', 'POST'])
 @login_required
 def download_sample_tags_csv_endpoint():
-    result = db_manager.get_properties({}, limit=100, offset=0)
+    filters = {}
+    limit = 100
+    if request.method == 'POST':
+        filters = request.json or {}
+        limit = None  # No limit when fetching filtered properties
+        
+    result = db_manager.get_properties(filters, limit=limit, offset=0)
     props = assign_sardo_references(result.get('properties', []))
     
     import io
