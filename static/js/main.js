@@ -1591,83 +1591,95 @@ function energyBadge(rating) {
     };
 
     window.submitTagUploadForm = async (event) => {
-        event.preventDefault();
-        const fileInput = document.getElementById('tags-csv-file');
-        const resultsEl = document.getElementById('tags-upload-results');
-        const submitBtn = document.getElementById('btn-submit-tags-upload');
-
-        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-            showToast('Please select a CSV file first', 'error');
-            return;
-        }
-
-        const checkedRadio = document.querySelector('input[name="tag_upload_mode"]:checked');
-        let selectedMode = checkedRadio ? checkedRadio.value : 'replace';
-
-        const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
-        formData.append('mode', selectedMode);
-
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Uploading & Tagging...';
-
         try {
-            const res = await fetch('/api/properties/tags/upload-csv', {
-                method: 'POST',
-                body: formData
-            });
-            const data = await res.json();
+            if (event) event.preventDefault();
+            console.log('submitTagUploadForm triggered');
+            const fileInput = document.getElementById('tags-csv-file');
+            const resultsEl = document.getElementById('tags-upload-results');
+            const submitBtn = document.getElementById('btn-submit-tags-upload');
 
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to upload tags');
+            if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                if (typeof showToast === 'function') showToast('Please select a CSV file first', 'error');
+                else alert('Please select a CSV file first');
+                return;
             }
 
-            let reportHtml = `
-                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px; margin-bottom: 12px; color: #166534;">
-                    <div style="font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-                        <i class="fas fa-check-circle" style="color: #16a34a; font-size: 16px;"></i> Tags Applied Successfully!
-                    </div>
-                    <div style="font-size: 13px;">
-                        • Total CSV rows processed: <strong>${data.total_rows}</strong><br>
-                        • Properties matched and tagged: <strong>${data.matched_count}</strong><br>
-                        • Total distinct tags in CSV: <strong>${data.distinct_tags_count}</strong>
-                    </div>
-                </div>
-            `;
+            const checkedRadio = document.querySelector('input[name="tag_upload_mode"]:checked');
+            let selectedMode = checkedRadio ? checkedRadio.value : 'replace';
 
-            if (data.unmatched_rows && data.unmatched_rows.length > 0) {
-                reportHtml += `
-                    <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 12px; color: #92400e; font-size: 12px; max-height: 140px; overflow-y: auto;">
-                        <div style="font-weight: 700; margin-bottom: 4px;"><i class="fas fa-exclamation-triangle"></i> Unmatched Rows (${data.unmatched_rows.length}):</div>
-                        ${data.unmatched_rows.map(u => `<div>Row ${u.row}: <code>${esc(u.identifier)}</code> — ${esc(u.reason)}</div>`).join('')}
-                    </div>
-                `;
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('mode', selectedMode);
+
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Uploading & Tagging...';
             }
 
-            if (resultsEl) {
-                resultsEl.innerHTML = reportHtml;
-                resultsEl.style.display = 'block';
-            }
+            try {
+                const res = await fetch('/api/properties/tags/upload-csv', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
 
-            showToast(`Successfully updated tags for ${data.matched_count} properties!`, 'success');
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to upload tags');
+                }
 
-            // Refresh data and tag filters
-            refreshTagsFilter();
-            fetchProperties(getFilters());
-        } catch (err) {
-            console.error('Upload Error:', err);
-            if (resultsEl) {
-                resultsEl.innerHTML = `
-                    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 14px; color: #991b1b; font-size: 13px;">
-                        <i class="fas fa-times-circle" style="color: #dc2626;"></i> <strong>Upload Failed:</strong> ${esc(err.message)}
+                let reportHtml = `
+                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px; margin-bottom: 12px; color: #166534;">
+                        <div style="font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                            <i class="fas fa-check-circle" style="color: #16a34a; font-size: 16px;"></i> Tags Applied Successfully!
+                        </div>
+                        <div style="font-size: 13px;">
+                            • Total CSV rows processed: <strong>${data.total_rows}</strong><br>
+                            • Properties matched and tagged: <strong>${data.matched_count}</strong><br>
+                            • Total distinct tags in CSV: <strong>${data.distinct_tags_count}</strong>
+                        </div>
                     </div>
                 `;
-                resultsEl.style.display = 'block';
+
+                if (data.unmatched_rows && data.unmatched_rows.length > 0) {
+                    reportHtml += `
+                        <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 12px; color: #92400e; font-size: 12px; max-height: 140px; overflow-y: auto;">
+                            <div style="font-weight: 700; margin-bottom: 4px;"><i class="fas fa-exclamation-triangle"></i> Unmatched Rows (${data.unmatched_rows.length}):</div>
+                            ${data.unmatched_rows.map(u => `<div>Row ${u.row}: <code>${esc(u.identifier)}</code> — ${esc(u.reason)}</div>`).join('')}
+                        </div>
+                    `;
+                }
+
+                if (resultsEl) {
+                    resultsEl.innerHTML = reportHtml;
+                    resultsEl.style.display = 'block';
+                }
+
+                if (typeof showToast === 'function') showToast(`Successfully updated tags for ${data.matched_count} properties!`, 'success');
+
+                // Refresh data and tag filters
+                if (typeof refreshTagsFilter === 'function') refreshTagsFilter();
+                if (typeof fetchProperties === 'function') fetchProperties(getFilters());
+            } catch (err) {
+                console.error('Upload Error:', err);
+                if (resultsEl) {
+                    resultsEl.innerHTML = `
+                        <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 14px; color: #991b1b; font-size: 13px;">
+                            <i class="fas fa-times-circle" style="color: #dc2626;"></i> <strong>Upload Failed:</strong> ${err.message}
+                        </div>
+                    `;
+                    resultsEl.style.display = 'block';
+                }
+                if (typeof showToast === 'function') showToast(`Error: ${err.message}`, 'error');
+                else alert(`Error: ${err.message}`);
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & Apply Tags';
+                }
             }
-            showToast(`Error: ${err.message}`, 'error');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & Apply Tags';
+        } catch (fatalErr) {
+            console.error('Fatal Upload Error:', fatalErr);
+            alert('A critical error occurred: ' + fatalErr.message);
         }
     };
 
