@@ -105,7 +105,7 @@ class Config:
     SOURCE_NAME_MAPPING = {
         # Currently present in the database
         "WaratahpropertiesScraper": "Waratah",
-        "QuintaProperty": "Quinta",
+        "QuintaProperty": "QP Savills",
         "OlivehomesScraper": "Olive Homes",
         "MaproRealEstateScraper": "Mapro",
         "QuintadoLagoScraper": "Quinta Lago",
@@ -113,7 +113,7 @@ class Config:
         "Manual / Off-Market": "Manual / Off-Market",
 
         # Legacy / historical spellings, kept so old rows still map correctly
-        "QuintapropertyScraper": "Quinta",
+        "QuintapropertyScraper": "QP Savills",
         "QuintadolagoScraper": "Quinta Lago",
         "LibertyrealestateScraper": "Liberty",
         "AlgarvePropScraper": "Gatehouse"
