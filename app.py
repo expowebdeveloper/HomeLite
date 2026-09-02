@@ -1645,6 +1645,29 @@ def generate_excel_report(properties, client_name):
         reference = prop.get('reference', 'N/A')
         display_reference = title if is_waratah and title and title.strip() else reference
 
+        from datetime import datetime, date
+        
+        first_seen_val = prop.get('first_seen_at')
+        first_seen_display = '—'
+        days_on_market = '—'
+        
+        if first_seen_val:
+            try:
+                if isinstance(first_seen_val, str):
+                    try:
+                        # Handle typical ISO strings
+                        fs_date = datetime.fromisoformat(first_seen_val.replace('Z', '+00:00')).date()
+                    except ValueError:
+                        # Fallback to RFC 1123 format which database.py emits
+                        fs_date = datetime.strptime(first_seen_val, '%a, %d %b %Y %H:%M:%S GMT').date()
+                else:
+                    fs_date = first_seen_val.date() if hasattr(first_seen_val, 'date') else first_seen_val
+                    
+                first_seen_display = fs_date.strftime('%d %b %Y')
+                days_on_market = (date.today() - fs_date).days
+            except Exception as e:
+                print(f"Excel DOM Parse Error: {e}")
+
         row = {
             'Price': format_price_value(prop.get('property_price')),
             'Location': prop.get('location', 'N/A'),
@@ -1655,6 +1678,8 @@ def generate_excel_report(properties, client_name):
             'Plot (m²)': format_area_value(prop.get('land_area')),
             'Source': source,
             'Status': prop.get('property_status') if (prop.get('property_status') and prop.get('property_status') != 'Unknown') else 'For Sale',
+            'First Seen Date': first_seen_display,
+            'Days on Market': days_on_market,
             'Tags': ", ".join(prop.get('tags') or []),
             'SARDO Ref': prop.get('sardo_reference', 'N/A'),
             'Reference (with link to page source)': display_reference,
@@ -1665,7 +1690,8 @@ def generate_excel_report(properties, client_name):
     df = pd.DataFrame(selected_property_data)
     columns_order = [
         'Price', 'Location', 'Type', 'Beds', 'Baths',
-        'Build (m²)', 'Plot (m²)', 'Source', 'Status', 'Tags', 'SARDO Ref',
+        'Build (m²)', 'Plot (m²)', 'Source', 'Status', 
+        'First Seen Date', 'Days on Market', 'Tags', 'SARDO Ref',
         'Reference (with link to page source)'
     ]
     df_export = df[columns_order]

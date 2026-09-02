@@ -53,6 +53,23 @@ document.addEventListener('DOMContentLoaded', () => {
         'Withdrawn':    'fa-times-circle',
     };
 
+    const formatDate = (dateString) => {
+        if (!dateString) return '—';
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '—';
+        return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+
+    const calculateDOM = (firstSeenAt) => {
+        if (!firstSeenAt) return '—';
+        const start = new Date(firstSeenAt);
+        if (isNaN(start.getTime())) return '—';
+        const end = new Date();
+        const diffTime = Math.abs(end - start);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays;
+    };
+
 function energyBadge(rating) {
     if (!rating || rating === '—' || rating === 'N/A') return '—';
     let bg = '#e2e8f0';
@@ -251,6 +268,10 @@ function energyBadge(rating) {
                         <span title="Bathrooms"><i class="fas fa-bath"></i> ${prop.num_baths || '-'}</span>
                         <span title="Build Area"><i class="fas fa-ruler-combined"></i> ${prop.living_area ? parseFloat(prop.living_area).toFixed(0) + ' m²' : '-'}</span>
                     </div>
+                    <div style="display: flex; gap: 12px; font-size: 11px; margin: 8px 0; color: var(--text-secondary); font-weight: 500;">
+                        <span title="First Seen Date"><i class="fas fa-calendar-alt"></i> Seen: ${formatDate(prop.first_seen_at)}</span>
+                        <span title="Days on Market"><i class="fas fa-clock"></i> DOM: ${calculateDOM(prop.first_seen_at)}</span>
+                    </div>
                     ${renderTagsBadges(prop.tags)}
                     <div class="card-footer" style="flex-direction: column; align-items: stretch; gap: 10px;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -377,6 +398,8 @@ function energyBadge(rating) {
                 <td>${livingArea}</td>
                 <td>${landArea}</td>
                 <td>${prop.construction_year || '—'}</td>
+                <td>${formatDate(prop.first_seen_at)}</td>
+                <td><span style="font-weight: 600;">${calculateDOM(prop.first_seen_at)}</span></td>
                 <td>${energyBadge(prop.energy_rating)}</td>
                 <td><span class="source-badge">${prop.display_source || 'N/A'}</span> ${prop.duplicate_count > 1 ? `<button class="btn-duplicate" onclick="event.stopPropagation(); window.openDuplicateGroupModal('${prop.id}')"><i class="fas fa-copy"></i> +${prop.duplicate_count - 1}</button>` : ''}</td>
                 <td>${statusBadge(prop.property_status)}</td>
@@ -555,6 +578,8 @@ function energyBadge(rating) {
                         <p><strong>Status:</strong> ${statusBadge(prop.property_status)}</p>
                         <p><strong>SARDO Ref:</strong> ${prop.sardo_reference || 'N/A'}</p>
                         <p><strong>Original Ref:</strong> ${prop.display_reference || 'N/A'}</p>
+                        <p><strong>First Seen Date:</strong> ${formatDate(prop.first_seen_at)}</p>
+                        <p><strong>Days on Market:</strong> ${calculateDOM(prop.first_seen_at)}</p>
                         <p><strong>Construction / Renovation:</strong> ${prop.construction_year || 'N/A'} / ${prop.renovation_year || 'N/A'}</p>
                         <p><strong>Energy Rating:</strong> ${energyBadge(prop.energy_rating)}</p>
                         

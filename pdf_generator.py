@@ -741,6 +741,28 @@ class PDFGenerator:
             fontName='Open Sans'
         )
         
+        from datetime import datetime, date
+        first_seen_str = property_data.get('first_seen_at')
+        days_on_market_str = 'N/A'
+        first_seen_display = 'N/A'
+        
+        if first_seen_str:
+            try:
+                if isinstance(first_seen_str, str):
+                    try:
+                        # First try ISO format
+                        fs_date = datetime.fromisoformat(first_seen_str.replace('Z', '+00:00')).date()
+                    except ValueError:
+                        # Fallback to RFC 1123 format which database.py emits
+                        fs_date = datetime.strptime(first_seen_str, '%a, %d %b %Y %H:%M:%S GMT').date()
+                else:
+                    fs_date = first_seen_str.date() if hasattr(first_seen_str, 'date') else first_seen_str
+                    
+                first_seen_display = fs_date.strftime('%d %b %Y')
+                days_on_market_str = f"{(date.today() - fs_date).days} days"
+            except Exception as e:
+                print(f"DOM Parse Error: {e} | value: {first_seen_str}")
+
         # Compile attributes HTML column using clean character icons matching template layout
         attributes_list = [
             Paragraph(f"📍 &nbsp; {location}", attr_style),
@@ -750,6 +772,8 @@ class PDFGenerator:
             Paragraph(f"🌳 &nbsp; {plot} m² (Plot)", attr_style),
             Paragraph(f"📅 &nbsp; Built {const_year}", attr_style),
             Paragraph(f"⚡ &nbsp; Energy {energy}", attr_style),
+            Paragraph(f"⏱ &nbsp; DOM: {days_on_market_str}", attr_style),
+            Paragraph(f"📅 &nbsp; Seen {first_seen_display}", attr_style),
             Paragraph(f"💶 &nbsp; <b>{price}</b>", attr_style),
         ]
         
