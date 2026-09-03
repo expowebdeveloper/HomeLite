@@ -391,7 +391,7 @@ function energyBadge(rating) {
                     <input type="checkbox" class="row-checkbox" value="${propIdStr}" ${selectedPropertyIds.has(propIdStr) || selectedPropertyIds.has(prop.id) ? 'checked' : ''}>
                 </td>
                 <td style="font-weight: 600; color: var(--primary-color);">${price}</td>
-                <td title="${esc(prop.location || 'N/A')}">${prop.location || 'N/A'} ${offMarketTag} ${renderTagsBadges(prop.tags)}</td>
+                <td title="${esc(prop.location || 'N/A')}">${prop.location || 'N/A'} ${offMarketTag}</td>
                 <td>${prop.property_type || 'N/A'}</td>
                 <td>${prop.num_beds || '-'}</td>
                 <td>${prop.num_baths || '-'}</td>
@@ -652,6 +652,11 @@ function energyBadge(rating) {
         // otherwise the two filters would contradict each other and return nothing.
         if (filterHideDelisted && filterHideDelisted.checked && !selectedStatuses.includes('Delisted')) {
             filters.exclude_delisted = true;
+        }
+
+        // Hide sold stock unless explicitly searched for 'Sold'
+        if (!selectedStatuses.includes('Sold')) {
+            filters.exclude_sold = true;
         }
 
         // Agent / Sources Filter

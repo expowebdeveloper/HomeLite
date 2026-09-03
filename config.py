@@ -108,13 +108,13 @@ class Config:
         "QuintaProperty": "QP Savills",
         "OlivehomesScraper": "Olive Homes",
         "MaproRealEstateScraper": "Mapro",
-        "QuintadoLagoScraper": "Quinta Lago",
+        "QuintadoLagoScraper": "QDL",
         "VendiciPropertiesScraper": "Vendici",
         "Manual / Off-Market": "Manual / Off-Market",
 
         # Legacy / historical spellings, kept so old rows still map correctly
         "QuintapropertyScraper": "QP Savills",
-        "QuintadolagoScraper": "Quinta Lago",
+        "QuintadolagoScraper": "QDL",
         "LibertyrealestateScraper": "Liberty",
         "AlgarvePropScraper": "Gatehouse"
     }

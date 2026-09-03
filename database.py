@@ -924,7 +924,11 @@ class DatabaseManager:
 
         # Hide delisted stock (opt-in, so existing callers are unaffected)
         if filters.get('exclude_delisted'):
-            base_query += " AND property_status <> 'Delisted'"
+            base_query += " AND (property_status IS NULL OR property_status <> 'Delisted')"
+
+        # Hide sold stock (opt-in)
+        if filters.get('exclude_sold'):
+            base_query += " AND (property_status IS NULL OR property_status <> 'Sold')"
 
         # Market visibility filtering
         vis = filters.get('market_visibility')
