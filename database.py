@@ -883,26 +883,32 @@ class DatabaseManager:
             params.append(filters['property_type'])
         
         # Bedrooms filtering with NULL handling
-        if filters.get('min_beds') is not None:
-            # If min_beds is provided, exclude NULL bedrooms and include properties with bedrooms >= min_beds
-            base_query += " AND bedrooms >= %s AND bedrooms IS NOT NULL"
-            params.append(filters['min_beds'])
-        
-        if filters.get('max_beds') is not None:
-            # If max_beds is provided, exclude NULL bedrooms and include properties with bedrooms <= max_beds
-            base_query += " AND bedrooms <= %s AND bedrooms IS NOT NULL"
-            params.append(filters['max_beds'])
+        if filters.get('na_beds'):
+            base_query += " AND (bedrooms IS NULL OR TRIM(bedrooms) IN ('', 'N/A', 'None'))"
+        else:
+            if filters.get('min_beds') is not None:
+                # If min_beds is provided, exclude NULL bedrooms and include properties with bedrooms >= min_beds
+                base_query += " AND CAST(NULLIF(regexp_replace(bedrooms::text, '[^0-9.]', '', 'g'), '') AS numeric) >= %s AND bedrooms IS NOT NULL"
+                params.append(filters['min_beds'])
+            
+            if filters.get('max_beds') is not None:
+                # If max_beds is provided, exclude NULL bedrooms and include properties with bedrooms <= max_beds
+                base_query += " AND CAST(NULLIF(regexp_replace(bedrooms::text, '[^0-9.]', '', 'g'), '') AS numeric) <= %s AND bedrooms IS NOT NULL"
+                params.append(filters['max_beds'])
         
         # Bathrooms filtering with NULL handling
-        if filters.get('min_baths') is not None:
-            # If min_baths is provided, exclude NULL bathrooms and include properties with bathrooms >= min_baths
-            base_query += " AND bathrooms >= %s AND bathrooms IS NOT NULL"
-            params.append(filters['min_baths'])
-        
-        if filters.get('max_baths') is not None:
-            # If max_baths is provided, exclude NULL bathrooms and include properties with bathrooms <= max_baths
-            base_query += " AND bathrooms <= %s AND bathrooms IS NOT NULL"
-            params.append(filters['max_baths'])
+        if filters.get('na_baths'):
+            base_query += " AND (bathrooms IS NULL OR TRIM(bathrooms) IN ('', 'N/A', 'None'))"
+        else:
+            if filters.get('min_baths') is not None:
+                # If min_baths is provided, exclude NULL bathrooms and include properties with bathrooms >= min_baths
+                base_query += " AND CAST(NULLIF(regexp_replace(bathrooms::text, '[^0-9.]', '', 'g'), '') AS numeric) >= %s AND bathrooms IS NOT NULL"
+                params.append(filters['min_baths'])
+            
+            if filters.get('max_baths') is not None:
+                # If max_baths is provided, exclude NULL bathrooms and include properties with bathrooms <= max_baths
+                base_query += " AND CAST(NULLIF(regexp_replace(bathrooms::text, '[^0-9.]', '', 'g'), '') AS numeric) <= %s AND bathrooms IS NOT NULL"
+                params.append(filters['max_baths'])
 
         # Property status filtering (canonical SARDO360 statuses only)
         statuses = filters.get('statuses') or filters.get('property_status')

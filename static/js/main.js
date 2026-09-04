@@ -636,11 +636,17 @@ function energyBadge(rating) {
         const maxBeds = document.getElementById('filter-max-beds').value;
         if (maxBeds) filters.max_beds = parseInt(maxBeds);
 
+        const naBeds = document.getElementById('filter-na-beds');
+        if (naBeds && naBeds.checked) filters.na_beds = true;
+
         const minBaths = document.getElementById('filter-min-baths').value;
         if (minBaths) filters.min_baths = parseInt(minBaths);
 
         const maxBaths = document.getElementById('filter-max-baths').value;
         if (maxBaths) filters.max_baths = parseInt(maxBaths);
+
+        const naBaths = document.getElementById('filter-na-baths');
+        if (naBaths && naBaths.checked) filters.na_baths = true;
 
         // Property status (multi-select)
         const selectedStatuses = filterStatuses
@@ -959,7 +965,7 @@ function energyBadge(rating) {
                 if (filterStatuses && Array.isArray(data.statuses)) {
                     filterStatuses.innerHTML = '';
                     data.statuses.forEach(status => {
-                        if (status) {
+                        if (status && status !== 'Sold' && status !== 'Delisted' && status !== 'Unknown') {
                             const option = document.createElement('option');
                             option.value = status;
                             option.textContent = status;
@@ -1046,7 +1052,12 @@ function energyBadge(rating) {
                 throw new Error(`Server returned HTTP ${response.status}`);
             }
             const data = await response.json();
-            currentProperties = data.properties;
+            currentProperties = data.properties.map(p => {
+                if (p.property_url && !p.property_url.toLowerCase().startsWith('http')) {
+                    p.property_url = null;
+                }
+                return p;
+            });
             totalPropertiesCount = data.total_count;
             
             // Set Stats dynamically from search results
