@@ -768,6 +768,37 @@ function energyBadge(rating) {
     const stypeFilter = document.getElementById('filter-source-type');
     if (stypeFilter) stypeFilter.addEventListener('change', () => btnSearch.click());
 
+    // Allow multiple selection without holding Ctrl/Cmd on all multi-select elements
+    document.querySelectorAll('select.multi-select').forEach(select => {
+        select.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            const originalScrollTop = this.scrollTop;
+            
+            if (e.target.tagName === 'OPTION') {
+                e.target.selected = !e.target.selected;
+                this.dispatchEvent(new Event('change')); // Trigger auto-search
+            }
+            
+            this.focus();
+            setTimeout(() => { this.scrollTop = originalScrollTop; }, 0);
+        });
+        select.addEventListener('change', () => btnSearch.click());
+    });
+
+    // Clear multi-select buttons
+    document.querySelectorAll('.clear-select').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const targetId = e.target.getAttribute('data-target');
+            if (targetId) {
+                const select = document.getElementById(targetId);
+                if (select) {
+                    Array.from(select.options).forEach(opt => opt.selected = false);
+                    select.dispatchEvent(new Event('change')); // Trigger auto-search
+                }
+            }
+        });
+    });
+
     selectAllCheckbox.addEventListener('change', (e) => {
         const isChecked = e.target.checked;
         const checkboxes = document.querySelectorAll('.card-checkbox, .row-checkbox');
@@ -980,8 +1011,9 @@ function energyBadge(rating) {
                     data.sources.forEach(src => {
                         if (src && src.value) {
                             const option = document.createElement('option');
-                            option.value = src.value;
-                            option.textContent = src.label || src.value;
+                            const friendlyName = src.label || src.value;
+                            option.value = friendlyName;
+                            option.textContent = friendlyName;
                             filterSources.appendChild(option);
                         }
                     });
@@ -998,6 +1030,7 @@ function energyBadge(rating) {
                             filterTags.appendChild(option);
                         }
                     });
+                    
                 }
 
                 // Set Stats safely
@@ -1027,6 +1060,47 @@ function energyBadge(rating) {
             console.error('Error loading metadata:', error);
             if (statusText) statusText.innerText = 'Error loading metadata';
         } finally {
+            // Prefill DOM filters from URL before the initial search
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            const prefillInput = (id, param) => {
+                const el = document.getElementById(id);
+                if (el && urlParams.has(param)) el.value = urlParams.get(param);
+            };
+            const prefillCheckbox = (id, param) => {
+                const el = document.getElementById(id);
+                if (el && urlParams.has(param)) el.checked = (urlParams.get(param) === 'true');
+            };
+            const prefillMulti = (id, param) => {
+                const el = document.getElementById(id);
+                if (el && urlParams.has(param)) {
+                    const values = urlParams.get(param).split(',').map(v => v.trim());
+                    Array.from(el.options).forEach(opt => {
+                        if (values.includes(opt.value)) opt.selected = true;
+                    });
+                }
+            };
+
+            prefillInput('filter-min-price', 'min_price');
+            prefillInput('filter-max-price', 'max_price');
+            prefillInput('filter-type', 'property_type');
+            prefillInput('filter-min-beds', 'min_beds');
+            prefillInput('filter-max-beds', 'max_beds');
+            prefillInput('filter-min-baths', 'min_baths');
+            prefillInput('filter-max-baths', 'max_baths');
+            prefillInput('filter-ref', 'reference');
+            prefillInput('filter-visibility', 'market_visibility');
+            prefillInput('filter-source-type', 'source_type');
+
+            prefillCheckbox('filter-na-beds', 'na_beds');
+            prefillCheckbox('filter-na-baths', 'na_baths');
+            prefillCheckbox('filter-hide-delisted', 'exclude_delisted');
+
+            prefillMulti('filter-locations', 'locations');
+            prefillMulti('filter-statuses', 'statuses');
+            prefillMulti('filter-sources', 'sources');
+            prefillMulti('filter-tags', 'tags');
+
             // Always fetch properties even if metadata loading had non-fatal warnings
             fetchProperties(getFilters());
         }
@@ -1037,6 +1111,29 @@ function energyBadge(rating) {
         try {
             filters.page = currentPage;
             filters.limit = itemsPerPage;
+
+            // Sync all filters to URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const allowedUrlKeys = ['min_price', 'max_price', 'locations', 'property_type', 'min_beds', 'max_beds', 'na_beds', 'min_baths', 'max_baths', 'na_baths', 'statuses', 'sources', 'tags', 'reference', 'market_visibility', 'source_type'];
+            
+            // Clear old params
+            allowedUrlKeys.forEach(k => urlParams.delete(k));
+            urlParams.delete('exclude_delisted');
+            urlParams.delete('exclude_sold');
+            
+            // Set new params
+            Object.keys(filters).forEach(key => {
+                if (allowedUrlKeys.includes(key)) {
+                    if (Array.isArray(filters[key]) && filters[key].length > 0) {
+                        urlParams.set(key, filters[key].join(','));
+                    } else if (filters[key] !== undefined && filters[key] !== '' && filters[key] !== false) {
+                        urlParams.set(key, filters[key]);
+                    }
+                }
+            });
+            
+            const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+            window.history.replaceState(null, '', newUrl);
 
             showLoading('Searching properties...');
             const response = await fetch('/api/properties', {

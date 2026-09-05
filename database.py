@@ -948,16 +948,27 @@ class DatabaseManager:
             base_query += " AND source_type = %s"
             params.append(str(stype).strip().lower())
 
-        # Agent / source filtering (exact match on the raw source value)
+        # Agent / source filtering (exact match on the raw source or friendly name)
         sources = filters.get('sources') or filters.get('source')
         if sources:
             if isinstance(sources, str):
                 sources = [sources]
             sources = [s.strip() for s in sources if s and s.strip()]
             if sources:
-                placeholders = ', '.join(['%s'] * len(sources))
+                expanded_sources = []
+                for s in sources:
+                    expanded_sources.append(s)
+                    for raw_key, friendly_name in Config.SOURCE_NAME_MAPPING.items():
+                        if friendly_name == s:
+                            expanded_sources.append(raw_key)
+                    if not s.endswith("Scraper"):
+                        expanded_sources.append(s + "Scraper")
+                        
+                # Remove duplicates
+                expanded_sources = list(set(expanded_sources))
+                placeholders = ', '.join(['%s'] * len(expanded_sources))
                 base_query += f" AND source IN ({placeholders})"
-                params.extend(sources)
+                params.extend(expanded_sources)
 
         # Tags filtering (match properties containing ANY of the selected tags)
         tags = filters.get('tags')
