@@ -127,7 +127,10 @@
                 </div>
 
                 <div class="filter-section">
-                    <label>Location</label>
+                    <label style="display:flex; justify-content:space-between; align-items:center;">
+                        <span>Location</span>
+                        <span class="clear-select" data-target="filter-locations" style="cursor:pointer; font-size:11px; color:var(--primary-color);">Clear</span>
+                    </label>
                     <input type="text" id="location-search" placeholder="Search Location..."
                         style="margin-bottom: 8px;">
                     <select id="filter-locations" multiple class="multi-select">
@@ -145,7 +148,10 @@
                 </div>
 
                 <div class="filter-section">
-                    <label>Status</label>
+                    <label style="display:flex; justify-content:space-between; align-items:center;">
+                        <span>Status</span>
+                        <span class="clear-select" data-target="filter-statuses" style="cursor:pointer; font-size:11px; color:var(--primary-color);">Clear</span>
+                    </label>
                     <select id="filter-statuses" multiple class="multi-select">
                         <!-- Populated via JS -->
                     </select>
@@ -157,19 +163,23 @@
                 </div>
 
                 <div class="filter-section">
-                    <label>Agent / Source</label>
+                    <label style="display:flex; justify-content:space-between; align-items:center;">
+                        <span>Agent / Source</span>
+                        <span class="clear-select" data-target="filter-sources" style="cursor:pointer; font-size:11px; color:var(--primary-color);">Clear</span>
+                    </label>
                     <select id="filter-sources" multiple class="multi-select">
                         <!-- Populated via JS -->
                     </select>
-                    <small>Hold Ctrl/Cmd to select multiple</small>
                 </div>
 
                 <div class="filter-section">
-                    <label><i class="fas fa-tags" style="color: var(--primary-color);"></i> Tags</label>
+                    <label style="display:flex; justify-content:space-between; align-items:center;">
+                        <span><i class="fas fa-tags" style="color: var(--primary-color);"></i> Tags</span>
+                        <span class="clear-select" data-target="filter-tags" style="cursor:pointer; font-size:11px; color:var(--primary-color);">Clear</span>
+                    </label>
                     <select id="filter-tags" multiple class="multi-select">
                         <!-- Populated via JS -->
                     </select>
-                    <small>Hold Ctrl/Cmd to select multiple</small>
                 </div>
 
                 <div class="filter-section">
