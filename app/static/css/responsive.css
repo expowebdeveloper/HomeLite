@@ -117,3 +117,237 @@
         min-width: 100px;
     }
 }
+
+/* ==========================================================================
+   App header — responsive
+   The header packs a logo, three stat cards, three actions and the profile
+   menu into one row. Below ~1500px that row has nowhere left to go, so the
+   labels wrap mid-phrase and the buttons get clipped.
+
+   The rules outside a media query only engage once the content would overflow
+   (flex-wrap does nothing while everything fits), so the desktop layout is
+   unchanged at full width.
+   ========================================================================== */
+.app-header {
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.stats-container {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    /* No align-items here on purpose: the default `stretch` is what makes the
+       action buttons match the height of the stat cards. Setting `center`
+       would shrink them to their text and change the desktop layout. */
+}
+
+/* Cards size to their content instead of being squeezed thinner than their text. */
+.stat-card {
+    flex-shrink: 0;
+}
+
+.stat-label,
+.stat-value,
+.stat-subtext,
+#stat-duplicates {
+    white-space: nowrap;
+}
+
+/* Laptops: reclaim space before anything is forced to wrap. */
+@media (max-width: 1500px) {
+    .app-header { padding: 12px 20px; }
+    .stats-container { gap: 12px; }
+    .stat-card { padding: 8px 14px; }
+    .stat-value { font-size: 1.2rem; }
+    .stat-label { font-size: 0.68rem; letter-spacing: 0.6px; }
+    .logo-container { gap: 16px !important; }
+}
+
+/* Small laptops and tablets: stats drop onto their own full-width row. */
+@media (max-width: 1200px) {
+    .app-header {
+        justify-content: flex-start;
+        row-gap: 12px;
+    }
+    .stats-container {
+        width: 100%;
+        justify-content: flex-start;
+        gap: 10px;
+    }
+    /* Inline margin-left on the action buttons fights the flex gap. */
+    .stats-container > .btn,
+    .stats-container > a.btn {
+        margin-left: 0 !important;
+    }
+    .stats-container .user-profile-dropdown {
+        margin-left: auto !important;
+    }
+}
+
+/* Tablets and large phones: three stats across, actions on the row below. */
+@media (max-width: 900px) {
+    .app-header { padding: 12px 16px; }
+    .logo-container img { height: 28px; }
+
+    /* The three cards take the whole row (gap: 10px x 2), which pushes the
+       action buttons onto the line below. Sharing a row with the buttons
+       squeezed the values down to "AVG P..." and "EUR2,...". */
+    .stat-card {
+        flex: 1 1 calc((100% - 20px) / 3);
+        min-width: 0;
+        padding: 8px 10px;
+    }
+    .stat-label,
+    .stat-value,
+    .stat-subtext,
+    #stat-duplicates {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .stat-value { font-size: 1.1rem; }
+    .stat-subtext { font-size: 0.6rem; }
+
+    .stats-container > .btn,
+    .stats-container > a.btn {
+        flex: 1 1 auto;
+        justify-content: center;
+        font-size: 13px;
+        padding: 8px 10px;
+    }
+    .stats-container .user-profile-dropdown { margin-left: 0 !important; }
+}
+
+/* Phones: the header collapses to three rows — logo + profile, the three
+   stats, then the actions. Stacking each stat and each button full width
+   pushed the listings themselves off the first screen.
+
+   This uses grid rather than flex-wrap on purpose. With flex, the only way to
+   force a row break is to give an item a 100% flex-basis, which is exactly
+   what made every button take a row of its own; anything narrower lets the
+   whole header collapse onto one line and squeeze the stat cards down to a
+   single character. A 6-column grid states the rows outright. */
+@media (max-width: 600px) {
+    .app-header {
+        padding: 12px;
+        row-gap: 12px;
+        /* Anchor for the profile pill lifted out of the flow below. */
+        position: relative;
+    }
+
+    /* The pill is taller than the wordmark, so the logo row has to reserve its
+       height — otherwise the absolutely positioned pill hangs into the stats
+       row and the two crowd each other. */
+    .logo-container {
+        min-height: 32px;
+        align-items: center;
+        gap: 12px !important;
+    }
+    .logo-container img { height: 26px; }
+
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    /* Row 1 of the grid: three stats, two columns each. Padding is symmetric:
+       nothing inside the card is reserved for the duplicate badge, so all
+       three have the same height and the same internal spacing. */
+    .stat-card {
+        grid-column: span 2;
+        min-width: 0;
+        padding: 6px;
+        justify-content: center;
+    }
+    /* body sets line-height: 1.6, which at these font sizes leaves a visible
+       band of empty space above and below both the label and the number. */
+    .stat-label {
+        font-size: 0.55rem;
+        letter-spacing: 0.4px;
+        line-height: 1.15;
+    }
+    .stat-value {
+        font-size: 1.05rem;
+        line-height: 1.1;
+    }
+    /* The lifted, thick-bordered active card would make the row uneven. */
+    .clickable-stat-card.active {
+        border-width: 1px;
+        transform: none;
+    }
+    .stat-card:hover { transform: none; }
+
+    /* "All Agency Listings" only restates the label once the cards are this
+       narrow; the duplicate count is real information, so it stays. */
+    #card-active-stock .stat-subtext { display: none; }
+    /* On its own line the badge is an extra row only the middle card has, so
+       the grid stretched the other two to match and left them with a band of
+       dead space. Putting it beside the number instead keeps all three cards
+       the same (short) height, and the gap and the card's own padding give it
+       clearance on both sides. */
+    .stat-value-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        min-width: 0;
+    }
+    #stat-duplicates {
+        margin-top: 0;
+        font-size: 0.5rem;
+        padding: 1px 5px;
+        line-height: 1.5;
+    }
+    /* Trims "Identified Duplicates:" and "Add Off-Market Property". */
+    .label-long { display: none; }
+
+    /* Row 2: the three actions side by side rather than one row each. */
+    .stats-container > .btn,
+    .stats-container > a.btn {
+        grid-column: span 2;
+        min-width: 0;
+        justify-content: center;
+        font-size: 11.5px;
+        padding: 7px 6px;
+        gap: 5px !important;
+        margin-left: 0 !important;
+        white-space: nowrap;
+    }
+
+    /* The profile rides on the logo row rather than claiming a row of its own.
+       `!important` is required: the element carries an inline `position:
+       relative`, which a plain rule here cannot outrank. */
+    .stats-container .user-profile-dropdown {
+        position: absolute !important;
+        top: 10px;
+        right: 12px;
+        margin-left: 0 !important;
+    }
+    .stats-container .profile-toggle-btn {
+        padding: 4px 12px 4px 4px !important;
+        font-size: 13px;
+    }
+    .profile-dropdown-menu {
+        width: min(280px, calc(100vw - 24px)) !important;
+        min-width: 0 !important;
+    }
+}
+
+/* Small phones: the action labels stop fitting three across, so they go two
+   up with the last one filling the row below. */
+@media (max-width: 430px) {
+    .stats-container > .btn,
+    .stats-container > a.btn {
+        grid-column: span 3;
+    }
+    .stats-container > a.btn:last-of-type {
+        grid-column: span 6;
+    }
+}
+
+/* Very small phones: the currency value is the widest thing in a stat card. */
+@media (max-width: 380px) {
+    .stat-value { font-size: 0.92rem; }
+    .stat-label { font-size: 0.5rem; letter-spacing: 0.2px; }
+}

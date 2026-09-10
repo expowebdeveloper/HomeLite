@@ -1050,7 +1050,7 @@ function energyBadge(rating) {
                     
                     const statDuplicates = document.getElementById('stat-duplicates');
                     if (statDuplicates && data.stats.duplicate_listings !== undefined) {
-                        statDuplicates.innerText = `Identified Duplicates: ${Number(data.stats.duplicate_listings).toLocaleString()}`;
+                        statDuplicates.innerHTML = `<span class="label-long">Identified </span>Duplicates: ${Number(data.stats.duplicate_listings).toLocaleString()}`;
                     }
 
                     if (statAvg) statAvg.innerText = formatCurrency(data.stats.avg_price);
@@ -1174,7 +1174,7 @@ function energyBadge(rating) {
                 
                 const statDuplicates = document.getElementById('stat-duplicates');
                 if (statDuplicates && data.stats.duplicate_listings !== undefined) {
-                    statDuplicates.innerText = `Identified Duplicates: ${Number(data.stats.duplicate_listings).toLocaleString()}`;
+                    statDuplicates.innerHTML = `<span class="label-long">Identified </span>Duplicates: ${Number(data.stats.duplicate_listings).toLocaleString()}`;
                 }
             }
 

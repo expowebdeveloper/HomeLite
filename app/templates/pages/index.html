@@ -22,8 +22,10 @@
                 </div>
                 <div class="stat-card clickable-stat-card" id="card-unique-stock">
                     <span class="stat-label">Unique Stock</span>
-                    <span class="stat-value" id="stat-unique">--</span>
-                    <span class="stat-subtext" id="stat-duplicates">Identified Duplicates: 0</span>
+                    <div class="stat-value-row">
+                        <span class="stat-value" id="stat-unique">--</span>
+                        <span class="stat-subtext" id="stat-duplicates"><span class="label-long">Identified </span>Duplicates: 0</span>
+                    </div>
                 </div>
                 <div class="stat-card" id="card-avg-price">
                     <span class="stat-label">Avg Price</span>
@@ -37,7 +39,7 @@
 
                 <button class="btn btn-secondary" id="btn-add-off-market" onclick="openCreateManualModal()"
                         style="display: flex; align-items: center; gap: 8px; margin-left: 10px;">
-                    <i class="fas fa-plus-circle" style="color: var(--accent-color);"></i> Add Off-Market Property
+                    <i class="fas fa-plus-circle" style="color: var(--accent-color);"></i> <span>Add Off-Market<span class="label-long"> Property</span></span>
                 </button>
 
                 <a href="{{ url_for('pages.scraper_logs') }}" class="btn btn-secondary" id="btn-scraper-logs"
@@ -1077,7 +1079,7 @@
          third-party CDN being reachable from the browser. -->
     <script src="/static/js/vendor/chart.umd.min.js?v=4.4.0"></script>
 
-    <script src="/static/js/main.js?v=6.0"></script>
+    <script src="/static/js/main.js?v=6.1"></script>
     <script src="/static/js/pages/market_intelligence.js?v=5.5"></script>
     <script>
         // Simple Toast logic
