@@ -1,0 +1,11 @@
+{#
+  Shared document head. Callers set `page_title`, and optionally `head_font`
+  (defaults to Inter; the auth portal uses Outfit). Page-specific <style> blocks
+  and meta tags stay in the page template, after this include.
+#}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }}</title>
+<link href="https://fonts.googleapis.com/css2?family={{ head_font | default('Inter') }}:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+{% include 'components/stylesheets.html' %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">

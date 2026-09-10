@@ -1,0 +1,668 @@
+/* ==========================================================================
+   SARDO360 — Market Intelligence Dashboard
+   Collapsible navigation rail + analytics dashboard shell.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   View mode toggle (Listings / MI Dashboard) in the filter sidebar
+   -------------------------------------------------------------------------- */
+.view-mode-toggle {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.view-mode-toggle .btn {
+    flex: 1;
+    justify-content: center;
+    padding: 9px 8px;
+    font-size: 12.5px;
+    white-space: nowrap;
+}
+
+.view-mode-toggle .btn.active {
+    background: var(--sardo-navy-900);
+    border-color: var(--sardo-navy-900);
+    color: var(--sardo-white);
+}
+
+.view-mode-toggle .btn.active i {
+    color: var(--sardo-gold-500);
+}
+
+/* Hidden while the Market Intelligence dashboard is open. Separate from
+   .d-none so the grid/table view mode keeps its own state. */
+.mi-hidden {
+    display: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   Dashboard shell
+   -------------------------------------------------------------------------- */
+.mi-dashboard-wrapper {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 2px 8px 28px 2px;
+}
+
+.mi-topbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.mi-topbar h2 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--sardo-navy-900);
+    letter-spacing: -0.01em;
+}
+
+.mi-subtitle {
+    color: var(--sardo-grey-600);
+    font-size: 0.875rem;
+    margin-top: 4px;
+}
+
+.mi-topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.mi-updated {
+    color: var(--sardo-grey-600);
+    font-size: 0.78rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mi-refresh-btn {
+    background: transparent;
+    border: none;
+    color: var(--sardo-grey-600);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    transition: var(--transition-fast);
+}
+
+.mi-refresh-btn:hover {
+    color: var(--sardo-navy-900);
+    background: var(--sardo-grey-200);
+}
+
+.mi-refresh-btn.spinning i {
+    animation: mi-spin 0.8s linear infinite;
+}
+
+@keyframes mi-spin {
+    to { transform: rotate(360deg); }
+}
+
+.mi-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    border-radius: 9px;
+    border: 1px solid var(--sardo-grey-200);
+    background: var(--sardo-white);
+    color: var(--sardo-charcoal);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: var(--transition-fast);
+}
+
+.mi-btn:hover {
+    border-color: var(--sardo-blue-300);
+    background: var(--sardo-warm-white);
+}
+
+.mi-btn-dark {
+    background: var(--sardo-navy-900);
+    border-color: var(--sardo-navy-900);
+    color: var(--sardo-white);
+}
+
+.mi-btn-dark:hover {
+    background: var(--sardo-navy-700);
+    border-color: var(--sardo-navy-700);
+    color: var(--sardo-white);
+}
+
+/* --------------------------------------------------------------------------
+   Filter bar
+   -------------------------------------------------------------------------- */
+.mi-filterbar {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(140px, 1fr)) auto auto;
+    gap: 14px;
+    align-items: end;
+    background: var(--sardo-white);
+    border: 1px solid var(--sardo-grey-200);
+    border-radius: var(--border-radius);
+    padding: 16px 18px;
+    margin-bottom: 18px;
+}
+
+.mi-filter-field label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--sardo-grey-600);
+    margin-bottom: 7px;
+}
+
+.mi-filter-field select {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--sardo-grey-200);
+    border-radius: 9px;
+    background: var(--sardo-white);
+    color: var(--sardo-charcoal);
+    font-family: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.mi-filter-field select:focus {
+    outline: none;
+    border-color: var(--sardo-blue-500);
+    box-shadow: 0 0 0 3px rgba(79, 113, 150, 0.12);
+}
+
+/* --------------------------------------------------------------------------
+   KPI tiles
+   -------------------------------------------------------------------------- */
+.mi-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.mi-kpi-card {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: var(--sardo-white);
+    border: 1px solid var(--sardo-grey-200);
+    border-radius: var(--border-radius);
+    padding: 18px 20px;
+    transition: var(--transition-fast);
+}
+
+.mi-kpi-card:hover {
+    border-color: var(--sardo-blue-200);
+    box-shadow: var(--shadow-md);
+}
+
+.mi-kpi-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: var(--sardo-grey-200);
+    color: var(--sardo-navy-800);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05rem;
+    flex-shrink: 0;
+}
+
+.mi-kpi-card.accent .mi-kpi-icon {
+    background: var(--sardo-gold-200);
+    color: var(--sardo-gold-500);
+}
+
+.mi-kpi-body {
+    min-width: 0;
+}
+
+.kpi-title {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--sardo-grey-600);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 5px;
+}
+
+.kpi-value {
+    font-size: 1.55rem;
+    font-weight: 700;
+    color: var(--sardo-navy-900);
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.kpi-sub {
+    font-size: 0.73rem;
+    color: var(--sardo-grey-600);
+    margin-top: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* --------------------------------------------------------------------------
+   Card grids
+   -------------------------------------------------------------------------- */
+.mi-row {
+    display: grid;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.mi-row-primary {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr);
+}
+
+.mi-row-quad {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.mi-card {
+    background: var(--sardo-white);
+    border: 1px solid var(--sardo-grey-200);
+    border-radius: var(--border-radius);
+    padding: 18px 20px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.mi-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.mi-card-head h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--sardo-navy-900);
+}
+
+.mi-card-action {
+    background: transparent;
+    border: 1px solid var(--sardo-grey-200);
+    border-radius: 7px;
+    color: var(--sardo-grey-600);
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 5px 11px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: var(--transition-fast);
+}
+
+.mi-card-action:hover {
+    color: var(--sardo-navy-900);
+    border-color: var(--sardo-blue-300);
+    background: var(--sardo-warm-white);
+}
+
+.mi-card-action.link {
+    border: none;
+    color: var(--sardo-blue-500);
+    padding: 5px 2px;
+}
+
+.mi-card-action.link:hover {
+    background: transparent;
+    color: var(--sardo-navy-900);
+    text-decoration: underline;
+}
+
+.mi-chart-box {
+    position: relative;
+    width: 100%;
+    height: 240px;
+}
+
+.mi-chart-box.tall {
+    height: 268px;
+}
+
+.mi-card-note {
+    font-size: 0.73rem;
+    color: var(--sardo-grey-600);
+    margin-top: 12px;
+}
+
+/* Expandable data table behind each card's "View Details" button. */
+.mi-card-details {
+    margin-top: 14px;
+    border-top: 1px solid var(--sardo-grey-200);
+    padding-top: 10px;
+    max-height: 190px;
+    overflow-y: auto;
+}
+
+.mi-card-details .mi-matrix td {
+    background: transparent;
+}
+
+/* --------------------------------------------------------------------------
+   Bedroom stock heatmap
+   -------------------------------------------------------------------------- */
+.mi-matrix-scroll {
+    overflow-x: auto;
+}
+
+.mi-matrix {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 3px;
+    font-size: 0.8rem;
+}
+
+.mi-matrix th {
+    color: var(--sardo-grey-600);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: none;
+    padding: 6px 8px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.mi-matrix th:first-child,
+.mi-matrix td:first-child {
+    text-align: left;
+    color: var(--sardo-navy-900);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.mi-matrix td {
+    text-align: center;
+    padding: 7px 8px;
+    border-radius: 6px;
+    color: var(--sardo-charcoal);
+}
+
+.mi-matrix tfoot td {
+    font-weight: 700;
+    color: var(--sardo-navy-900);
+    border-top: 1px solid var(--sardo-grey-200);
+    background: transparent !important;
+    padding-top: 11px;
+}
+
+.mi-matrix .heat-0 { color: var(--sardo-grey-400); }
+
+/* --------------------------------------------------------------------------
+   Market composition / outliers list cards
+   -------------------------------------------------------------------------- */
+.mi-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.mi-list-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 2px;
+}
+
+.mi-list-row + .mi-list-row {
+    border-top: 1px solid var(--sardo-grey-200);
+}
+
+.mi-list-row i {
+    width: 18px;
+    text-align: center;
+    color: var(--sardo-grey-600);
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
+.mi-list-label {
+    font-size: 0.83rem;
+    color: var(--sardo-charcoal);
+}
+
+.mi-list-value {
+    margin-left: auto;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--sardo-navy-900);
+    white-space: nowrap;
+}
+
+.mi-list-row.up i { color: var(--sardo-danger); }
+.mi-list-row.down i { color: var(--sardo-success); }
+
+/* --------------------------------------------------------------------------
+   Duplicate intelligence tiles
+   -------------------------------------------------------------------------- */
+.mi-dup-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    flex: 1;
+    align-content: center;
+}
+
+.mi-dup-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 7px;
+    padding: 6px 2px;
+}
+
+.mi-dup-tile > i {
+    font-size: 1.15rem;
+    color: var(--sardo-navy-800);
+}
+
+.mi-dup-val {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--sardo-navy-900);
+    line-height: 1;
+}
+
+.mi-dup-label {
+    font-size: 0.68rem;
+    color: var(--sardo-grey-600);
+    line-height: 1.35;
+}
+
+/* --------------------------------------------------------------------------
+   Most widely listed ranking
+   -------------------------------------------------------------------------- */
+.mi-rank-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.mi-rank-row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 9px 2px;
+}
+
+.mi-rank-row + .mi-rank-row {
+    border-top: 1px solid var(--sardo-grey-200);
+}
+
+.mi-rank-badge {
+    width: 23px;
+    height: 23px;
+    border-radius: 50%;
+    background: var(--sardo-gold-200);
+    color: var(--sardo-navy-900);
+    font-size: 0.72rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.mi-rank-body {
+    min-width: 0;
+    flex: 1;
+}
+
+.mi-rank-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--sardo-navy-900);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mi-rank-meta {
+    font-size: 0.72rem;
+    color: var(--sardo-grey-600);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mi-rank-count {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--sardo-grey-600);
+    white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   Single-source gauge
+   -------------------------------------------------------------------------- */
+.mi-gauge-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 1;
+}
+
+.mi-gauge-figure {
+    flex: 0 0 auto;
+    text-align: center;
+}
+
+.mi-gauge-figure .mi-dup-val {
+    font-size: 2.4rem;
+}
+
+.mi-gauge-figure .mi-dup-label {
+    max-width: 130px;
+    margin-top: 6px;
+}
+
+.mi-gauge-chart {
+    position: relative;
+    width: 132px;
+    height: 132px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.mi-gauge-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--sardo-navy-900);
+    pointer-events: none;
+}
+
+/* Centre label for the price-distribution donut. */
+.mi-donut-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.mi-donut-center strong {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--sardo-navy-900);
+    line-height: 1;
+}
+
+.mi-donut-center span {
+    font-size: 0.68rem;
+    color: var(--sardo-grey-600);
+    margin-top: 3px;
+}
+
+/* --------------------------------------------------------------------------
+   Footnote / empty state
+   -------------------------------------------------------------------------- */
+.mi-footnote {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--sardo-grey-600);
+    font-size: 0.73rem;
+    padding: 6px 2px 0 2px;
+}
+
+.mi-footnote i {
+    color: var(--sardo-blue-300);
+}
+
+.mi-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 90px;
+    color: var(--sardo-grey-400);
+    font-size: 0.83rem;
+    text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive
+   -------------------------------------------------------------------------- */
+@media (max-width: 1500px) {
+    .mi-row-quad { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 1200px) {
+    .mi-row-primary { grid-template-columns: minmax(0, 1fr); }
+    .mi-filterbar { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+}
+
+@media (max-width: 900px) {
+    .mi-row-quad,
+    .mi-row-primary { grid-template-columns: minmax(0, 1fr); }
+    .mi-filterbar { grid-template-columns: minmax(140px, 1fr); }
+    .mi-gauge-card { flex-direction: column; }
+    .mi-gauge-chart { margin-left: 0; }
+}

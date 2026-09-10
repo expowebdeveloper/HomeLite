@@ -1,0 +1,1624 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    {% with page_title = 'SARDO360 - PROPERTY INSIGHT' %}{% include 'components/head.html' %}{% endwith %}
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-container" style="display: flex; align-items: center; gap: 30px;">
+                <img src="/static/assets/logo.png" alt="SARDO360 Logo" id="app-logo"
+                    onerror="this.style.display='none'; document.getElementById('logo-text').style.display='block';">
+                <h1 id="logo-text" style="display:none;">SARDO360</h1>
+            </div>
+            <div class="stats-container">
+                <div class="stat-card clickable-stat-card active" id="card-active-stock">
+                    <span class="stat-label">Active Stock</span>
+                    <span class="stat-value" id="stat-total">--</span>
+                    <span class="stat-subtext">All Agency Listings</span>
+                </div>
+                <div class="stat-card clickable-stat-card" id="card-unique-stock">
+                    <span class="stat-label">Unique Stock</span>
+                    <span class="stat-value" id="stat-unique">--</span>
+                    <span class="stat-subtext" id="stat-duplicates">Identified Duplicates: 0</span>
+                </div>
+                <div class="stat-card" id="card-avg-price">
+                    <span class="stat-label">Avg Price</span>
+                    <span class="stat-value" id="stat-avg">--</span>
+                </div>
+
+                <button class="btn btn-secondary" id="btn-manage-tags" onclick="openTagUploadModal()"
+                        style="display: flex; align-items: center; gap: 8px; margin-left: 15px;">
+                    <i class="fas fa-tags" style="color: #6366f1;"></i> Manage Tags
+                </button>
+
+                <button class="btn btn-secondary" id="btn-add-off-market" onclick="openCreateManualModal()"
+                        style="display: flex; align-items: center; gap: 8px; margin-left: 10px;">
+                    <i class="fas fa-plus-circle" style="color: var(--accent-color);"></i> Add Off-Market Property
+                </button>
+
+                <a href="{{ url_for('pages.scraper_logs') }}" class="btn btn-secondary" id="btn-scraper-logs"
+                   style="text-decoration: none; display: flex; align-items: center; gap: 8px; margin-left: 15px; position: relative;">
+                    <i class="fas fa-terminal"></i> Scraper Logs
+                    <span id="scraper-live-dot" style="display:none; width:8px; height:8px; border-radius:50%; background:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,.2);"></span>
+                </a>
+
+                <div class="user-profile-dropdown" style="position: relative; margin-left: 20px;">
+                    <button class="btn btn-secondary profile-toggle-btn" id="profileToggleBtn" onclick="toggleProfileMenu(event)" style="display: flex; align-items: center; gap: 8px; border-radius: 20px; padding: 6px 14px; cursor: pointer; background: white; border: 1px solid var(--border-color);">
+                        <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px;">
+                            {{ current_user.username[0]|upper if current_user.username else 'U' }}
+                        </div>
+                        <span style="font-weight: 600; color: var(--text-primary);">{{ current_user.username }}</span>
+                        <i class="fas fa-chevron-down" style="font-size: 12px; color: var(--text-secondary);"></i>
+                    </button>
+                    
+                    <div class="profile-dropdown-menu" id="profileDropdownMenu" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 8px; width: 260px; background: white; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 1000; overflow: hidden;">
+                        <div style="padding: 16px; border-bottom: 1px solid var(--border-color); background: #f8fafc;">
+                            <div style="font-weight: 700; color: var(--text-primary); font-size: 15px;">{{ current_user.username }}</div>
+                            <div style="color: var(--text-secondary); font-size: 13px; margin-top: 2px; word-break: break-all;">{{ current_user.email }}</div>
+                        </div>
+                        
+                        <div style="padding: 12px 16px; border-bottom: 1px solid var(--border-color);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <span style="font-weight: 600; font-size: 13px; color: var(--text-primary);"><i class="fas fa-shield-alt" style="color: var(--primary-color); margin-right: 6px;"></i> Authenticator App</span>
+                                <span id="mfa-status-badge" style="font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 600; background: #f1f5f9; color: #64748b;">Checking...</span>
+                            </div>
+                            <button id="btn-toggle-mfa" class="btn btn-secondary" style="width: 100%; justify-content: center; font-size: 13px; padding: 8px; display: none;" onclick="handleMfaToggle()">
+                                Loading...
+                            </button>
+                        </div>
+                        
+                        <div style="padding: 8px;">
+                            <a href="{{ url_for('pages.reports') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text-secondary); text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='var(--surface-hover)'; this.style.color='var(--primary-color)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
+                                <i class="fas fa-chart-line" style="width: 16px; text-align: center;"></i> Market Reports
+                            </a>
+                            <a href="{{ url_for('pages.scraper_logs') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text-secondary); text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='var(--surface-hover)'; this.style.color='var(--primary-color)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
+                                <i class="fas fa-terminal" style="width: 16px; text-align: center;"></i> Scraper Logs
+                            </a>
+                            <a href="{{ url_for('auth.login_history') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text-secondary); text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='var(--surface-hover)'; this.style.color='var(--primary-color)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
+                                <i class="fas fa-history" style="width: 16px; text-align: center;"></i> Login History
+                            </a>
+                            <a href="{{ url_for('auth.logout') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: #dc2626; text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s; margin-top: 4px;" onmouseover="this.style.background='rgba(220,38,38,0.1)';" onmouseout="this.style.background='transparent';">
+                                <i class="fas fa-sign-out-alt" style="width: 16px; text-align: center;"></i> Logout
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+
+            <!-- Sidebar Overlay (mobile) -->
+            <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+            <!-- Sidebar Filters -->
+            <aside class="sidebar" id="sidebar">
+                <button class="sidebar-close-btn" id="sidebar-close">
+                    <i class="fas fa-times"></i> Close
+                </button>
+                <div class="filter-group">
+                    <h3><i class="fas fa-layer-group"></i> View Mode</h3>
+                    <div class="view-mode-toggle">
+                        <button id="btn-mode-listings" class="btn btn-primary active">
+                            <i class="fas fa-list"></i> Listings
+                        </button>
+                        <button id="btn-mode-mi" class="btn btn-secondary">
+                            <i class="fas fa-chart-pie"></i> MI Dashboard
+                        </button>
+                    </div>
+
+                    <h3><i class="fas fa-filter"></i> Filters</h3>
+                </div>
+
+                <div class="filter-section">
+                    <label>SARDO Ref / Reference</label>
+                    <input type="text" id="filter-ref" placeholder="e.g. SARDO1105 or reference...">
+                    <small>Searches globally across all properties</small>
+                </div>
+
+                <div class="filter-section">
+                    <label>Price Range (€)</label>
+                    <div class="input-row">
+                        <input type="number" id="filter-min-price" placeholder="Min" min="0">
+                        <span>-</span>
+                        <input type="number" id="filter-max-price" placeholder="Max" min="0">
+                    </div>
+                </div>
+
+                <div class="filter-section">
+                    <label style="display:flex; justify-content:space-between; align-items:center;">
+                        <span>Location</span>
+                        <span class="clear-select" data-target="filter-locations" style="cursor:pointer; font-size:11px; color:var(--primary-color);">Clear</span>
+                    </label>
+                    <input type="text" id="location-search" placeholder="Search Location..."
+                        style="margin-bottom: 8px;">
+                    <select id="filter-locations" multiple class="multi-select">
+                        <!-- Populated via JS -->
+                    </select>
+                    <small>Hold Ctrl/Cmd to select multiple</small>
+                </div>
+
+                <div class="filter-section">
+                    <label>Property Type</label>
+                    <select id="filter-type">
+                        <option value="">Any Type</option>
+                        <!-- Populated via JS -->
+                    </select>
+                </div>
+
+                <div class="filter-section">
+                    <label style="display:flex; justify-content:space-between; align-items:center;">
+                        <span>Status</span>
+                        <span class="clear-select" data-target="filter-statuses" style="cursor:pointer; font-size:11px; color:var(--primary-color);">Clear</span>
+                    </label>
+                    <select id="filter-statuses" multiple class="multi-select">
+                        <!-- Populated via JS -->
+                    </select>
+                    <small>Hold Ctrl/Cmd to select multiple</small>
+                    <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-weight:500;">
+                        <input type="checkbox" id="filter-hide-delisted" checked style="width:auto; margin:0;">
+                        Hide delisted properties
+                    </label>
+                </div>
+
+                <div class="filter-section">
+                    <label style="display:flex; justify-content:space-between; align-items:center;">
+                        <span>Agent / Source</span>
+                        <span class="clear-select" data-target="filter-sources" style="cursor:pointer; font-size:11px; color:var(--primary-color);">Clear</span>
+                    </label>
+                    <select id="filter-sources" multiple class="multi-select">
+                        <!-- Populated via JS -->
+                    </select>
+                </div>
+
+                <div class="filter-section">
+                    <label style="display:flex; justify-content:space-between; align-items:center;">
+                        <span><i class="fas fa-tags" style="color: var(--primary-color);"></i> Tags</span>
+                        <span class="clear-select" data-target="filter-tags" style="cursor:pointer; font-size:11px; color:var(--primary-color);">Clear</span>
+                    </label>
+                    <select id="filter-tags" multiple class="multi-select">
+                        <!-- Populated via JS -->
+                    </select>
+                </div>
+
+                <div class="filter-section">
+                    <label>Market Visibility</label>
+                    <select id="filter-visibility" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: white;">
+                        <option value="all">All Properties</option>
+                        <option value="public">Public Only</option>
+                        <option value="off_market">Off-Market Only</option>
+                    </select>
+                </div>
+
+                <div class="filter-section">
+                    <label>Source Type</label>
+                    <select id="filter-source-type" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: white;">
+                        <option value="all">All Sources</option>
+                        <option value="scraped">Scraped Listings</option>
+                        <option value="manual">Manual / Off-Market</option>
+                    </select>
+                </div>
+
+                <div class="filter-section">
+                    <label>Bedrooms</label>
+                    <div class="input-row">
+                        <input type="number" id="filter-min-beds" placeholder="Min" min="0">
+                        <span>-</span>
+                        <input type="number" id="filter-max-beds" placeholder="Max" min="0">
+                    </div>
+                    <label style="display:flex; align-items:center; gap:8px; margin-top:6px; font-weight:500; font-size:12px; color:var(--text-secondary);">
+                        <input type="checkbox" id="filter-na-beds" style="width:auto; margin:0;">
+                        Only show N/A
+                    </label>
+                </div>
+
+                <div class="filter-section">
+                    <label>Bathrooms</label>
+                    <div class="input-row">
+                        <input type="number" id="filter-min-baths" placeholder="Min" min="0">
+                        <span>-</span>
+                        <input type="number" id="filter-max-baths" placeholder="Max" min="0">
+                    </div>
+                    <label style="display:flex; align-items:center; gap:8px; margin-top:6px; font-weight:500; font-size:12px; color:var(--text-secondary);">
+                        <input type="checkbox" id="filter-na-baths" style="width:auto; margin:0;">
+                        Only show N/A
+                    </label>
+                </div>
+
+                <div class="filter-actions">
+                    <button id="btn-search" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
+                    <button id="btn-clear" class="btn btn-secondary"><i class="fas fa-trash-alt"></i> Clear</button>
+                </div>
+
+                <hr class="divider">
+
+                <div class="export-section">
+                    <h3><i class="fas fa-file-export"></i> Export</h3>
+                    <label>Client Name</label>
+                    <input type="text" id="export-client" value="Smith" placeholder="e.g. Smith">
+                    <div class="export-buttons">
+                        <button id="btn-export-pdf" class="btn btn-danger" disabled><i class="fas fa-file-pdf"></i>
+                            PDF</button>
+                        <button id="btn-export-excel" class="btn btn-success" disabled><i class="fas fa-file-excel"></i>
+                            Excel</button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Grid Area -->
+            <section class="main-area">
+                <div id="view-listings-container">
+                    <div class="header-controls">
+                    <!-- Mobile Filter Toggle (styled like Select All) -->
+                    <div style="display: flex; align-items: stretch; gap: 15px;">
+                        <button class="mobile-filter-toggle" id="mobile-filter-toggle">
+                            <i class="fas fa-sliders-h"></i> Filters
+                        </button>
+                        <div class="select-all-wrapper">
+                            <input type="checkbox" id="select-all">
+                            <label for="select-all">Select All</label>
+                        </div>
+                    </div>
+                    <div class="view-toggle">
+                        <button id="btn-view-table" class="btn-view active"><i class="fas fa-list"></i> Table</button>
+                        <button id="btn-view-grid" class="btn-view"><i class="fas fa-th-large"></i> Grid</button>
+                    </div>
+                    <div class="results-info">
+                        <span id="results-count">0 Properties Found</span>
+                    </div>
+                </div>
+
+                <!-- Sort By Container for Grid View -->
+                <div class="grid-sort-wrapper d-none" id="grid-sort-container"
+                    style="align-self: flex-end; margin-bottom: 15px;">
+                    <label for="grid-sort"
+                        style="font-size: 0.9rem; font-weight: 600; color: var(--text-secondary);">Sort By:</label>
+                    <select id="grid-sort" style="padding: 6px 12px; width: auto; font-size: 0.9rem;">
+                        <option value="created_at-DESC">Newest</option>
+                        <option value="price-ASC">Price (Low to High)</option>
+                        <option value="price-DESC" selected>Price (High to Low)</option>
+                        <option value="living_area-DESC">Build Area (Large to Small)</option>
+                        <option value="land_area-DESC">Plot Area (Large to Small)</option>
+                    </select>
+                </div>
+
+                <!-- The Grid -->
+                <div class="property-grid d-none" id="properties-grid">
+                    <!-- Populated via JS -->
+                </div>
+
+                <!-- The Table (Hidden by default) -->
+                <div class="table-area" id="table-area">
+                    <div class="table-container">
+                        <table class="properties-table">
+                            <thead>
+                                <tr>
+                                    <th>Select</th>
+                                    <th class="sortable" data-sort="price">Price <i class="fas fa-sort sort-icon"></i>
+                                    </th>
+                                    <th class="sortable" data-sort="location">Location <i
+                                            class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable" data-sort="property_type">Type <i
+                                            class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable" data-sort="bedrooms">Beds <i class="fas fa-sort sort-icon"></i>
+                                    </th>
+                                    <th class="sortable" data-sort="bathrooms">Baths <i
+                                            class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable" data-sort="living_area">Build (m²) <i
+                                            class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable" data-sort="land_area">Plot (m²) <i
+                                            class="fas fa-sort sort-icon"></i></th>
+                                    <th>Year</th>
+                                    <th class="sortable" data-sort="first_seen_at">First Seen <i class="fas fa-sort sort-icon"></i></th>
+                                    <th>DOM</th>
+                                    <th>Energy</th>
+                                    <th class="sortable" data-sort="source">Source <i class="fas fa-sort sort-icon"></i>
+                                    </th>
+                                    <th class="sortable" data-sort="property_status">Status <i
+                                            class="fas fa-sort sort-icon"></i></th>
+                                    <th>SARDO Ref</th>
+                                    <th>Reference</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-body">
+                                <!-- Populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Pagination Controls -->
+                <div class="pagination-controls" id="pagination-controls">
+                    <div class="items-per-page">
+                        <label for="per-page-select">Items per page:</label>
+                        <select id="per-page-select">
+                            <option value="10" selected>10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="All">All</option>
+                        </select>
+                    </div>
+                    <div class="pagination-center">
+                        <div class="pagination-buttons" id="pagination-buttons">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+                    <div class="pagination-info" id="pagination-info">
+                        Showing 0 to 0 of 0 properties
+                    </div>
+                    </div>
+                </div> <!-- End of view-listings-container -->
+                
+                <!-- ============================================================
+                     Market Intelligence Dashboard
+                     Cards carry data-mi-section so the nav rail can narrow the
+                     view (Market / Sources / Duplicates / Opportunities) while
+                     "Overview" shows everything.
+                     ============================================================ -->
+                <div id="view-mi-container" class="mi-dashboard-wrapper" style="display: none;">
+
+                    <div class="mi-topbar">
+                        <div>
+                            <h2>Market Intelligence Dashboard</h2>
+                            <p class="mi-subtitle">Real-time market overview and analytics for informed buying decisions.</p>
+                        </div>
+                        <div class="mi-topbar-actions">
+                            <div class="mi-updated">
+                                <span id="mi-last-updated">Last updated: —</span>
+                                <button class="mi-refresh-btn" id="mi-refresh" title="Refresh data" aria-label="Refresh data">
+                                    <i class="fas fa-rotate"></i>
+                                </button>
+                            </div>
+                            <button class="mi-btn" id="mi-save-view"><i class="fas fa-bookmark"></i> Save View</button>
+                            <button class="mi-btn" id="mi-export-report"><i class="fas fa-file-export"></i> Export Report</button>
+                            <button class="mi-btn mi-btn-dark" id="mi-share"><i class="fas fa-share-nodes"></i> Share</button>
+                        </div>
+                    </div>
+
+                    <!-- Filter bar. These controls drive the same filter state as the
+                         Property Search sidebar, so both views describe one dataset. -->
+                    <div class="mi-filterbar">
+                        <div class="mi-filter-field">
+                            <label for="mi-filter-location">Location</label>
+                            <select id="mi-filter-location"><option value="">All Locations</option></select>
+                        </div>
+                        <div class="mi-filter-field">
+                            <label for="mi-filter-type">Property Type</label>
+                            <select id="mi-filter-type"><option value="">All Types</option></select>
+                        </div>
+                        <div class="mi-filter-field">
+                            <label for="mi-filter-beds">Bedrooms</label>
+                            <select id="mi-filter-beds">
+                                <option value="">All</option>
+                                <option value="3">3 Bed</option>
+                                <option value="4">4 Bed</option>
+                                <option value="5">5 Bed</option>
+                                <option value="6">6 Bed</option>
+                                <option value="7">7 Bed</option>
+                                <option value="8">8 Bed</option>
+                                <option value="9+">9+ Bed</option>
+                            </select>
+                        </div>
+                        <div class="mi-filter-field">
+                            <label for="mi-filter-price">Price Range</label>
+                            <select id="mi-filter-price">
+                                <option value="">Any Price</option>
+                                <option value="0-2000000">Under €2M</option>
+                                <option value="2000000-5000000">€2M – €5M</option>
+                                <option value="5000000-10000000">€5M – €10M</option>
+                                <option value="10000000-15000000">€10M – €15M</option>
+                                <option value="15000000-">€15M+</option>
+                            </select>
+                        </div>
+                        <div class="mi-filter-field">
+                            <label for="mi-filter-source">Source</label>
+                            <select id="mi-filter-source"><option value="">All Sources</option></select>
+                        </div>
+                        <button class="mi-btn mi-btn-dark" id="mi-open-filters"><i class="fas fa-filter"></i> Filters</button>
+                        <button class="mi-btn" id="mi-reset-filters"><i class="fas fa-rotate-left"></i> Reset</button>
+                    </div>
+
+                    <!-- KPI tiles -->
+                    <div class="mi-kpi-grid" data-mi-section="market sources duplicates opportunities">
+                        <div class="mi-kpi-card">
+                            <div class="mi-kpi-icon"><i class="fas fa-building"></i></div>
+                            <div class="mi-kpi-body">
+                                <div class="kpi-title">Active Listings</div>
+                                <div class="kpi-value" id="kpi-active-count">—</div>
+                                <div class="kpi-sub" id="kpi-active-sub">Across — sources</div>
+                            </div>
+                        </div>
+                        <div class="mi-kpi-card">
+                            <div class="mi-kpi-icon"><i class="fas fa-house"></i></div>
+                            <div class="mi-kpi-body">
+                                <div class="kpi-title">Est. Unique Properties</div>
+                                <div class="kpi-value" id="kpi-unique-count">—</div>
+                                <div class="kpi-sub" id="kpi-unique-sub">— duplicate groups</div>
+                            </div>
+                        </div>
+                        <div class="mi-kpi-card">
+                            <div class="mi-kpi-icon"><i class="fas fa-tag"></i></div>
+                            <div class="mi-kpi-body">
+                                <div class="kpi-title">Average Asking Price</div>
+                                <div class="kpi-value" id="kpi-avg-price">—</div>
+                                <div class="kpi-sub" id="kpi-median-price">Median —</div>
+                            </div>
+                        </div>
+                        <div class="mi-kpi-card">
+                            <div class="mi-kpi-icon"><i class="fas fa-ruler"></i></div>
+                            <div class="mi-kpi-body">
+                                <div class="kpi-title">Average €/m² (Build)</div>
+                                <div class="kpi-value" id="kpi-avg-sqm">—</div>
+                                <div class="kpi-sub" id="kpi-median-sqm">Median —</div>
+                            </div>
+                        </div>
+                        <div class="mi-kpi-card accent">
+                            <div class="mi-kpi-icon"><i class="fas fa-trophy"></i></div>
+                            <div class="mi-kpi-body">
+                                <div class="kpi-title">Highest Asking Price</div>
+                                <div class="kpi-value" id="kpi-max-price">—</div>
+                                <div class="kpi-sub" id="kpi-max-price-sub">—</div>
+                            </div>
+                        </div>
+                        <div class="mi-kpi-card">
+                            <div class="mi-kpi-icon"><i class="fas fa-layer-group"></i></div>
+                            <div class="mi-kpi-body">
+                                <div class="kpi-title">Total Build Area</div>
+                                <div class="kpi-value" id="kpi-build-area">—</div>
+                                <div class="kpi-sub" id="kpi-build-area-sub">Avg — per property</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stock composition -->
+                    <div class="mi-row mi-row-primary">
+                        <div class="mi-card" data-mi-section="market">
+                            <div class="mi-card-head">
+                                <h3>Stock by Bedroom Count</h3>
+                                <button class="mi-card-action" id="mi-bedroom-mode" data-mode="active">Chart Options</button>
+                            </div>
+                            <div class="mi-chart-box"><canvas id="chart-bedrooms"></canvas></div>
+                            <div class="mi-card-note" id="mi-bedroom-note">—</div>
+                        </div>
+
+                        <div class="mi-card" data-mi-section="sources">
+                            <div class="mi-card-head">
+                                <h3>Listings by Source</h3>
+                                <button class="mi-card-action" data-details="details-sources">View Details</button>
+                            </div>
+                            <div class="mi-chart-box"><canvas id="chart-sources"></canvas></div>
+                            <div class="mi-card-details" id="details-sources" hidden></div>
+                        </div>
+
+                        <div class="mi-card" data-mi-section="sources">
+                            <div class="mi-card-head">
+                                <h3>Bedroom Stock by Source</h3>
+                                <button class="mi-card-action" id="mi-matrix-heat" data-heat="on">Heatmap: On</button>
+                            </div>
+                            <div class="mi-matrix-scroll">
+                                <table class="mi-matrix" id="matrix-table">
+                                    <thead><tr id="matrix-header"></tr></thead>
+                                    <tbody id="matrix-body"></tbody>
+                                    <tfoot><tr id="matrix-footer"></tr></tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pricing analytics -->
+                    <div class="mi-row mi-row-quad">
+                        <div class="mi-card" data-mi-section="market">
+                            <div class="mi-card-head">
+                                <h3>Asking Price Distribution</h3>
+                                <button class="mi-card-action" data-details="details-price" >View Details</button>
+                            </div>
+                            <div class="mi-chart-box">
+                                <canvas id="chart-price-dist"></canvas>
+                                <div class="mi-donut-center">
+                                    <strong id="donut-total">—</strong>
+                                    <span>Listings</span>
+                                </div>
+                            </div>
+                            <div class="mi-card-details" id="details-price" hidden></div>
+                        </div>
+
+                        <div class="mi-card" data-mi-section="sources">
+                            <div class="mi-card-head">
+                                <h3>Average Asking Price by Source</h3>
+                                <button class="mi-card-action" data-details="details-avg-price">View Details</button>
+                            </div>
+                            <div class="mi-chart-box"><canvas id="chart-avg-price-source"></canvas></div>
+                            <div class="mi-card-details" id="details-avg-price" hidden></div>
+                        </div>
+
+                        <div class="mi-card" data-mi-section="sources">
+                            <div class="mi-card-head">
+                                <h3>Average €/m² by Source</h3>
+                                <button class="mi-card-action" data-details="details-avg-sqm">View Details</button>
+                            </div>
+                            <div class="mi-chart-box"><canvas id="chart-avg-sqm-source"></canvas></div>
+                            <div class="mi-card-details" id="details-avg-sqm" hidden></div>
+                        </div>
+
+                        <div class="mi-card" data-mi-section="market">
+                            <div class="mi-card-head">
+                                <h3>Market Composition</h3>
+                            </div>
+                            <div class="mi-list" id="mi-composition"></div>
+                        </div>
+                    </div>
+
+                    <!-- Duplicate intelligence & outliers -->
+                    <div class="mi-row mi-row-quad">
+                        <div class="mi-card" data-mi-section="duplicates">
+                            <div class="mi-card-head">
+                                <h3>Duplicate Intelligence</h3>
+                            </div>
+                            <div class="mi-dup-grid">
+                                <div class="mi-dup-tile">
+                                    <i class="fas fa-layer-group"></i>
+                                    <span class="mi-dup-val" id="dup-active">—</span>
+                                    <span class="mi-dup-label">Active Listings</span>
+                                </div>
+                                <div class="mi-dup-tile">
+                                    <i class="fas fa-house"></i>
+                                    <span class="mi-dup-val" id="dup-unique">—</span>
+                                    <span class="mi-dup-label">Est. Unique Properties</span>
+                                </div>
+                                <div class="mi-dup-tile">
+                                    <i class="fas fa-file-lines"></i>
+                                    <span class="mi-dup-val" id="dup-listings">—</span>
+                                    <span class="mi-dup-label">Duplicate Listings</span>
+                                </div>
+                                <div class="mi-dup-tile">
+                                    <i class="fas fa-users"></i>
+                                    <span class="mi-dup-val" id="dup-groups">—</span>
+                                    <span class="mi-dup-label">Duplicate Groups</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mi-card" data-mi-section="duplicates opportunities">
+                            <div class="mi-card-head">
+                                <h3>Most Widely Listed Properties</h3>
+                                <button class="mi-card-action link" id="mi-view-duplicates">View All</button>
+                            </div>
+                            <div class="mi-rank-list" id="mi-rank-list"></div>
+                        </div>
+
+                        <div class="mi-card" data-mi-section="duplicates opportunities">
+                            <div class="mi-card-head">
+                                <h3>Single-Source (Unique) Listings</h3>
+                            </div>
+                            <div class="mi-gauge-card">
+                                <div class="mi-gauge-figure">
+                                    <div class="mi-dup-val" id="single-source-count">—</div>
+                                    <div class="mi-dup-label">Listings found on only one source</div>
+                                </div>
+                                <div class="mi-gauge-chart">
+                                    <canvas id="chart-single-source"></canvas>
+                                    <div class="mi-gauge-center" id="single-source-pct">—</div>
+                                </div>
+                            </div>
+                            <div class="mi-card-note">of estimated unique properties</div>
+                        </div>
+
+                        <div class="mi-card" data-mi-section="opportunities">
+                            <div class="mi-card-head">
+                                <h3>Market Outliers</h3>
+                            </div>
+                            <div class="mi-list" id="mi-outliers"></div>
+                        </div>
+                    </div>
+
+                    <div class="mi-footnote">
+                        <i class="fas fa-circle-info"></i>
+                        <span>Data based on information provided by third-party sources. SARDO360 does not guarantee accuracy or completeness.</span>
+                    </div>
+
+                </div> <!-- End of view-mi-container -->
+            </section>
+
+            <!-- Preview Panel (Hidden in grid mode) -->
+            <aside class="preview-panel" id="preview-panel">
+                <h3><i class="fas fa-eye"></i> Quick Preview</h3>
+                <div class="image-wrapper" id="preview-image-container">
+                    <div class="no-image-placeholder">
+                        <i class="fas fa-image"></i>
+                        <p>Hover a property</p>
+                    </div>
+                </div>
+                <div class="preview-details" id="preview-details">
+                    <!-- Details will be populated here -->
+                </div>
+            </aside>
+        </div>
+
+        <!-- Status Bar -->
+        <footer class="status-bar">
+            <span id="status-text">Ready</span>
+        </footer>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display:none;">
+        <div class="spinner"></div>
+        <p id="loading-text">Loading...</p>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+    
+    <!-- Custom Confirm Modal -->
+    <div id="sardo-confirm-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); backdrop-filter:blur(4px); z-index:1000000; align-items:center; justify-content:center;">
+        <div id="sardo-confirm-box" style="background:white; border-radius:12px; padding:24px; width:100%; max-width:380px; box-shadow:0 20px 40px rgba(0,0,0,0.2); transform:scale(0.9); opacity:0; transition:all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+                <div id="sardo-confirm-icon" style="width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px;"></div>
+                <h3 id="sardo-confirm-title" style="margin:0; font-size:18px; color:var(--text-primary);"></h3>
+            </div>
+            <p id="sardo-confirm-body" style="margin:0 0 24px 0; color:var(--text-secondary); font-size:14px; line-height:1.5;"></p>
+            <div style="display:flex; gap:12px; justify-content:flex-end;">
+                <button id="sardo-confirm-cancel" class="btn btn-secondary" style="padding:8px 16px;">Cancel</button>
+                <button id="sardo-confirm-ok" class="btn btn-primary" style="padding:8px 16px;">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="property-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+    
+    <!-- Duplicate Group Modal -->
+    <div id="duplicate-modal" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 99999; backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 20px;">
+        <div class="modal-content" style="background: white; width: 100%; max-width: 820px; border-radius: 14px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35); overflow: hidden; max-height: 90vh; display: flex; flex-direction: column; animation: modalFadeIn 0.25s ease-out;">
+            <!-- Modal Header -->
+            <div style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); color: white; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(99, 102, 241, 0.25); border: 1px solid rgba(165, 180, 252, 0.4); display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-layer-group" style="font-size: 20px; color: #a5b4fc;"></i>
+                    </div>
+                    <div>
+                        <h2 id="duplicate-modal-title" style="margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.3px;">Duplicate Cluster</h2>
+                        <div id="duplicate-modal-subtitle" style="font-size: 13px; color: #cbd5e1; margin-top: 4px;"></div>
+                    </div>
+                </div>
+                <button onclick="closeDuplicateModal()" style="background: rgba(255,255,255,0.12); border: none; color: white; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Body -->
+            <div id="duplicate-modal-body" style="padding: 24px; overflow-y: auto; flex: 1; background: #f8fafc;">
+            </div>
+        </div>
+    </div>
+
+    <!-- MFA Setup Modal -->
+    <div id="mfa-setup-modal" class="modal-overlay" style="display:none; z-index: 2000;">
+        <div class="modal-content" style="max-width: 400px; text-align: center; padding: 30px;">
+            <span class="close-modal" onclick="closeMfaModal()">&times;</span>
+            <h3 style="margin-bottom: 10px;">Setup Authenticator</h3>
+            <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 20px;">Scan this QR code with Google Authenticator or Authy.</p>
+            
+            <div style="background: white; padding: 15px; border-radius: 12px; display: inline-block; margin-bottom: 20px; border: 1px solid var(--border-color);">
+                <img id="mfa-qr-code" src="" alt="QR Code" style="max-width: 200px; display: block; margin: 0 auto;">
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <input type="text" id="mfa-verify-code" placeholder="000000" maxlength="6" style="border: 1px solid var(--border-color); padding: 10px 15px; border-radius: var(--border-radius-sm); font-size: 20px; letter-spacing: 4px; text-align: center; width: 150px;">
+            </div>
+            
+            <button class="btn btn-primary" onclick="verifyMfaSetup()" style="width: 100%; justify-content: center;">
+                Verify & Enable
+            </button>
+            
+            <div id="mfa-backup-codes-container" style="display: none; margin-top: 20px; text-align: left;">
+                <h4 style="margin-bottom: 10px; color: var(--success-color);"><i class="fas fa-check-circle"></i> Authenticator Enabled</h4>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 10px;">Save these backup codes in a secure place. They can be used to log in if you lose access to your device.</p>
+                <div id="mfa-backup-codes" style="background: #f8fafc; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 13px; letter-spacing: 1px; line-height: 1.6; border: 1px solid var(--border-color); word-break: break-all;"></div>
+                <button class="btn btn-secondary" onclick="closeMfaModal()" style="width: 100%; justify-content: center; margin-top: 15px;">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Off-Market Property Modal (Application Default Theme) -->
+    <div id="manual-property-modal" class="modal-overlay" style="display:none; z-index: 1500; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(5px);">
+        <div class="modal-content" style="max-width: 900px; padding: 0; max-height: 90vh; overflow-y: auto; background: #ffffff; color: var(--text-primary); border-radius: var(--border-radius-lg); border: 1px solid var(--border-color); box-shadow: var(--shadow-hover);">
+            <!-- Modal Header -->
+            <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 24px 30px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; position: relative;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div style="width: 48px; height: 48px; border-radius: 12px; background: var(--primary-color); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: var(--shadow-md);">
+                        <i class="fas fa-user-secret"></i>
+                    </div>
+                    <div>
+                        <h2 id="manual-modal-title" style="margin: 0; font-size: 22px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.5px;">Add VIP Off-Market Asset</h2>
+                        <p id="manual-modal-subtitle" style="margin: 4px 0 0; font-size: 13px; color: var(--text-secondary);">Confidential property registration & private client portfolio management</p>
+                    </div>
+                </div>
+                <span class="close-modal" onclick="closeManualPropertyModal()" style="color: var(--text-secondary); font-size: 28px; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='var(--danger-color)'" onmouseout="this.style.color='var(--text-secondary)'">&times;</span>
+            </div>
+
+            <form id="manual-property-form" onsubmit="handleManualPropertySubmit(event)" style="padding: 30px;">
+                <input type="hidden" id="manual-prop-id" value="">
+                
+                <!-- Section 1: Core Specs Card -->
+                <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 22px; margin-bottom: 24px; box-shadow: var(--shadow-sm);">
+                    <h3 style="font-size: 14px; font-weight: 700; margin: 0 0 18px 0; color: var(--primary-color); display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                        <i class="fas fa-gem" style="color: var(--accent-color);"></i> Core Specifications
+                    </h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div style="grid-column: span 2;">
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Listing Title *</label>
+                            <input type="text" id="manual-title" required placeholder="e.g. Exclusive Modern Villa with Panoramic Ocean Views" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none; transition: all 0.2s;" onfocus="this.style.borderColor='var(--accent-color)'; this.style.boxShadow='0 0 0 3px rgba(99, 102, 241, 0.1)'" onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='none'">
+                        </div>
+
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Property Type *</label>
+                            <select id="manual-type" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='#cbd5e1'">
+                                <option value="Villa">Villa</option>
+                                <option value="Apartment">Apartment</option>
+                                <option value="Townhouse">Townhouse</option>
+                                <option value="Plot">Plot</option>
+                                <option value="Commercial">Commercial</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Status *</label>
+                            <select id="manual-status" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='#cbd5e1'">
+                                <option value="Off Market">Off Market</option>
+                                <option value="For Sale">For Sale</option>
+                                <option value="Under Offer">Under Offer</option>
+                                <option value="Sold">Sold</option>
+                                <option value="Withdrawn">Withdrawn</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Price (€)</label>
+                            <input type="number" id="manual-price" placeholder="e.g. 2500000" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='var(--accent-color)'; this.style.boxShadow='0 0 0 3px rgba(99, 102, 241, 0.1)'" onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='none'">
+                        </div>
+
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Market Visibility</label>
+                            <select id="manual-visibility" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='#cbd5e1'">
+                                <option value="off_market">Off-Market (Confidential)</option>
+                                <option value="public">Public</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Bedrooms</label>
+                            <input type="number" id="manual-bedrooms" placeholder="e.g. 5" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Bathrooms</label>
+                            <input type="number" id="manual-bathrooms" placeholder="e.g. 6" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Living Area (m²)</label>
+                            <input type="number" id="manual-living" placeholder="e.g. 450" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Land / Plot Area (m²)</label>
+                            <input type="number" id="manual-land" placeholder="e.g. 3000" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Location & Architectural Card -->
+                <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 22px; margin-bottom: 24px; box-shadow: var(--shadow-sm);">
+                    <h3 style="font-size: 14px; font-weight: 700; margin: 0 0 18px 0; color: var(--primary-color); display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                        <i class="fas fa-map-marked-alt" style="color: #0284c7;"></i> Location & Architectural Specs
+                    </h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Location</label>
+                            <input type="text" id="manual-location" placeholder="e.g. Quinta do Lago" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Resort Area</label>
+                            <input type="text" id="manual-resort-area" placeholder="e.g. Vale do Lobo" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Sub Area</label>
+                            <input type="text" id="manual-sub-area" placeholder="e.g. Ocean Club" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div style="grid-column: span 2;">
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Confidential Address</label>
+                            <input type="text" id="manual-address" placeholder="Full street address (kept private)" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">GPS Coordinates</label>
+                            <input type="text" id="manual-coordinates" placeholder="37.0500, -8.0200" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Construction Year</label>
+                            <input type="number" id="manual-construction-year" placeholder="2022" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Renovation Year</label>
+                            <input type="number" id="manual-renovation-year" placeholder="2025" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Energy Rating</label>
+                            <input type="text" id="manual-energy-rating" placeholder="A+" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Source & Contact Card -->
+                <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 22px; margin-bottom: 24px; box-shadow: var(--shadow-sm);">
+                    <h3 style="font-size: 14px; font-weight: 700; margin: 0 0 18px 0; color: var(--primary-color); display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                        <i class="fas fa-handshake" style="color: #7c3aed;"></i> Confidential Source & Introducer
+                    </h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Source Contact Name</label>
+                            <input type="text" id="manual-contact-name" placeholder="e.g. Client / Owner Name" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Source Contact Email</label>
+                            <input type="email" id="manual-contact-email" placeholder="owner@private.com" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Source Contact Phone</label>
+                            <input type="text" id="manual-contact-phone" placeholder="+351 912 345 678" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Source Agency / Partner</label>
+                            <input type="text" id="manual-source-agent" placeholder="e.g. Private Advisory" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Introduced By</label>
+                            <input type="text" id="manual-introduced-by" placeholder="e.g. VIP Referral" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Reference ID (Optional)</label>
+                            <input type="text" id="manual-reference" placeholder="Auto-generated if left blank" style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#cbd5e1'">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 4: Notes & Media Card -->
+                <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 22px; margin-bottom: 24px; box-shadow: var(--shadow-sm);">
+                    <h3 style="font-size: 14px; font-weight: 700; margin: 0 0 18px 0; color: var(--primary-color); display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                        <i class="fas fa-file-contract" style="color: var(--success-color);"></i> Confidential Notes & Attached Media
+                    </h3>
+                    <div style="margin-bottom: 20px;">
+                        <label style="font-weight: 600; font-size: 12px; margin-bottom: 6px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Internal Advisory Notes</label>
+                        <textarea id="manual-notes" rows="3" placeholder="Internal viewing instructions, owner terms, price negotiation flexibility..." style="width: 100%; padding: 11px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--text-primary); font-size: 14px; font-family: inherit; outline: none; transition: all 0.2s;" onfocus="this.style.borderColor='var(--success-color)'" onblur="this.style.borderColor='#cbd5e1'"></textarea>
+                    </div>
+
+                    <!-- Documents & Media Section -->
+                    <div id="manual-docs-section" style="border-top: 1px dashed var(--border-color); padding-top: 18px;">
+                        <label style="font-weight: 600; font-size: 12px; margin-bottom: 10px; display: block; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Upload Photos / Brochures / Floorplans</label>
+                        <div style="display: flex; gap: 12px; margin-bottom: 16px; align-items: center; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+                            <input type="file" id="manual-file-input" style="border: none; color: var(--text-secondary); font-size: 13px; flex: 1;">
+                            <select id="manual-file-type" style="padding: 8px 12px; background: #ffffff; color: var(--text-primary); border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none;">
+                                <option value="Image">Image / Photo</option>
+                                <option value="Brochure">Brochure (PDF)</option>
+                                <option value="Floorplan">Floorplan</option>
+                                <option value="Contract">Contract</option>
+                                <option value="Other">Other Document</option>
+                            </select>
+                        </div>
+                        <div id="manual-docs-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;"></div>
+                    </div>
+                </div>
+
+                <!-- Footer Bar -->
+                <div style="display: flex; justify-content: flex-end; gap: 14px; border-top: 1px solid var(--border-color); padding-top: 24px; align-items: center;">
+                    <button type="button" onclick="closeManualPropertyModal()" style="background: transparent; border: 1px solid #cbd5e1; color: var(--text-secondary); padding: 11px 22px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#f1f5f9'; this.style.color='var(--text-primary)'" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)'">
+                        Cancel
+                    </button>
+                    <button type="submit" id="btn-save-manual" style="background: var(--primary-color); color: #ffffff; padding: 12px 28px; border: none; border-radius: 8px; font-weight: 700; font-size: 15px; cursor: pointer; box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 8px; transition: all 0.2s;" onmouseover="this.style.background='var(--secondary-color)'" onmouseout="this.style.background='var(--primary-color)'">
+                        <i class="fas fa-save"></i> Save VIP Asset
+                    </button>
+                </div>
+        </div>
+    </div>
+
+    <!-- Property Tags Manager (Global Tags Library & CSV Upload) Modal -->
+    <div id="tags-modal" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); z-index: 99999; backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); align-items: center; justify-content: center; padding: 20px;">
+        <div class="modal-content" style="background: #ffffff; color: var(--text-primary); border-radius: var(--border-radius-lg); border: 1px solid var(--border-color); box-shadow: var(--shadow-hover); overflow: hidden; max-height: 90vh; display: flex; flex-direction: column; width: 100%; max-width: 820px; animation: modalFadeIn 0.25s ease-out;">
+            <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 24px 30px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; position: relative;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div style="width: 48px; height: 48px; border-radius: 12px; background: var(--primary-color); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: var(--shadow-md);">
+                        <i class="fas fa-tags"></i>
+                    </div>
+                    <div>
+                        <h2 style="margin: 0; font-size: 22px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.5px;">Property Tags Manager</h2>
+                        <p style="margin: 4px 0 0; font-size: 13px; color: var(--text-secondary);">Global Tags Library, Bulk Assignments & CSV Upload</p>
+                    </div>
+                </div>
+                <span class="close-modal" onclick="closeTagUploadModal()" style="color: var(--text-secondary); font-size: 28px; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='var(--danger-color)'" onmouseout="this.style.color='var(--text-secondary)'">&times;</span>
+            </div>
+            
+            <!-- Modal Navigation Tabs -->
+            <div style="display: flex; background: #f8fafc; border-bottom: 1px solid var(--border-color); padding: 0 24px;">
+                <button id="tab-btn-global-tags" onclick="switchTagsModalTab('global')" style="padding: 16px 20px; font-weight: 700; font-size: 13px; color: var(--accent-hover); border: none; background: transparent; border-bottom: 3px solid var(--accent-hover); cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-layer-group"></i> Global Tags Library
+                </button>
+                <button id="tab-btn-csv-upload" onclick="switchTagsModalTab('csv')" style="padding: 16px 20px; font-weight: 600; font-size: 13px; color: var(--text-secondary); border: none; background: transparent; border-bottom: 3px solid transparent; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-file-csv"></i> Bulk CSV Upload
+                </button>
+            </div>
+ 
+            <!-- Tab 1: Global Tags Library View -->
+            <div id="tags-tab-global" style="padding: 24px; overflow-y: auto; flex: 1; background: #ffffff;">
+                <!-- Selected properties banner -->
+                <div id="global-tags-selection-banner" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--border-radius); padding: 12px 18px; margin-bottom: 18px; justify-content: space-between; align-items: center; box-shadow: var(--shadow-sm);">
+                    <div style="font-size: 13px; color: #1e40af; font-weight: 700;">
+                        <i class="fas fa-check-square"></i> <span id="global-tags-selected-count">0</span> properties selected in table/grid. Click any tag below to apply or remove.
+                    </div>
+                </div>
+ 
+                <!-- Search and Add new Tag Bar -->
+                <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 240px; position: relative;">
+                        <i class="fas fa-search" style="position: absolute; left: 12px; top: 11px; color: var(--text-secondary); font-size: 13px;"></i>
+                        <input type="text" id="global-tag-search-input" placeholder="Search tags in library..." style="width: 100%; padding: 9px 12px 9px 34px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; outline: none; background: #ffffff;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='#cbd5e1'">
+                    </div>
+                    <button type="button" onclick="toggleCreateGlobalTagForm()" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; font-size: 13px; background: #ffffff; border: 1px solid #cbd5e1; color: var(--text-secondary); box-shadow: var(--shadow-sm);">
+                        <i class="fas fa-plus"></i> New Global Tag
+                    </button>
+                </div>
+ 
+                <!-- Create Global Tag Form (collapsible) -->
+                <div id="create-global-tag-panel" style="display: none; background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 18px; margin-bottom: 20px; box-shadow: var(--shadow-sm);">
+                    <h4 style="margin: 0 0 14px 0; font-size: 14px; font-weight: 700; color: var(--primary-color);">Create New Global Tag</h4>
+                    <div style="display: grid; grid-template-columns: 2fr 1.5fr 1fr auto; gap: 12px; align-items: end;">
+                        <div>
+                            <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 4px; display: block; letter-spacing: 0.5px;">Tag Name</label>
+                            <input type="text" id="new-global-tag-name" placeholder="e.g. Sunset Views" style="width: 100%; padding: 8px 11px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 13px; outline: none; background: rgba(255, 255, 255, 0.85);" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='var(--border-color)'">
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 4px; display: block; letter-spacing: 0.5px;">Category</label>
+                            <select id="new-global-tag-category" style="width: 100%; padding: 8px 11px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 13px; background: rgba(255, 255, 255, 0.85); outline: none; cursor: pointer;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='var(--border-color)'">
+                                <option value="Views & Location">Views & Location</option>
+                                <option value="Features & Amenities">Features & Amenities</option>
+                                <option value="Investment & Legal">Investment & Legal</option>
+                                <option value="Style & Quality">Style & Quality</option>
+                                <option value="Custom" selected>Custom</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 4px; display: block; letter-spacing: 0.5px;">Color</label>
+                            <input type="color" id="new-global-tag-color" value="#6366f1" style="width: 100%; height: 36px; padding: 2px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; background: transparent;">
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button type="button" onclick="submitCreateGlobalTag()" class="btn btn-primary" style="padding: 9px 18px; font-size: 13px;">Save Tag</button>
+                            <button type="button" onclick="toggleCreateGlobalTagForm(false)" class="btn btn-secondary" style="padding: 9px 16px; font-size: 13px; background: transparent; border: 1px solid var(--border-color);">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+ 
+                <!-- Categorized Tags Container -->
+                <div id="global-tags-categories-list" style="display: flex; flex-direction: column; gap: 16px;">
+                    <div style="text-align: center; color: var(--text-secondary); padding: 30px;"><i class="fas fa-circle-notch fa-spin"></i> Loading Global Tags Library...</div>
+                </div>
+            </div>
+            <!-- Tab 2: Bulk CSV Upload View -->
+            <div id="tags-tab-csv" style="display: none; padding: 24px; overflow-y: auto; flex: 1; background: transparent;">
+                <div style="background: rgba(255, 255, 255, 0.45); border: 1px solid rgba(255, 255, 255, 0.6); border-radius: var(--border-radius); padding: 14px 18px; margin-bottom: 20px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
+                    <div style="font-size: 13px; color: #334155; line-height: 1.5; margin-bottom: 8px;">
+                        <i class="fas fa-info-circle" style="color: #6366f1;"></i> <strong>CSV Upload Format:</strong> Upload a <code>.csv</code> file with columns <code>property_id</code> (or SARDO ID) and <code>tags</code>.
+                    </div>
+                    <div style="background: rgba(255, 255, 255, 0.7); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px; font-family: monospace; font-size: 12px; color: var(--text-primary);">
+                        property_id,tags<br>
+                        SARDO1099,"micro location, macro location, sea view, golf course views"<br>
+                        405,"macro location, golf course views"<br>
+                        1004,"sea view"
+                    </div>
+                    <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
+                        <a href="javascript:void(0)" id="btn-download-csv-template" style="font-size: 12px; font-weight: 600; color: var(--accent-hover); text-decoration: underline; display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="fas fa-file-download"></i> Download CSV Template with Current Properties
+                        </a>
+                    </div>
+                </div>
+
+                <form id="tags-upload-form">
+                    <!-- File drop area -->
+                    <div id="tags-dropzone" style="border: 2px dashed var(--border-color); border-radius: var(--border-radius); padding: 32px; text-align: center; background: rgba(255, 255, 255, 0.5); cursor: pointer; transition: var(--transition-smooth);" onclick="document.getElementById('tags-csv-file').click()" ondragover="event.preventDefault(); this.style.borderColor='var(--accent-color)'; this.style.background='rgba(99, 102, 241, 0.05)';" ondragleave="this.style.borderColor='var(--border-color)'; this.style.background='rgba(255, 255, 255, 0.5)';" ondrop="handleTagFileDrop(event)">
+                        <input type="file" id="tags-csv-file" accept=".csv,.txt" style="display: none;" onchange="handleTagFileSelect(event)">
+                        <i class="fas fa-file-csv" style="font-size: 36px; color: var(--accent-color); margin-bottom: 10px;"></i>
+                        <div id="tags-file-name" style="font-weight: 700; font-size: 14px; color: var(--text-primary);">Click or drag & drop CSV file here</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Supports .csv files with multiple tags per property</div>
+                    </div>
+
+                    <!-- Upload Mode Options -->
+                    <div style="margin-top: 18px;">
+                        <label style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; display: block;">Upload Mode</label>
+                        <div style="display: flex; gap: 20px;">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; color: var(--text-secondary); font-weight: 500;">
+                                <input type="radio" name="tag_upload_mode" value="replace" checked style="accent-color: var(--accent-color);"> Overwrite existing tags
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; color: var(--text-secondary); font-weight: 500;">
+                                <input type="radio" name="tag_upload_mode" value="append" style="accent-color: var(--accent-color);"> Append to existing tags
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Action buttons -->
+                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 18px;">
+                        <button type="button" onclick="closeTagUploadModal()" class="btn btn-secondary" style="background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary);">Cancel</button>
+                        <button type="button" id="btn-submit-tags-upload" onclick="submitTagUploadForm(event)" class="btn btn-primary" style="display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-upload"></i> Upload & Apply Tags
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Results Report Container -->
+                <div id="tags-upload-results" style="display: none; margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+                    <!-- Filled dynamically via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js 4.4.0, served locally so the dashboard never depends on a
+         third-party CDN being reachable from the browser. -->
+    <script src="/static/js/vendor/chart.umd.min.js?v=4.4.0"></script>
+
+    <script src="/static/js/main.js?v=6.0"></script>
+    <script src="/static/js/pages/market_intelligence.js?v=5.2"></script>
+    <script>
+        // Simple Toast logic
+        // Supports both: showToast(title, message, type) and showToast(message, type)
+        function showToast(titleOrMessage, messageOrType, type) {
+            const validTypes = ['info', 'success', 'error', 'warning'];
+            let title, message, toastType;
+
+            if (type !== undefined) {
+                // 3-arg call: showToast(title, message, type)
+                title = titleOrMessage;
+                message = messageOrType;
+                toastType = type;
+            } else if (validTypes.includes(messageOrType)) {
+                // 2-arg call: showToast(message, type)
+                title = messageOrType.charAt(0).toUpperCase() + messageOrType.slice(1);
+                message = titleOrMessage;
+                toastType = messageOrType;
+            } else {
+                // 2-arg call: showToast(title, message)
+                title = titleOrMessage;
+                message = messageOrType || '';
+                toastType = 'info';
+            }
+
+            const colorMap = { success: '#10b981', error: '#ef4444', warning: '#f59e0b', info: '#6366f1' };
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${toastType}`;
+            toast.style.cssText = 'background: white; border-radius: 8px; padding: 12px 16px; margin-top: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-left: 4px solid ' + (colorMap[toastType] || '#6366f1');
+            toast.innerHTML = `<div style="font-weight:bold;font-size:14px;color:var(--text-primary);margin-bottom:4px;">${title}</div><div style="font-size:13px;color:var(--text-secondary);">${message}</div>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // Custom Confirm logic
+        function sardoConfirm({ title, body, confirmText = 'Confirm', cancelText = 'Cancel', type = 'warning' }) {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('sardo-confirm-overlay');
+                const box = document.getElementById('sardo-confirm-box');
+                const titleEl = document.getElementById('sardo-confirm-title');
+                const bodyEl = document.getElementById('sardo-confirm-body');
+                const iconEl = document.getElementById('sardo-confirm-icon');
+                const btnOk = document.getElementById('sardo-confirm-ok');
+                const btnCancel = document.getElementById('sardo-confirm-cancel');
+
+                titleEl.textContent = title;
+                bodyEl.innerHTML = body;
+                btnOk.textContent = confirmText;
+                btnCancel.textContent = cancelText;
+
+                const colors = {
+                    danger:  { bg: '#fee2e2', color: '#ef4444', icon: 'fas fa-trash-alt' },
+                    warning: { bg: '#fef3c7', color: '#f59e0b', icon: 'fas fa-exclamation-triangle' },
+                    success: { bg: '#d1fae5', color: '#10b981', icon: 'fas fa-check' }
+                };
+                const theme = colors[type] || colors.warning;
+
+                iconEl.style.backgroundColor = theme.bg;
+                iconEl.style.color = theme.color;
+                iconEl.innerHTML = `<i class="${theme.icon}"></i>`;
+                
+                btnOk.style.backgroundColor = theme.color;
+                btnOk.style.borderColor = theme.color;
+                btnOk.style.color = 'white';
+
+                overlay.style.display = 'flex';
+                requestAnimationFrame(() => {
+                    box.style.transform = 'scale(1)';
+                    box.style.opacity = '1';
+                });
+
+                const cleanup = (result) => {
+                    box.style.transform = 'scale(0.9)';
+                    box.style.opacity = '0';
+                    setTimeout(() => {
+                        overlay.style.display = 'none';
+                        btnOk.removeEventListener('click', onOk);
+                        btnCancel.removeEventListener('click', onCancel);
+                        resolve(result);
+                    }, 200);
+                };
+
+                const onOk = () => cleanup(true);
+                const onCancel = () => cleanup(false);
+
+                btnOk.addEventListener('click', onOk);
+                btnCancel.addEventListener('click', onCancel);
+            });
+        }
+
+        // Profile Dropdown logic
+        function toggleProfileMenu(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('profileDropdownMenu');
+            const isVisible = menu.style.display === 'block';
+            menu.style.display = isVisible ? 'none' : 'block';
+            if (!isVisible) fetchMfaStatus();
+        }
+
+        document.addEventListener('click', function(e) {
+            const menu = document.getElementById('profileDropdownMenu');
+            const btn = document.getElementById('profileToggleBtn');
+            if (menu.style.display === 'block' && !menu.contains(e.target) && !btn.contains(e.target)) {
+                menu.style.display = 'none';
+            }
+        });
+
+        // MFA API logic
+        let mfaIsTotpEnabled = false;
+
+        async function fetchMfaStatus() {
+            try {
+                const token = localStorage.getItem('access_token');
+                const headers = {};
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+                
+                const res = await fetch('/api/auth/mfa/status', { headers });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    mfaIsTotpEnabled = data.totp_enabled;
+                    const badge = document.getElementById('mfa-status-badge');
+                    const btn = document.getElementById('btn-toggle-mfa');
+                    
+                    btn.style.display = 'flex';
+                    
+                    if (mfaIsTotpEnabled) {
+                        badge.textContent = 'Enabled';
+                        badge.style.color = '#059669';
+                        badge.style.background = 'rgba(16, 185, 129, 0.12)';
+                        btn.textContent = 'Disable 2FA';
+                        btn.className = 'btn btn-secondary';
+                        btn.style.color = '#dc2626';
+                    } else {
+                        badge.textContent = 'Disabled';
+                        badge.style.color = '#64748b';
+                        badge.style.background = '#f1f5f9';
+                        btn.textContent = 'Enable 2FA';
+                        btn.className = 'btn btn-primary';
+                        btn.style.color = '';
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to fetch MFA status', err);
+            }
+        }
+
+        async function handleMfaToggle() {
+            const token = localStorage.getItem('access_token');
+            const headers = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            if (mfaIsTotpEnabled) {
+                // Disable MFA
+                const confirmed = await sardoConfirm({
+                    title: 'Disable Authenticator App?',
+                    body: 'Your account will no longer require a TOTP code from Google Authenticator to log in.',
+                    confirmText: 'Disable 2FA',
+                    cancelText: 'Keep Enabled',
+                    type: 'danger'
+                });
+                
+                if (confirmed) {
+                    const res = await fetch('/api/auth/mfa/totp/disable', {
+                        method: 'POST',
+                        headers
+                    });
+                    if (res.ok) {
+                        showToast('Authenticator Disabled', '2FA has been removed from your account.', 'success');
+                        fetchMfaStatus();
+                    } else {
+                        showToast('Error', 'Failed to disable 2FA.', 'error');
+                    }
+                }
+            } else {
+                // Enable MFA (Show setup modal)
+                const res = await fetch('/api/auth/mfa/totp/setup', { headers });
+                const data = await res.json();
+                
+                if (res.ok && data.qr_code) {
+                    document.getElementById('mfa-qr-code').src = data.qr_code;
+                    document.getElementById('mfa-verify-code').value = '';
+                    document.getElementById('mfa-backup-codes-container').style.display = 'none';
+                    document.getElementById('mfa-setup-modal').style.display = 'flex';
+                }
+            }
+            
+            // Close dropdown
+            document.getElementById('profileDropdownMenu').style.display = 'none';
+        }
+
+        async function verifyMfaSetup() {
+            const token = localStorage.getItem('access_token');
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            
+            const code = document.getElementById('mfa-verify-code').value.trim();
+            if (!code) return;
+            
+            const res = await fetch('/api/auth/mfa/totp/verify-setup', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ code })
+            });
+            const data = await res.json();
+            
+            if (res.ok) {
+                showToast('Authenticator Enabled', 'Your account is now protected with 2FA.', 'success');
+                document.getElementById('mfa-backup-codes').innerHTML = data.backup_codes.join(' &nbsp; ');
+                document.getElementById('mfa-backup-codes-container').style.display = 'block';
+                fetchMfaStatus();
+            } else {
+                showToast('Invalid Code', data.error || 'The code you entered is incorrect.', 'error');
+            }
+        }
+
+        function closeMfaModal() {
+            document.getElementById('mfa-setup-modal').style.display = 'none';
+        }
+
+        // Manual Off-Market Property UI Logic
+        function openCreateManualModal() {
+            document.getElementById('manual-modal-title').innerHTML = 'Add VIP Off-Market Asset';
+            const sub = document.getElementById('manual-modal-subtitle');
+            if (sub) sub.innerText = 'Confidential property registration & private client portfolio management';
+            document.getElementById('manual-property-form').reset();
+            document.getElementById('manual-prop-id').value = '';
+            document.getElementById('manual-docs-section').style.display = 'block';
+            document.getElementById('manual-docs-list').innerHTML = '<div style="color:var(--text-secondary); font-size:13px; grid-column: 1/-1;">Select files above. They will be uploaded automatically when you save the property.</div>';
+            document.getElementById('manual-property-modal').style.display = 'flex';
+        }
+
+        async function openEditManualModal(id) {
+            const propModal = document.getElementById('property-modal');
+            if (propModal) propModal.style.display = 'none';
+            
+            document.getElementById('manual-modal-title').innerHTML = 'Edit VIP Off-Market Asset';
+            const sub = document.getElementById('manual-modal-subtitle');
+            if (sub) sub.innerText = 'Updating confidential listing details & attached media';
+            document.getElementById('manual-property-form').reset();
+            document.getElementById('manual-prop-id').value = id;
+
+            try {
+                const res = await fetch(`/api/properties/${id}`);
+                if (!res.ok) throw new Error('Failed to load property');
+                const p = await res.json();
+                
+                document.getElementById('manual-title').value = p.title || '';
+                document.getElementById('manual-type').value = p.property_type || 'Villa';
+                document.getElementById('manual-status').value = p.property_status || 'Off Market';
+                document.getElementById('manual-price').value = p.property_price || '';
+                document.getElementById('manual-visibility').value = p.market_visibility || 'off_market';
+                document.getElementById('manual-bedrooms').value = p.num_beds || '';
+                document.getElementById('manual-bathrooms').value = p.num_baths || '';
+                document.getElementById('manual-living').value = p.living_area || '';
+                document.getElementById('manual-land').value = p.land_area || '';
+                document.getElementById('manual-location').value = p.location || '';
+                document.getElementById('manual-resort-area').value = p.resort_area || '';
+                document.getElementById('manual-sub-area').value = p.sub_area || '';
+                document.getElementById('manual-address').value = p.address || '';
+                document.getElementById('manual-coordinates').value = p.coordinates || '';
+                document.getElementById('manual-construction-year').value = p.construction_year || '';
+                document.getElementById('manual-renovation-year').value = p.renovation_year || '';
+                document.getElementById('manual-energy-rating').value = p.energy_rating || '';
+                document.getElementById('manual-contact-name').value = p.source_contact_name || '';
+                document.getElementById('manual-contact-email').value = p.source_contact_email || '';
+                document.getElementById('manual-contact-phone').value = p.source_contact_phone || '';
+                document.getElementById('manual-source-agent').value = p.source_agent || '';
+                document.getElementById('manual-introduced-by').value = p.introduced_by || '';
+                document.getElementById('manual-reference').value = p.reference || '';
+                document.getElementById('manual-notes').value = p.notes || '';
+
+                document.getElementById('manual-docs-section').style.display = 'block';
+                loadManualDocuments(id);
+                document.getElementById('manual-property-modal').style.display = 'flex';
+            } catch (err) {
+                showToast('Error', err.message, 'error');
+            }
+        }
+
+        function closeManualPropertyModal() {
+            document.getElementById('manual-property-modal').style.display = 'none';
+        }
+
+        async function handleManualPropertySubmit(event, confirmDuplicate = false) {
+            if (event && event.preventDefault) event.preventDefault();
+            
+            const id = document.getElementById('manual-prop-id').value;
+            const isEdit = !!id;
+
+            const payload = {
+                title: document.getElementById('manual-title').value.trim(),
+                property_type: document.getElementById('manual-type').value,
+                property_status: document.getElementById('manual-status').value,
+                price: parseFloat(document.getElementById('manual-price').value) || 0,
+                market_visibility: document.getElementById('manual-visibility').value,
+                bedrooms: parseInt(document.getElementById('manual-bedrooms').value) || 0,
+                bathrooms: parseInt(document.getElementById('manual-bathrooms').value) || 0,
+                living_area: parseFloat(document.getElementById('manual-living').value) || null,
+                land_area: parseFloat(document.getElementById('manual-land').value) || null,
+                location: document.getElementById('manual-location').value.trim(),
+                resort_area: document.getElementById('manual-resort-area').value.trim(),
+                sub_area: document.getElementById('manual-sub-area').value.trim(),
+                address: document.getElementById('manual-address').value.trim(),
+                coordinates: document.getElementById('manual-coordinates').value.trim(),
+                construction_year: parseInt(document.getElementById('manual-construction-year').value) || null,
+                renovation_year: parseInt(document.getElementById('manual-renovation-year').value) || null,
+                energy_rating: document.getElementById('manual-energy-rating').value.trim(),
+                source_contact_name: document.getElementById('manual-contact-name').value.trim(),
+                source_contact_email: document.getElementById('manual-contact-email').value.trim(),
+                source_contact_phone: document.getElementById('manual-contact-phone').value.trim(),
+                source_agent: document.getElementById('manual-source-agent').value.trim(),
+                introduced_by: document.getElementById('manual-introduced-by').value.trim(),
+                reference: document.getElementById('manual-reference').value.trim(),
+                notes: document.getElementById('manual-notes').value.trim(),
+                confirm_duplicate: confirmDuplicate
+            };
+
+            const url = isEdit ? `/api/properties/manual/${id}` : '/api/properties/manual';
+            const method = isEdit ? 'PUT' : 'POST';
+
+            try {
+                const res = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await res.json();
+
+                if (res.status === 409 && data.duplicate_warning) {
+                    const confirmed = await sardoConfirm({
+                        title: 'Potential Duplicate Detected',
+                        body: `Similar public listing(s) found in this location with similar specs.<br><br><strong>${data.error || 'Duplicate detected'}</strong><br><br>Are you sure you want to proceed creating this off-market property?`,
+                        confirmText: 'Proceed Anyway',
+                        cancelText: 'Cancel',
+                        type: 'warning'
+                    });
+                    if (confirmed) {
+                        return handleManualPropertySubmit(event, true);
+                    }
+                    return;
+                }
+
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to save property.');
+                }
+
+                showToast('Success', isEdit ? 'Property updated successfully.' : 'Property created successfully.', 'success');
+                
+                const fileInput = document.getElementById('manual-file-input');
+                const savedPropId = isEdit ? id : (data.property_id || null);
+                
+                if (fileInput && fileInput.files && fileInput.files.length > 0 && savedPropId) {
+                    const typeSelect = document.getElementById('manual-file-type');
+                    const formData = new FormData();
+                    formData.append('file', fileInput.files[0]);
+                    formData.append('document_type', typeSelect ? typeSelect.value : 'Image');
+                    try {
+                        await fetch(`/api/properties/${savedPropId}/documents`, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        fileInput.value = '';
+                    } catch (e) {
+                        console.error('Error uploading file after save:', e);
+                    }
+                }
+
+                // Reload the table AFTER upload is complete so image is visible
+                const btnSearch = document.getElementById('btn-search');
+                if (btnSearch) btnSearch.click();
+
+                if (typeof refreshStatsUI === 'function') await refreshStatsUI();
+
+                if (!isEdit && savedPropId) {
+                    showToast('Saved', 'Property saved and file attached.', 'info');
+                    closeManualPropertyModal();
+                } else {
+                    if (isEdit && id) loadManualDocuments(id);
+                    closeManualPropertyModal();
+                }
+            } catch (err) {
+                showToast('Save Error', err.message, 'error');
+            }
+        }
+
+        async function deleteManualPropertyConfirm(id) {
+            const confirmed = await sardoConfirm({
+                title: 'Delete Property?',
+                body: 'Are you sure you want to permanently delete this manual property and its attached documents? This action cannot be undone.',
+                confirmText: 'Delete',
+                cancelText: 'Cancel',
+                type: 'danger'
+            });
+            if (!confirmed) return;
+
+            try {
+                const res = await fetch(`/api/properties/manual/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Failed to delete property.');
+                
+                showToast('Deleted', 'Property deleted successfully.', 'success');
+                const propModal = document.getElementById('property-modal');
+                if (propModal) propModal.style.display = 'none';
+                const btnSearch = document.getElementById('btn-search');
+                if (btnSearch) btnSearch.click();
+                if (typeof refreshStatsUI === 'function') await refreshStatsUI();
+            } catch (err) {
+                showToast('Error', err.message, 'error');
+            }
+        }
+
+        async function refreshStatsUI() {
+            try {
+                const res = await fetch('/api/metadata');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.stats) {
+                        const headlineTotal = data.stats.active_properties !== undefined ? data.stats.active_properties : data.stats.total_properties;
+                        const statTotal = document.getElementById('stat-total');
+                        const statAvg = document.getElementById('stat-avg');
+                        if (statTotal) statTotal.innerText = headlineTotal.toLocaleString();
+                        if (statAvg) statAvg.innerText = '€' + Number(data.stats.avg_price || 0).toLocaleString(undefined, {maximumFractionDigits:0});
+                    }
+                }
+            } catch (e) { console.error('Error refreshing stats:', e); }
+        }
+
+        async function loadManualDocuments(propId) {
+            const container = document.getElementById('manual-docs-list');
+            if (!container) return;
+            container.innerHTML = '<div style="color:var(--text-secondary); font-size:13px;">Loading documents...</div>';
+            
+            try {
+                const res = await fetch(`/api/properties/${propId}/documents`);
+                const data = await res.json();
+                const docs = data.documents || [];
+                
+                if (docs.length === 0) {
+                    container.innerHTML = '<div style="color:var(--text-secondary); font-size:13px; grid-column: 1/-1;">No documents attached yet.</div>';
+                    return;
+                }
+
+                container.innerHTML = docs.map(d => `
+                    <div style="border:1px solid var(--border-color); border-radius:8px; padding:10px; background:#f8fafc; display:flex; flex-direction:column; justify-content:space-between; gap:8px;">
+                        <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
+                            <i class="fas ${d.document_type === 'Image' ? 'fa-image' : 'fa-file-alt'}" style="color:var(--primary-color); font-size:18px; flex-shrink:0;"></i>
+                            <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; font-weight:600;" title="${d.filename || 'Document'}">${d.filename || 'Document'}</div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--text-secondary);">
+                            <span>${d.document_type || 'File'}</span>
+                            <div>
+                                ${d.display_url ? `<a href="${d.display_url}" target="_blank" style="color:var(--primary-color); margin-right:8px;" title="View/Download"><i class="fas fa-external-link-alt"></i></a>` : ''}
+                                <button type="button" onclick="deleteManualDoc(${d.id})" style="background:none; border:none; color:#ef4444; cursor:pointer;" title="Delete"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = '<div style="color:#ef4444; font-size:13px;">Failed to load documents.</div>';
+            }
+        }
+
+        async function uploadManualDocument() {
+            const fileInput = document.getElementById('manual-file-input');
+            const typeSelect = document.getElementById('manual-file-type');
+            const propId = document.getElementById('manual-prop-id').value;
+
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showToast('Warning', 'Please select a file to upload.', 'warning');
+                return;
+            }
+            if (!propId) {
+                showToast('Info', 'Saving property first to attach file...', 'info');
+                await handleManualPropertySubmit(null);
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('document_type', typeSelect.value);
+
+            try {
+                const res = await fetch(`/api/properties/${propId}/documents`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Upload failed');
+                
+                showToast('Success', 'Document uploaded successfully.', 'success');
+                fileInput.value = '';
+                loadManualDocuments(propId);
+            } catch (err) {
+                showToast('Upload Error', err.message, 'error');
+            }
+        }
+
+        async function deleteManualDoc(docId) {
+            try {
+                const res = await fetch(`/api/properties/documents/${docId}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Delete failed');
+                
+                showToast('Deleted', 'Document removed.', 'success');
+                const propId = document.getElementById('manual-prop-id').value;
+                if (propId) loadManualDocuments(propId);
+            } catch (err) {
+                showToast('Error', err.message, 'error');
+            }
+        }
+
+        async function loadPropertyDocumentsForModal(propId) {
+            const container = document.getElementById('modal-docs-list');
+            if (!container) return;
+            
+            try {
+                const res = await fetch(`/api/properties/${propId}/documents`);
+                const data = await res.json();
+                const docs = data.documents || [];
+                
+                if (docs.length === 0) {
+                    container.innerHTML = '<span style="color:var(--text-secondary); font-size:13px;">No documents attached.</span>';
+                    return;
+                }
+
+                container.innerHTML = docs.map(d => `
+                    <a href="${d.display_url || '#'}" target="_blank" style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px; background:#f1f5f9; border:1px solid var(--border-color); border-radius:6px; text-decoration:none; color:var(--text-primary); font-size:12px; font-weight:600;">
+                        <i class="fas ${d.document_type === 'Image' ? 'fa-image' : 'fa-file-pdf'}" style="color:var(--primary-color);"></i>
+                        ${d.filename || 'Document'} (${d.document_type || 'File'})
+                    </a>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = '<span style="color:#ef4444; font-size:13px;">Could not load documents.</span>';
+            }
+        }
+    </script>
+</body>
+
+</html>

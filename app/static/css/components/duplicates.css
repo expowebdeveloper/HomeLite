@@ -1,0 +1,79 @@
+/* Ultimate Premium Duplicate Badge (Table) */
+.btn-duplicate {
+    position: relative;
+    background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+    color: var(--accent-hover);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 800;
+    margin-left: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    box-shadow: 
+        2px 2px 0px 0px rgba(99, 102, 241, 0.2), 
+        4px 4px 0px 0px rgba(99, 102, 241, 0.1);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-duplicate:hover {
+    background: var(--accent-hover);
+    color: #ffffff;
+    border-color: var(--accent-hover);
+    transform: translate(-2px, -2px);
+    box-shadow: 
+        4px 4px 0px 0px rgba(99, 102, 241, 0.3), 
+        8px 8px 0px 0px rgba(99, 102, 241, 0.1);
+}
+
+.btn-duplicate i {
+    font-size: 9px;
+    transition: transform 0.3s ease;
+}
+
+.btn-duplicate:hover i {
+    transform: rotate(-12deg) scale(1.15);
+}
+
+/* Premium Duplicate Card Button (Grid Card) */
+.btn-duplicate-card {
+    background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+    color: var(--accent-hover);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    width: calc(100% - 6px);
+    margin-right: 6px;
+    box-shadow: 
+        2px 2px 0px 0px rgba(99, 102, 241, 0.15), 
+        4px 4px 0px 0px rgba(99, 102, 241, 0.08);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-duplicate-card:hover {
+    background: var(--accent-hover);
+    color: #ffffff;
+    border-color: var(--accent-hover);
+    transform: translate(-2px, -2px);
+    box-shadow: 
+        4px 4px 0px 0px rgba(99, 102, 241, 0.25), 
+        8px 8px 0px 0px rgba(99, 102, 241, 0.12);
+}
+
+.btn-duplicate-card i {
+    transition: transform 0.3s ease;
+}
+
+.btn-duplicate-card:hover i {
+    transform: rotate(-12deg) scale(1.15);
+}

@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+
+import os
+import sys
+
+# Run directly from the project root: python migrations/<name>.py
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 """
 Migration 008: Global Tags Library Schema & Seeding
 Creates the global_tags table and pre-seeds it with curated real estate tags.

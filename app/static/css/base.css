@@ -1,0 +1,126 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+    /* Premium Color Palette */
+    --primary-color: #0f172a;
+    /* Slate 900 */
+    --secondary-color: #334155;
+    /* Slate 700 */
+    --accent-color: #6366f1;
+    /* Indigo 500 */
+    --accent-hover: #4f46e5;
+    /* Indigo 600 */
+    --accent-light: rgba(99, 102, 241, 0.1);
+
+    /* SARDO360 Brand Palette (client-specified) */
+    --sardo-navy-900: #071A33;
+    --sardo-navy-800: #0B2545;
+    --sardo-navy-700: #163A63;
+
+    --sardo-blue-500: #4F7196;
+    --sardo-blue-300: #8299B2;
+    --sardo-blue-200: #B7C3D0;
+    --sardo-blue-100: #DDE5EE;
+
+    --sardo-gold-500: #D3A24A;
+    --sardo-gold-200: #F1E3C4;
+
+    --sardo-charcoal: #34383D;
+    --sardo-grey-600: #69727D;
+    --sardo-grey-400: #A8AFB5;
+    --sardo-grey-200: #E3E6E8;
+
+    --sardo-white: #FFFFFF;
+    --sardo-warm-white: #FAFAF8;
+
+    --sardo-success: #2E8B67;
+    --sardo-warning: #D3A24A;
+    --sardo-danger: #B84A4A;
+
+    /* Legacy aliases kept so older rules keep resolving */
+    --sardo-blue-light: var(--sardo-blue-100);
+    --sardo-blue: var(--sardo-blue-500);
+
+    --danger-color: #ef4444;
+    /* Red 500 */
+    --danger-hover: #dc2626;
+    --success-color: #10b981;
+    /* Emerald 500 */
+    --success-hover: #059669;
+
+    --bg-color: #e2e8f0;
+    /* Slate 200 */
+    --surface-color: rgba(255, 255, 255, 0.65);
+    --surface-hover: rgba(255, 255, 255, 0.85);
+
+    --text-primary: #1e293b;
+    /* Slate 800 */
+    --text-secondary: #64748b;
+    /* Slate 500 */
+    --border-color: #e2e8f0;
+    /* Slate 200 */
+
+    --border-radius-sm: 6px;
+    --border-radius: 12px;
+    --border-radius-lg: 20px;
+
+    /* Smooth Shadows */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-hover: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+    --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+body {
+    font-family: 'Outfit', sans-serif;
+    background-color: var(--bg-color);
+    background-image:
+        radial-gradient(at 0% 0%, hsla(253, 16%, 85%, 1) 0, transparent 50%),
+        radial-gradient(at 50% 0%, hsla(225, 39%, 90%, 1) 0, transparent 50%),
+        radial-gradient(at 100% 0%, hsla(339, 49%, 90%, 1) 0, transparent 50%),
+        radial-gradient(at 0% 100%, hsla(210, 100%, 90%, 1) 0, transparent 50%),
+        radial-gradient(at 100% 100%, hsla(160, 50%, 90%, 1) 0, transparent 50%);
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-attachment: fixed;
+    color: var(--text-primary);
+    line-height: 1.6;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 15px 20px 20px 20px;
+    gap: 15px;
+}

@@ -1,82 +1,94 @@
-# SARDO360 - Property Insight
+# SARDO360 — Property Insight
 
-SARDO360 is a premium real estate property insight platform. It provides a highly optimized, glassy dashboard to view, filter, and export real estate listings fetched from various sources. 
+Flask application for aggregating, de-duplicating and analysing luxury property
+listings scraped from multiple Algarve agencies.
 
-The platform features an invite-only authentication system, dynamic frontend/backend pagination, and high-fidelity PDF and Excel export functionalities.
-
-## Features
-
-- **Secure Authentication**: Invite-only access via CLI user creation. Secure session management using `Flask-Login`.
-- **High-Performance Pagination**: Efficient data fetching using SQL `LIMIT` and `OFFSET` queries.
-- **Glassmorphism UI**: A stunning, premium aesthetic featuring dynamic mesh background gradients and translucent frosted glass panels.
-- **Rich Filtering**: Filter properties by price, location, type, bedrooms, and bathrooms.
-- **Reporting**: Generate premium PDF property reports and Excel exports.
-- **Dynamic Views**: Toggle between a dense data table and a visual grid of property cards.
-
-## Prerequisites
-
-- **Python 3.10+**
-- **PostgreSQL**: Used as the primary database.
-- **AWS S3**: Used for storing property images.
-
-## Setup Instructions
-
-### 1. Clone & Environment
-
-Clone the repository and set up a virtual environment:
+## Running it
 
 ```bash
-cd SARDO360
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### 2. Install Dependencies
-
-```bash
+python -m venv venv
+venv/Scripts/activate            # Windows;  source venv/bin/activate on Unix
 pip install -r requirements.txt
+
+cp env.example .env              # then fill in the values
+python run.py                    # http://localhost:5002
 ```
 
-### 3. Configuration
-
-Copy the example environment file and fill in your details:
+Production uses a real WSGI server and never enables debug:
 
 ```bash
-cp .env.example .env
+gunicorn --bind 0.0.0.0:5002 wsgi:app
 ```
 
-Ensure you configure the PostgreSQL credentials, AWS keys, and define a strong `SECRET_KEY` for Flask sessions.
-
-### 4. Database Initialization
-
-Ensure PostgreSQL is running, then run the database setup script to initialize the schema:
+## Tests
 
 ```bash
-python setup_database.py
+python tests/test_smoke.py       # no test framework required
+pytest tests/                    # pip install -r requirements-dev.txt
 ```
 
-### 5. Create an Administrator Account
+The smoke suite asserts that every route is registered, the data layer exposes
+its full method surface, pages render, every split stylesheet is served, and the
+main APIs answer with the expected shape. It talks to the real database, so it
+needs a working `.env`.
 
-Because there is no public signup page, you must create a user via the command line to access the dashboard:
+## Layout
 
-```bash
-python create_user.py
 ```
-Follow the interactive prompts to set your username and password.
+run.py / wsgi.py          entry points (dev / production)
+config.py, database.py    thin re-export shims kept so scripts/ and migrations/
+                          keep working; the real code lives in app/
 
-## Running the Application
+app/
+  __init__.py             create_app() — blueprints, hooks, error handlers
+  config.py               every setting, read from the environment
+  extensions.py           shared singletons (db, S3, mailer, PDF, login manager)
 
-Start the Flask development server:
+  routes/                 one blueprint per area of the URL space
+    pages.py              /, /reports, /scraper-logs
+    auth.py               login, OTP, TOTP/MFA, sessions
+    properties.py         search, detail, tags, manual records, documents
+    market_intelligence.py  the analytics dashboard API
+    scrapers.py           scraper activity and log streaming
+    exports.py            PDF and Excel export
 
-```bash
-python app.py
+  repositories/           data access, one module per domain, recomposed into a
+                          single DatabaseManager in __init__.py
+  services/               business logic: auth, email, exports, PDF, S3, grouping
+  utils/                  formatting, request helpers, security primitives
+  models/                 the Flask-Login user model
+
+  templates/
+    pages/                one file per rendered page
+    components/           shared partials (document head, stylesheet links)
+    legacy/               kept but not rendered by any route
+  static/
+    css/                  base, layout, utilities, responsive, components/, pages/
+    js/                   main.js, pages/, vendor/
+    assets/  images/  pdfs/
+
+migrations/               numbered schema migrations, run directly
+scripts/                  one-off maintenance scripts, run directly
+tests/                    smoke tests
+fonts/                    TTFs registered by the PDF generator
 ```
 
-Navigate to `http://127.0.0.1:5000` in your browser. You will be redirected to the secure login portal.
+### Notes on the structure
 
-## Technologies Used
+- **Repositories are mixins.** `DatabaseManager` is composed from one mixin per
+  domain, so every existing `db_manager.<method>()` call site works unchanged
+  while each domain lives in its own file.
+- **Stylesheets are split but order-dependent.** The files in `static/css`
+  concatenate, in the order listed in `templates/components/stylesheets.html`,
+  to exactly the CSS that used to live in one `style.css`. Re-ordering those
+  links changes the cascade.
+- **Endpoints are blueprint-qualified.** `url_for` needs the prefix:
+  `url_for('pages.index')`, `url_for('auth.logout')`.
 
-- **Backend**: Python, Flask, psycopg2, SQLAlchemy (via dependencies).
-- **Database**: PostgreSQL.
-- **Frontend**: HTML5, Vanilla JavaScript, CSS3 (Custom Glassmorphism Design System).
-- **Exports**: ReportLab (PDF), pandas/openpyxl (Excel).
+## Configuration
+
+Every setting is read from the environment in `app/config.py`; `env.example`
+documents all of them. Several security keys fall back to a value hard-coded in
+that file — the app logs a warning at startup for each one still on its default.
+Set `FLASK_SECRET_KEY`, `SECRET_KEY`, `JWT_SECRET_KEY` and `MFA_ENCRYPTION_KEY`
+in `.env` before deploying.

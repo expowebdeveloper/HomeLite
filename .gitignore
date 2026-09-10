@@ -213,3 +213,8 @@ __marimo__/
 branch_structure.json
 temp_auto_push.bat
 temp_interactive_push.bat
+
+# The bundled report template ships with the application. The blanket *.pdf
+# rule above is meant for generated reports, not this asset -- without this
+# exception the file silently drops out of version control.
+!app/static/pdfs/*.pdf

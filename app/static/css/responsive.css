@@ -1,0 +1,119 @@
+/* ===== Responsive ===== */
+
+/* Large screens — shrink preview */
+@media (max-width: 1500px) {
+    .preview-panel {
+        width: 260px;
+        min-width: 260px;
+        padding: 16px;
+    }
+
+    .preview-panel h3 {
+        font-size: 1rem;
+        margin-bottom: 14px;
+        padding-bottom: 10px;
+    }
+}
+
+/* Hide preview panel to give table breathing room */
+@media (max-width: 1300px) {
+    .preview-panel {
+        display: none !important;
+    }
+}
+
+/* Tablets */
+@media (max-width: 1100px) {
+
+    body {
+        height: auto;
+        overflow-y: auto;
+    }
+
+    .app-container {
+        height: auto;
+        min-height: 100vh;
+    }
+
+    .main-content {
+        flex-direction: column;
+        overflow: visible;
+    }
+
+    .mobile-filter-toggle {
+        display: flex;
+    }
+
+    .sidebar {
+        display: none;
+        width: 100%;
+        min-width: unset;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 100;
+        border-radius: 0;
+        padding: 20px;
+        overflow-y: auto;
+        background: rgba(255, 255, 255, 0.97);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+    }
+
+    .sidebar.open {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .sidebar-close-btn {
+        display: flex;
+    }
+
+    .export-section {
+        grid-column: 1 / -1;
+    }
+
+    .preview-panel {
+        display: none !important;
+    }
+
+    .header-controls {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .pagination-controls {
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+        padding: 12px;
+    }
+
+    .pagination-center {
+        order: -1;
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 20px;
+    }
+
+    .preview-panel h3 {
+        width: 100%;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .image-wrapper {
+        width: 300px;
+        flex-shrink: 0;
+    }
+
+    .preview-details {
+        margin-top: 0;
+        flex: 1;
+        min-width: 100px;
+    }
+}
