@@ -237,9 +237,29 @@
         return filters;
     }
 
-    async function fetchMarketIntelligence() {
+    /**
+     * Toggle the dashboard's skeleton state.
+     *
+     * The endpoint runs seven aggregate queries, so a first load takes a
+     * noticeable moment. Cards keep their size and shimmer in place, which
+     * avoids both an empty-looking dashboard and any reflow when data lands.
+     */
+    function setLoading(on) {
+        const wrapper = document.getElementById('view-mi-container');
+        if (wrapper) wrapper.classList.toggle('is-loading', on);
+
+        const stamp = document.getElementById('mi-last-updated');
+        if (stamp) {
+            if (on) stamp.textContent = 'Loading dashboard…';
+            if (stamp.parentElement) stamp.parentElement.classList.toggle('is-loading', on);
+        }
+
         const refreshBtn = document.getElementById('mi-refresh');
-        if (refreshBtn) refreshBtn.classList.add('spinning');
+        if (refreshBtn) refreshBtn.classList.toggle('spinning', on);
+    }
+
+    async function fetchMarketIntelligence() {
+        setLoading(true);
 
         const controller = new AbortController();
         if (inFlight) inFlight.abort();
@@ -269,8 +289,12 @@
                 showToast('Market Intelligence', 'Could not load dashboard data: ' + err.message, 'error');
             }
         } finally {
-            if (inFlight === controller) inFlight = null;
-            if (refreshBtn) refreshBtn.classList.remove('spinning');
+            // A superseded request must not switch the skeleton off while its
+            // replacement is still running.
+            if (inFlight === controller) {
+                inFlight = null;
+                setLoading(false);
+            }
         }
     }
 
@@ -743,7 +767,9 @@
         syncFromSidebar();
 
         if (!wasActive || !latest) {
-            // Let the panel lay out before Chart.js measures its canvases.
+            // Skeleton goes up immediately; the fetch waits a beat so the panel
+            // is laid out before Chart.js measures its canvases.
+            setLoading(true);
             setTimeout(fetchMarketIntelligence, 60);
         } else {
             // Charts must be redrawn: they were sized while hidden.

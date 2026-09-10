@@ -648,6 +648,53 @@
 }
 
 /* --------------------------------------------------------------------------
+   Loading state
+   The dashboard fetches several aggregates at once, so the cards keep their
+   layout and are covered by a shimmer while it runs. Nothing reflows when the
+   data lands, and the empty "--" placeholders never flash on screen.
+   -------------------------------------------------------------------------- */
+.mi-dashboard-wrapper.is-loading .mi-kpi-card,
+.mi-dashboard-wrapper.is-loading .mi-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.mi-dashboard-wrapper.is-loading .mi-kpi-card::after,
+.mi-dashboard-wrapper.is-loading .mi-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(
+        100deg,
+        rgba(255, 255, 255, 0.86) 0%,
+        rgba(227, 230, 232, 0.94) 45%,
+        rgba(255, 255, 255, 0.86) 90%);
+    background-size: 300% 100%;
+    animation: mi-shimmer 1.3s linear infinite;
+}
+
+@keyframes mi-shimmer {
+    from { background-position: 150% 0; }
+    to   { background-position: -150% 0; }
+}
+
+/* Respect a reduced-motion preference: hold a flat tint instead of sweeping. */
+@media (prefers-reduced-motion: reduce) {
+    .mi-dashboard-wrapper.is-loading .mi-kpi-card::after,
+    .mi-dashboard-wrapper.is-loading .mi-card::after {
+        animation: none;
+        background: rgba(250, 250, 248, 0.9);
+    }
+}
+
+.mi-updated.is-loading {
+    color: var(--sardo-blue-500);
+    font-weight: 600;
+}
+
+/* --------------------------------------------------------------------------
    Responsive
    -------------------------------------------------------------------------- */
 @media (max-width: 1500px) {
