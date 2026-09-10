@@ -9,7 +9,7 @@ import psycopg2.extras
 import logging
 import time
 import re
-from typing import List
+from typing import Dict, List
 
 
 class TagsMixin:

@@ -7,7 +7,7 @@ unchanged and are recomposed into a single class in __init__.py.
 import psycopg2
 import psycopg2.extras
 import logging
-from typing import List
+from typing import Dict, List
 
 
 class DocumentsMixin:

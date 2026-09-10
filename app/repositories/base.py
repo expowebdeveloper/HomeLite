@@ -9,7 +9,7 @@ import psycopg2.extras
 
 import logging
 import time
-from typing import Tuple
+from typing import Dict, List, Tuple
 from app.config import Config
 
 

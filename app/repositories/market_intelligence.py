@@ -4,6 +4,8 @@ Split out of the original database.DatabaseManager; the method bodies are
 unchanged and are recomposed into a single class in __init__.py.
 """
 
+from typing import Dict
+
 import psycopg2
 import psycopg2.extras
 import logging

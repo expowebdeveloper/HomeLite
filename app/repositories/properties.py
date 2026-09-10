@@ -9,7 +9,7 @@ import psycopg2.extras
 import logging
 import datetime
 import uuid
-from typing import List, Optional
+from typing import Dict, List, Optional
 from app.config import Config
 
 

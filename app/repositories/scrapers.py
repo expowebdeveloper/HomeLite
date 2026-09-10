@@ -8,7 +8,7 @@ import psycopg2
 import psycopg2.extras
 import logging
 import datetime
-from typing import List
+from typing import Dict, List
 from app.config import Config
 
 
