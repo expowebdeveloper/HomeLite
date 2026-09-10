@@ -407,12 +407,17 @@
                         </div>
                         <div class="mi-filter-field">
                             <label for="mi-filter-price">Price Range</label>
+                            {# Upper bounds are exclusive: the filter applies price <= max,
+                               while the distribution bands are >= lower AND < upper. Without
+                               the -1 a property priced at exactly €10M would be returned by
+                               "€5M – €10M" and then charted in the €10M – €15M band. `price`
+                               is an integer column, so this is exact. #}
                             <select id="mi-filter-price">
                                 <option value="">Any Price</option>
-                                <option value="0-2000000">Under €2M</option>
-                                <option value="2000000-5000000">€2M – €5M</option>
-                                <option value="5000000-10000000">€5M – €10M</option>
-                                <option value="10000000-15000000">€10M – €15M</option>
+                                <option value="0-1999999">Under €2M</option>
+                                <option value="2000000-4999999">€2M – €5M</option>
+                                <option value="5000000-9999999">€5M – €10M</option>
+                                <option value="10000000-14999999">€10M – €15M</option>
                                 <option value="15000000-">€15M+</option>
                             </select>
                         </div>
@@ -1073,7 +1078,7 @@
     <script src="/static/js/vendor/chart.umd.min.js?v=4.4.0"></script>
 
     <script src="/static/js/main.js?v=6.0"></script>
-    <script src="/static/js/pages/market_intelligence.js?v=5.4"></script>
+    <script src="/static/js/pages/market_intelligence.js?v=5.5"></script>
     <script>
         // Simple Toast logic
         // Supports both: showToast(title, message, type) and showToast(message, type)

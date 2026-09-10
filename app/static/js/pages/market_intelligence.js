@@ -855,8 +855,13 @@
                 (meta.locations || []).map((l) => ({ value: l, label: l })), 'All Locations');
             fillSelect(el('mi-filter-type'),
                 (meta.property_types || []).map((t) => ({ value: t, label: t })), 'All Types');
+            // The sidebar's source options carry the FRIENDLY name as their value
+            // (main.js sets option.value = src.label), and applyFilterBar() matches
+            // against those options. Using the raw scraper key here would never
+            // match, so the filter would silently do nothing. The API accepts the
+            // friendly name and expands it to the raw keys server-side.
             fillSelect(el('mi-filter-source'),
-                (meta.sources || []).map((s) => ({ value: s.value, label: s.label })), 'All Sources');
+                (meta.sources || []).map((s) => ({ value: s.label, label: s.label })), 'All Sources');
             syncFromSidebar();
         } catch (err) {
             console.error('[MI] could not load filter options:', err);
@@ -881,7 +886,17 @@
 
     function selectSingle(multi, value) {
         if (!multi) return;
-        Array.from(multi.options).forEach((o) => { o.selected = value ? o.value === value : false; });
+        let matched = false;
+        Array.from(multi.options).forEach((o) => {
+            o.selected = value ? o.value === value : false;
+            matched = matched || o.selected;
+        });
+        // A value that matches no option means the two controls disagree about
+        // what an option's value is, and the filter would quietly do nothing.
+        if (value && !matched) {
+            console.warn('[MI] "' + value + '" matches no option in #' + multi.id +
+                        ' - filter not applied');
+        }
     }
 
     function applyFilterBar() {
