@@ -596,29 +596,6 @@
     pointer-events: none;
 }
 
-/* Centre label for the price-distribution donut. */
-.mi-donut-center {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-}
-
-.mi-donut-center strong {
-    font-size: 1.35rem;
-    font-weight: 700;
-    color: var(--sardo-navy-900);
-    line-height: 1;
-}
-
-.mi-donut-center span {
-    font-size: 0.68rem;
-    color: var(--sardo-grey-600);
-    margin-top: 3px;
-}
 
 /* --------------------------------------------------------------------------
    Footnote / empty state

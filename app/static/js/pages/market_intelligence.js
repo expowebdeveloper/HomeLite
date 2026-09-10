@@ -130,6 +130,54 @@
         }
     };
 
+    /**
+     * Writes the total inside a doughnut's hole.
+     *
+     * This has to be drawn on the canvas rather than overlaid in HTML: the
+     * legend takes up the right-hand side of the chart box, so the doughnut's
+     * centre is not the box's centre. Chart.js gives us the arc's real centre
+     * and inner radius, so the text lands correctly and shrinks to fit however
+     * small the hole gets.
+     */
+    const donutCenterLabel = {
+        id: 'miDonutCenter',
+        afterDatasetsDraw(chart, args, opts) {
+            if (!opts || !opts.value) return;
+            const arc = chart.getDatasetMeta(0).data[0];
+            if (!arc) return;
+
+            const inner = arc.innerRadius || 0;
+            if (inner < 16) return;                 // hole too small to letter
+
+            const ctx = chart.ctx;
+            const maxWidth = inner * 1.6;           // keep clear of the ring
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            let size = Math.min(26, Math.floor(inner * 0.62));
+            while (size > 9) {
+                ctx.font = '700 ' + size + 'px Outfit, Inter, sans-serif';
+                if (ctx.measureText(opts.value).width <= maxWidth) break;
+                size -= 1;
+            }
+
+            const caption = opts.label || '';
+            const small = Math.max(9, Math.round(size * 0.44));
+            const gap = caption ? size * 0.30 : 0;
+
+            ctx.fillStyle = C.navy900;
+            ctx.fillText(opts.value, arc.x, arc.y - gap);
+
+            if (caption) {
+                ctx.font = '500 ' + small + 'px Outfit, Inter, sans-serif';
+                ctx.fillStyle = C.grey600;
+                ctx.fillText(caption, arc.x, arc.y + size * 0.62);
+            }
+            ctx.restore();
+        }
+    };
+
     const gridStyle = { color: 'rgba(227,230,232,0.7)', drawBorder: false };
     const tickStyle = { color: C.grey600, font: { size: 11, family: 'Outfit, Inter, sans-serif' } };
 
@@ -534,12 +582,13 @@
                                 return nf.format(ctx.parsed) + ' listings (' + pct + '%)';
                             }
                         }
-                    })
+                    }),
+                    miDonutCenter: { value: nf.format(total), label: 'Listings' }
                 }
-            }
+            },
+            plugins: [donutCenterLabel]
         });
 
-        setText('donut-total', nf.format(total));
 
         fillDetails('details-price', ['Band', 'Listings', 'Share'], rows.map((r) => [
             priceBandLabel(r.price_bucket),
