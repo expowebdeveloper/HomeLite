@@ -337,3 +337,26 @@ tbody td {
 .preview-details {
     margin-top: 25px;
 }
+
+/* Listings view wrapper.
+
+   .main-area is a flex column with overflow:hidden, and the table/grid rely on
+   `flex: 1` + `overflow: auto` to scroll inside it. This wrapper sits between
+   them, so if it stays a plain block those `flex: 1` rules are inert: the table
+   sizes to its content and .main-area silently clips the overflow, leaving rows
+   unreachable at 25/50/100 per page.
+
+   min-height: 0 is required as well - a flex item defaults to min-height:auto
+   and will not shrink below its content, which keeps the inner overflow:auto
+   from ever engaging. */
+#view-listings-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+#view-listings-container > .table-area,
+#view-listings-container > .property-grid {
+    min-height: 0;
+}

@@ -53,10 +53,13 @@
 
     const num = (v) => (v === null || v === undefined || isNaN(v) ? 0 : Number(v));
 
-    /** €19.95M / €845K / €14,252 — the compact form the KPI tiles use. */
+    /** €4.45B / €19.95M / €845K / €14,252 — the compact form the KPI tiles use. */
     function fmtMoneyCompact(v) {
         const n = num(v);
         if (!n) return '—';
+        // Total stock value runs into the billions, so it needs its own step;
+        // without it the tile would read '€4454.31M'.
+        if (n >= 1e9) return '€' + (n / 1e9).toFixed(2).replace(/\.00$/, '') + 'B';
         if (n >= 1e6) return '€' + (n / 1e6).toFixed(2).replace(/\.00$/, '') + 'M';
         if (n >= 1e5) return '€' + Math.round(n / 1e3) + 'K';
         return money.format(Math.round(n));
@@ -424,10 +427,21 @@
         else if (num(top.build_area)) bits.push(fmtArea(top.build_area) + ' Build');
         setText('kpi-max-price-sub', bits.length ? bits.join(' • ') : '—');
 
-        setText('kpi-build-area', fmtArea(k.total_build_area));
-        setText('kpi-build-area-sub', num(k.avg_build_area)
-            ? 'Avg ' + fmtArea(k.avg_build_area) + ' per property'
-            : 'Build size not published');
+        // Total Property Stock Value: the sum of every unique property's asking
+        // price. POA listings carry no price, so they are excluded from the sum
+        // and called out underneath rather than silently dropped.
+        setText('kpi-stock-value', fmtMoneyCompact(k.total_stock_value));
+        const priced = Math.max(0, num(k.unique_properties) - num(k.poa_count));
+        const poa = num(k.poa_count);
+        // .kpi-sub is a single ellipsised line, so keep the visible text short
+        // and put the full wording in the tooltip.
+        setText('kpi-stock-value-sub',
+            nf.format(priced) + ' priced' + (poa ? ' • ' + nf.format(poa) + ' POA' : ''));
+        const sub = document.getElementById('kpi-stock-value-sub');
+        if (sub) {
+            sub.title = 'Sum of ' + nf.format(priced) + ' unique property asking prices'
+                + (poa ? '. ' + nf.format(poa) + ' POA listings excluded.' : '.');
+        }
     }
 
     function sortedBedrooms(data) {
@@ -1063,6 +1077,9 @@
             ['Duplicate listings', num(d.duplicate_listings)],
             ['Duplicate groups', num(k.duplicate_groups)],
             ['Single-source properties', num(d.single_source_count)],
+            ['Total property stock value', Math.round(num(k.total_stock_value))],
+            ['Priced unique properties', Math.max(0, num(k.unique_properties) - num(k.poa_count))],
+            ['POA (no published price)', num(k.poa_count)],
             ['Average asking price', Math.round(num(k.avg_price))],
             ['Median asking price', Math.round(num(k.median_price))],
             ['Highest asking price', Math.round(num(k.max_price))],
