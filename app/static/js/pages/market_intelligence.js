@@ -59,7 +59,9 @@
         if (!n) return '—';
         // Total stock value runs into the billions, so it needs its own step;
         // without it the tile would read '€4454.31M'.
-        if (n >= 1e9) return '€' + (n / 1e9).toFixed(2).replace(/\.00$/, '') + 'B';
+        // Billions get three decimals: at two, the stock value tile rounds away
+        // up to €10M. Trailing zeros are trimmed so €4.000B reads as €4B.
+        if (n >= 1e9) return '€' + (n / 1e9).toFixed(3).replace(/\.?0+$/, '') + 'B';
         if (n >= 1e6) return '€' + (n / 1e6).toFixed(2).replace(/\.00$/, '') + 'M';
         if (n >= 1e5) return '€' + Math.round(n / 1e3) + 'K';
         return money.format(Math.round(n));
@@ -431,6 +433,8 @@
         // price. POA listings carry no price, so they are excluded from the sum
         // and called out underneath rather than silently dropped.
         setText('kpi-stock-value', fmtMoneyCompact(k.total_stock_value));
+        const valueEl = document.getElementById('kpi-stock-value');
+        if (valueEl) valueEl.title = fmtMoneyExact(k.total_stock_value);
         const priced = Math.max(0, num(k.unique_properties) - num(k.poa_count));
         const poa = num(k.poa_count);
         // .kpi-sub is a single ellipsised line, so keep the visible text short
