@@ -77,3 +77,478 @@
 .btn-duplicate-card:hover i {
     transform: rotate(-12deg) scale(1.15);
 }
+
+/* Manually linked duplicates: small marker on the +N badge */
+.manual-dup-icon {
+    font-size: 9px;
+    margin-left: 2px;
+    opacity: 0.85;
+}
+
+/* "Manually added" badge and remove action in the Duplicate Cluster modal */
+.manual-dup-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.manual-dup-remove {
+    background: transparent;
+    border: 1px solid #fca5a5;
+    color: #b91c1c;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.manual-dup-remove:hover {
+    background: #fef2f2;
+}
+
+/* "Mark as Duplicate" button beside Select All */
+.btn-mark-duplicates {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 42px;
+    padding: 0 16px;
+    border-radius: var(--border-radius);
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+    color: var(--accent-hover);
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition-fast);
+    white-space: nowrap;
+}
+
+.btn-mark-duplicates:hover {
+    background: var(--accent-hover);
+    color: #ffffff;
+}
+
+.btn-mark-duplicates[hidden] {
+    display: none;
+}
+
+/* Mark as Duplicate modal */
+.mark-dup-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.mark-dup-overlay[hidden] {
+    display: none;
+}
+
+.mark-dup-dialog {
+    background: #ffffff;
+    width: 100%;
+    max-width: 760px;
+    max-height: 90vh;
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+}
+
+.mark-dup-header {
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+    color: #ffffff;
+    padding: 18px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.mark-dup-header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.mark-dup-header p {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: #cbd5e1;
+    line-height: 1.4;
+}
+
+.mark-dup-close {
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.12);
+    border: none;
+    color: #ffffff;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.mark-dup-close:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.mark-dup-body {
+    padding: 20px 24px;
+    overflow-y: auto;
+    flex: 1;
+    background: #f8fafc;
+}
+
+.mark-dup-body h3 {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--secondary-color);
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mark-dup-body h3:not(:first-child) {
+    margin-top: 22px;
+}
+
+.mark-dup-body h3 span {
+    background: var(--accent-color);
+    color: #ffffff;
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-size: 11px;
+}
+
+.mark-dup-body small {
+    display: block;
+    margin-top: 6px;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.mark-dup-search {
+    display: flex;
+    gap: 10px;
+}
+
+.mark-dup-search input {
+    flex: 1;
+    min-width: 0;
+}
+
+.mark-dup-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#mark-dup-results {
+    margin-top: 12px;
+}
+
+.mark-dup-row {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.mark-dup-row-main {
+    min-width: 0;
+}
+
+.mark-dup-row-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.mark-dup-row-meta {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.mark-dup-row-grouped {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent-hover);
+}
+
+.mark-dup-row-btn {
+    flex-shrink: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 12px;
+}
+
+.mark-dup-row-btn.add {
+    background: var(--accent-color);
+    border: 1px solid var(--accent-color);
+    color: #ffffff;
+}
+
+.mark-dup-row-btn.remove {
+    background: transparent;
+    border: 1px solid #e2e8f0;
+    color: var(--text-secondary);
+}
+
+.mark-dup-row-btn.remove:hover {
+    border-color: #fca5a5;
+    color: #b91c1c;
+}
+
+.mark-dup-row-added {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #059669;
+}
+
+.mark-dup-empty {
+    font-size: 13px;
+    color: var(--text-secondary);
+    padding: 8px 2px;
+}
+
+.mark-dup-empty.error {
+    color: #b91c1c;
+}
+
+.mark-dup-footer {
+    padding: 14px 24px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: #ffffff;
+}
+
+#mark-dup-hint {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.mark-dup-actions {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+}
+
+@media (max-width: 600px) {
+    .mark-dup-overlay {
+        padding: 0;
+    }
+
+    .mark-dup-dialog {
+        max-height: 100vh;
+        height: 100%;
+        border-radius: 0;
+    }
+
+    .mark-dup-row {
+        flex-wrap: wrap;
+    }
+}
+
+/* "Manual Duplicates" quick filter button beside Select All */
+.btn-show-manual-duplicates {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 42px;
+    padding: 0 16px;
+    border-radius: var(--border-radius);
+    border: 1px solid #fcd34d;
+    background: #fffbeb;
+    color: #92400e;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition-fast);
+    white-space: nowrap;
+}
+
+.btn-show-manual-duplicates:hover {
+    border-color: #f59e0b;
+    background: #fef3c7;
+}
+
+.btn-show-manual-duplicates.active {
+    background: #f59e0b;
+    border-color: #d97706;
+    color: #ffffff;
+}
+
+/* Styled confirmation dialog (replaces the browser's confirm()) */
+.app-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100000; /* above the duplicate modals */
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(3px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.app-confirm-overlay[hidden] {
+    display: none;
+}
+
+.app-confirm-dialog {
+    background: #ffffff;
+    width: 100%;
+    max-width: 420px;
+    border-radius: 16px;
+    padding: 28px 28px 22px;
+    text-align: center;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+    animation: appConfirmIn 0.18s ease-out;
+}
+
+@keyframes appConfirmIn {
+    from { opacity: 0; transform: translateY(8px) scale(0.97); }
+    to { opacity: 1; transform: none; }
+}
+
+.app-confirm-icon {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 14px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    background: #eef2ff;
+    color: var(--accent-hover);
+}
+
+.app-confirm-icon.danger {
+    background: #fef2f2;
+    color: #dc2626;
+    box-shadow: 0 0 0 6px #fff5f5;
+}
+
+.app-confirm-dialog h3 {
+    margin: 0 0 8px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.app-confirm-dialog p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+.app-confirm-detail {
+    margin-top: 16px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    text-align: left;
+}
+
+.app-confirm-detail-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.app-confirm-detail-title i {
+    color: #6366f1;
+    margin-right: 4px;
+}
+
+.app-confirm-detail-meta {
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.app-confirm-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 22px;
+}
+
+.app-confirm-btn {
+    flex: 1;
+    height: 42px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.app-confirm-btn.cancel {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: var(--secondary-color);
+}
+
+.app-confirm-btn.cancel:hover {
+    background: #f1f5f9;
+}
+
+.app-confirm-btn.danger {
+    background: #dc2626;
+    border: 1px solid #dc2626;
+    color: #ffffff;
+    box-shadow: 0 4px 10px rgba(220, 38, 38, 0.25);
+}
+
+.app-confirm-btn.danger:hover {
+    background: #b91c1c;
+    border-color: #b91c1c;
+}
+
+.app-confirm-btn:focus-visible {
+    outline: 3px solid rgba(99, 102, 241, 0.45);
+    outline-offset: 2px;
+}

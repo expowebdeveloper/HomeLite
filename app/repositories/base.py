@@ -37,22 +37,26 @@ class BaseRepository:
     def _set_cache(self, key, data):
         self._cache[key] = {'time': time.time(), 'data': data}
         
+    def _open_connection(self):
+        """Open a new PostgreSQL connection with the app's settings."""
+        return psycopg2.connect(
+            host=self.config.DB_HOST,
+            port=self.config.DB_PORT,
+            database=self.config.DB_NAME,
+            user=self.config.DB_USER,
+            password=self.config.DB_PASSWORD,
+            # Detect connections dropped by RDS/network instead of letting them
+            # linger as half-open sockets that only fail on the next query.
+            keepalives=1,
+            keepalives_idle=30,
+            keepalives_interval=10,
+            keepalives_count=5,
+        )
+
     def connect(self):
         """Establish connection to PostgreSQL database"""
         try:
-            self.connection = psycopg2.connect(
-                host=self.config.DB_HOST,
-                port=self.config.DB_PORT,
-                database=self.config.DB_NAME,
-                user=self.config.DB_USER,
-                password=self.config.DB_PASSWORD,
-                # Detect connections dropped by RDS/network instead of letting them
-                # linger as half-open sockets that only fail on the next query.
-                keepalives=1,
-                keepalives_idle=30,
-                keepalives_interval=10,
-                keepalives_count=5,
-            )
+            self.connection = self._open_connection()
             # This manager holds one long-lived connection and is overwhelmingly
             # read-only. Without autocommit, psycopg2 opens a transaction on the
             # first SELECT and never closes it, so the connection sits
@@ -85,6 +89,7 @@ class BaseRepository:
                            pgm.group_id,
                            pgm.is_representative,
                            pg.group_code,
+                           pg.match_type as group_match_type,
                            (SELECT COUNT(*) FROM property_group_members WHERE group_id = pgm.group_id) as duplicate_count
                     FROM properties p_inner
                     LEFT JOIN property_group_members pgm ON pgm.property_id = p_inner.id
@@ -202,10 +207,22 @@ class BaseRepository:
         if tags:
             if isinstance(tags, str):
                 tags = [t.strip() for t in tags.split(',') if t.strip()]
-            tags = [t.strip() for t in tags if t and t.strip()]
+            tags = list(dict.fromkeys(t.strip() for t in tags if t and t.strip()))
             if tags:
-                base_query += " AND tags && %s::text[]"
+                # AND logic: a property must carry every selected tag (e.g. QDL + Private Pool).
+                # `@>` (contains) is served by the GIN index idx_properties_tags.
+                base_query += " AND tags @> %s::text[]"
                 params.append(tags)
+
+        duplicates = str(filters.get('duplicates') or '').strip().lower()
+        if duplicates == 'manual':
+            # Listings a user linked by hand ("Manually added" in the duplicate modal)
+            base_query += """ AND EXISTS (
+                SELECT 1 FROM manual_duplicate_links l
+                WHERE l.property_id_a = p.id OR l.property_id_b = p.id
+            )"""
+        elif duplicates == 'any':
+            base_query += " AND p.group_id IS NOT NULL"
 
         if filters.get('first_seen_from'):
             base_query += " AND first_seen_at >= %s::timestamp"

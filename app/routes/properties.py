@@ -165,6 +165,29 @@ def recalculate_groups_endpoint():
     res = db_manager.recalculate_unique_property_groups()
     return jsonify(res)
 
+@bp.route('/api/properties/duplicates/mark', methods=['POST'])
+@login_required
+def mark_duplicates_endpoint():
+    """Manually mark properties as duplicates the matching rules missed."""
+    data = request.json or {}
+    property_ids = data.get('property_ids') or []
+    if not isinstance(property_ids, list):
+        return jsonify({'success': False, 'error': 'property_ids must be a list'}), 400
+    created_by = getattr(current_user, 'username', None) or getattr(current_user, 'email', None)
+    res = db_manager.mark_properties_as_duplicates(property_ids, created_by=created_by)
+    if not res.get('success'):
+        return jsonify(res), 400
+    return jsonify(res)
+
+@bp.route('/api/properties/<property_id>/manual-duplicate', methods=['DELETE'])
+@login_required
+def remove_manual_duplicate_endpoint(property_id):
+    """Undo manual duplicate links for one property."""
+    res = db_manager.remove_manual_duplicate_links(property_id)
+    if not res.get('success'):
+        return jsonify(res), 400
+    return jsonify(res)
+
 @bp.route('/api/tags', methods=['GET'])
 @login_required
 def get_tags_endpoint():

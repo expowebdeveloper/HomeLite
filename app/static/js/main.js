@@ -116,6 +116,15 @@ function energyBadge(rating) {
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
         c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+    // Duplicate badge extras for groups that include a manually linked listing
+    const isManualGroup = (prop) => prop.group_match_type === 'manual' || prop.group_match_type === 'mixed';
+    const manualDuplicateIcon = (prop) => isManualGroup(prop)
+        ? ' <i class="fas fa-hand-pointer manual-dup-icon" aria-hidden="true"></i>'
+        : '';
+    const duplicateBadgeTitle = (prop) => isManualGroup(prop)
+        ? ' title="Duplicate group includes a manually added listing"'
+        : '';
+
     // Utility: Format Currency
     const formatCurrency = (value) => {
         if (value === null || value === undefined || value === '' || isNaN(Number(value))) return 'N/A';
@@ -280,7 +289,7 @@ function energyBadge(rating) {
                             </div>
                             ${statusBadge(prop.property_status)}
                         </div>
-                        ${prop.duplicate_count > 1 ? `<button class="btn-duplicate-card" onclick="event.stopPropagation(); window.openDuplicateGroupModal('${prop.id}')"><i class="fas fa-copy"></i> +${prop.duplicate_count - 1}</button>` : ''}
+                        ${prop.duplicate_count > 1 ? `<button class="btn-duplicate-card" onclick="event.stopPropagation(); window.openDuplicateGroupModal('${prop.id}')"${duplicateBadgeTitle(prop)}><i class="fas fa-copy"></i> +${prop.duplicate_count - 1}${manualDuplicateIcon(prop)}</button>` : ''}
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Ref: ${prop.sardo_reference || 'N/A'}</span>
                             ${isOffMarket ? `<span style="color: #f59e0b; font-size: 0.8rem; font-weight: 700;"><i class="fas fa-lock"></i> Confidential</span>` : ''}
@@ -401,7 +410,7 @@ function energyBadge(rating) {
                 <td>${formatDate(prop.first_seen_at)}</td>
                 <td><span style="font-weight: 600;">${calculateDOM(prop.first_seen_at)}</span></td>
                 <td>${energyBadge(prop.energy_rating)}</td>
-                <td><span class="source-badge">${prop.display_source || 'N/A'}</span> ${prop.duplicate_count > 1 ? `<button class="btn-duplicate" onclick="event.stopPropagation(); window.openDuplicateGroupModal('${prop.id}')"><i class="fas fa-copy"></i> +${prop.duplicate_count - 1}</button>` : ''}</td>
+                <td><span class="source-badge">${prop.display_source || 'N/A'}</span> ${prop.duplicate_count > 1 ? `<button class="btn-duplicate" onclick="event.stopPropagation(); window.openDuplicateGroupModal('${prop.id}')"${duplicateBadgeTitle(prop)}><i class="fas fa-copy"></i> +${prop.duplicate_count - 1}${manualDuplicateIcon(prop)}</button>` : ''}</td>
                 <td>${statusBadge(prop.property_status)}</td>
                 <td>${prop.sardo_reference || 'N/A'}</td>
                 <td>
@@ -654,14 +663,21 @@ function energyBadge(rating) {
             : [];
         if (selectedStatuses.length > 0) filters.statuses = selectedStatuses;
 
+        // Duplicates filter. Manual links count whatever the listing status, so the
+        // "Manually Added Duplicates" view shows sold and delisted ones too.
+        const dupFilter = document.getElementById('filter-duplicates');
+        const duplicatesMode = dupFilter && dupFilter.value !== 'all' ? dupFilter.value : '';
+        if (duplicatesMode) filters.duplicates = duplicatesMode;
+        const showAllStatuses = duplicatesMode === 'manual';
+
         // Hide delisted stock. Skipped when the user explicitly asked for Delisted,
         // otherwise the two filters would contradict each other and return nothing.
-        if (filterHideDelisted && filterHideDelisted.checked && !selectedStatuses.includes('Delisted')) {
+        if (!showAllStatuses && filterHideDelisted && filterHideDelisted.checked && !selectedStatuses.includes('Delisted')) {
             filters.exclude_delisted = true;
         }
 
         // Hide sold stock unless explicitly searched for 'Sold'
-        if (!selectedStatuses.includes('Sold')) {
+        if (!showAllStatuses && !selectedStatuses.includes('Sold')) {
             filters.exclude_sold = true;
         }
 
@@ -727,6 +743,8 @@ function energyBadge(rating) {
         if (vis) vis.value = 'all';
         const stype = document.getElementById('filter-source-type');
         if (stype) stype.value = 'all';
+        const dups = document.getElementById('filter-duplicates');
+        if (dups) dups.value = 'all';
 
         // Clear resets to the default view, which still hides delisted stock
         currentPage = 1;
@@ -738,54 +756,51 @@ function energyBadge(rating) {
         resultsCount.innerText = `${totalPropertiesCount} Properties Found`;
     };
 
-    // Auto-search logic: when user stops typing for 1 second, OR presses Enter, OR clicks away
-    if (filterRef) {
-        let debounceTimer;
+    // Sidebar filters no longer search on every change: the user builds up their
+    // selection (e.g. several tags) and applies it with Search. Until then the
+    // Search button is highlighted so it's clear there are unapplied changes.
+    const filterPendingHint = document.getElementById('filter-pending-hint');
+    const setFiltersPending = (pending) => {
+        btnSearch.classList.toggle('filters-pending', pending);
+        if (filterPendingHint) filterPendingHint.hidden = !pending;
+    };
+    btnSearch.addEventListener('click', () => setFiltersPending(false));
+    btnClear.addEventListener('click', () => setFiltersPending(false));
 
-        // Auto-search after user stops typing for 1 second
-        filterRef.addEventListener('input', () => {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                btnSearch.click();
-            }, 1000); // 1 full second delay
-        });
+    const filterSidebar = document.getElementById('sidebar');
+    if (filterSidebar) {
+        filterSidebar.querySelectorAll('.filter-section input, .filter-section select').forEach(control => {
+            // Location search only narrows the option list; it isn't a filter itself.
+            if (control.id === 'location-search') return;
+            control.addEventListener(control.tagName === 'SELECT' || control.type === 'checkbox' ? 'change' : 'input',
+                () => setFiltersPending(true));
 
-        // Search immediately if they click outside the box
-        filterRef.addEventListener('blur', () => {
-            clearTimeout(debounceTimer);
-            btnSearch.click();
-        });
-        
-        // Search immediately if they press Enter
-        filterRef.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                clearTimeout(debounceTimer);
-                btnSearch.click();
+            // Enter in any text/number box applies the filters, like clicking Search.
+            if (control.tagName === 'INPUT' && control.type !== 'checkbox') {
+                control.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        btnSearch.click();
+                    }
+                });
             }
         });
     }
-
-    const visFilter = document.getElementById('filter-visibility');
-    if (visFilter) visFilter.addEventListener('change', () => btnSearch.click());
-    const stypeFilter = document.getElementById('filter-source-type');
-    if (stypeFilter) stypeFilter.addEventListener('change', () => btnSearch.click());
 
     // Allow multiple selection without holding Ctrl/Cmd on all multi-select elements
     document.querySelectorAll('select.multi-select').forEach(select => {
         select.addEventListener('mousedown', function(e) {
             e.preventDefault();
             const originalScrollTop = this.scrollTop;
-            
+
             if (e.target.tagName === 'OPTION') {
                 e.target.selected = !e.target.selected;
-                this.dispatchEvent(new Event('change')); // Trigger auto-search
+                this.dispatchEvent(new Event('change')); // Marks filters as pending
             }
-            
+
             this.focus();
             setTimeout(() => { this.scrollTop = originalScrollTop; }, 0);
         });
-        select.addEventListener('change', () => btnSearch.click());
     });
 
     // Clear multi-select buttons
@@ -796,7 +811,7 @@ function energyBadge(rating) {
                 const select = document.getElementById(targetId);
                 if (select) {
                     Array.from(select.options).forEach(opt => opt.selected = false);
-                    select.dispatchEvent(new Event('change')); // Trigger auto-search
+                    select.dispatchEvent(new Event('change')); // Marks filters as pending
                 }
             }
         });
@@ -830,6 +845,14 @@ function energyBadge(rating) {
         const hasSelection = selectedPropertyIds.size > 0;
         btnExportPdf.disabled = !hasSelection;
         btnExportExcel.disabled = !hasSelection;
+
+        // One selection is enough to open "Mark as Duplicate": the other listing can be found by reference.
+        const btnMarkDuplicates = document.getElementById('btn-mark-duplicates');
+        if (btnMarkDuplicates) {
+            btnMarkDuplicates.hidden = !hasSelection;
+            const countEl = document.getElementById('mark-duplicates-count');
+            if (countEl) countEl.textContent = selectedPropertyIds.size;
+        }
     };
 
     // Utility: Toast Notification
@@ -1094,6 +1117,7 @@ function energyBadge(rating) {
             prefillInput('filter-ref', 'reference');
             prefillInput('filter-visibility', 'market_visibility');
             prefillInput('filter-source-type', 'source_type');
+            prefillInput('filter-duplicates', 'duplicates');
 
             prefillCheckbox('filter-na-beds', 'na_beds');
             prefillCheckbox('filter-na-baths', 'na_baths');
@@ -1117,7 +1141,7 @@ function energyBadge(rating) {
 
             // Sync all filters to URL
             const urlParams = new URLSearchParams(window.location.search);
-            const allowedUrlKeys = ['min_price', 'max_price', 'locations', 'property_type', 'min_beds', 'max_beds', 'na_beds', 'min_baths', 'max_baths', 'na_baths', 'statuses', 'sources', 'tags', 'reference', 'market_visibility', 'source_type'];
+            const allowedUrlKeys = ['min_price', 'max_price', 'locations', 'property_type', 'min_beds', 'max_beds', 'na_beds', 'min_baths', 'max_baths', 'na_baths', 'statuses', 'sources', 'tags', 'reference', 'market_visibility', 'source_type', 'duplicates'];
             
             // Clear old params
             allowedUrlKeys.forEach(k => urlParams.delete(k));
@@ -1137,6 +1161,14 @@ function energyBadge(rating) {
             
             const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
             window.history.replaceState(null, '', newUrl);
+
+            // Highlight the "Manual Duplicates" quick button while that view is applied
+            const btnShowManualDups = document.getElementById('btn-show-manual-duplicates');
+            if (btnShowManualDups) {
+                const active = filters.duplicates === 'manual';
+                btnShowManualDups.classList.toggle('active', active);
+                btnShowManualDups.setAttribute('aria-pressed', String(active));
+            }
 
             showLoading('Searching properties...');
             const response = await fetch('/api/properties', {
@@ -1450,6 +1482,7 @@ function energyBadge(rating) {
         if (modal) modal.style.display = 'none';
     };
 
+    let lastDuplicateGroupListings = []; // listings shown in the Duplicate Cluster modal, for the remove confirmation
     window.openDuplicateGroupModal = async (propertyId) => {
         const modal = document.getElementById('duplicate-modal');
         const titleEl = document.getElementById('duplicate-modal-title');
@@ -1470,21 +1503,42 @@ function energyBadge(rating) {
             }
 
             const group = data.group;
+            lastDuplicateGroupListings = group.listings;
+            const matchType = group.match_type || 'automatic';
+            const matchLabel = {
+                automatic: 'Matched on Price, Plot Area & Bedrooms',
+                manual: 'Manually linked',
+                mixed: 'Matched automatically + manually linked'
+            }[matchType] || '';
             titleEl.textContent = `Duplicate Cluster (${group.total_agency_listings} Agencies)`;
-            subtitleEl.textContent = `Group Code: ${group.group_code} • Matched on Price, Plot Area & Bedrooms`;
+            subtitleEl.textContent = `Group Code: ${group.group_code} • ${matchLabel}`;
+
+            const bannerText = matchType === 'automatic'
+                ? `The following <strong>${group.total_agency_listings} agency listings</strong> represent the exact same physical property based on identical pricing, plot size (${esc(group.listings[0]?.land_area || '—')} m²), and bedrooms (${esc(group.listings[0]?.bedrooms || '—')}).`
+                : `The following <strong>${group.total_agency_listings} agency listings</strong> represent the same physical property. Listings marked <strong>Manually added</strong> were linked by a user because the agents' details (e.g. bedrooms or plot size) didn't match.`;
 
             let html = `
                 <div style="margin-bottom: 18px; background: #e0e7ff; border-left: 4px solid #4f46e5; padding: 12px 16px; border-radius: 8px; font-size: 13px; color: #312e81; line-height: 1.5;">
-                    <i class="fas fa-info-circle" style="color: #4f46e5;"></i> <strong>SARDO360 Deduplication Engine:</strong> The following <strong>${group.total_agency_listings} agency listings</strong> represent the exact same physical property based on identical pricing, plot size (${group.listings[0]?.land_area || '—'} m²), and bedrooms (${group.listings[0]?.bedrooms || '—'}).
+                    <i class="fas fa-info-circle" style="color: #4f46e5;"></i> <strong>SARDO360 Deduplication Engine:</strong> ${bannerText}
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 14px;">
             `;
 
             group.listings.forEach((item) => {
                 const isRep = item.is_representative;
+                const linkedAt = item.manual_linked_at ? new Date(item.manual_linked_at) : null;
+                const linkedAtStr = linkedAt && !isNaN(linkedAt)
+                    ? linkedAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                    : '';
+                const manualBadge = item.is_manual
+                    ? `<span class="manual-dup-badge" title="Manually added${item.manual_linked_by ? ' by ' + esc(item.manual_linked_by) : ''}${linkedAtStr ? ' on ' + linkedAtStr : ''}"><i class="fas fa-hand-pointer"></i> Manually added${item.manual_linked_by ? ' by ' + esc(item.manual_linked_by) : ''}${linkedAtStr ? ' · ' + linkedAtStr : ''}</span>`
+                    : '';
+                const removeManualBtn = item.is_manual
+                    ? `<button type="button" class="manual-dup-remove" onclick="window.removeManualDuplicate('${item.id}', '${propertyId}')"><i class="fas fa-unlink"></i> Remove manual link</button>`
+                    : '';
                 const repBadge = isRep
-                    ? `<span style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(16,185,129,0.3);"><i class="fas fa-star"></i> ⭐ Primary Representative</span>`
-                    : `<span style="background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;">Alternate Agency Listing</span>`;
+                    ? `<span style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; box-shadow: 0 2px 4px rgba(16,185,129,0.3);"><i class="fas fa-star"></i> ⭐ Primary Representative</span>`
+                    : `<span style="background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap;">Alternate Agency Listing</span>`;
 
                 const priceStr = formatPrice(item.price);
                 const buildStr = (item.living_area && !isNaN(parseFloat(item.living_area))) ? `${parseFloat(item.living_area).toFixed(0)} m²` : '—';
@@ -1493,10 +1547,11 @@ function energyBadge(rating) {
                 html += `
                     <div style="background: white; border: 1.5px solid ${isRep ? '#6366f1' : '#e2e8f0'}; border-radius: 10px; padding: 16px 20px; box-shadow: ${isRep ? '0 4px 12px rgba(99, 102, 241, 0.12)' : '0 1px 3px rgba(0,0,0,0.04)'}; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;">
                         <div style="flex: 1; min-width: 260px;">
-                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                                <span style="font-weight: 700; font-size: 15px; color: var(--text-primary);"><i class="fas fa-building" style="color: #6366f1;"></i> ${item.display_source || item.source}</span>
+                            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin-bottom: 6px;">
+                                <span style="font-weight: 700; font-size: 15px; color: var(--text-primary); white-space: nowrap;"><i class="fas fa-building" style="color: #6366f1;"></i> ${item.display_source || item.source}</span>
                                 ${repBadge}
                                 ${statusBadge(item.property_status)}
+                                ${manualBadge}
                             </div>
                             <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
                                 <strong>Ref:</strong> ${item.reference || 'N/A'} • <strong>Title:</strong> ${item.title || 'Property Listing'}
@@ -1516,6 +1571,7 @@ function energyBadge(rating) {
                                     <i class="fas fa-external-link-alt"></i> View on Agency Site
                                 </a>
                             ` : ''}
+                            ${removeManualBtn}
                         </div>
                     </div>
                 `;
@@ -1527,6 +1583,253 @@ function energyBadge(rating) {
             bodyEl.innerHTML = `<div style="text-align: center; padding: 30px; color: #ef4444;"><i class="fas fa-exclamation-circle" style="font-size: 24px; margin-bottom: 8px;"></i><p>Error loading duplicate group: ${err.message}</p></div>`;
         }
     };
+
+    // "Manual Duplicates" quick button: one click lists every manually added duplicate,
+    // a second click goes back to all properties. Uses the sidebar Duplicates filter.
+    document.getElementById('btn-show-manual-duplicates')?.addEventListener('click', (e) => {
+        const dupFilter = document.getElementById('filter-duplicates');
+        if (!dupFilter) return;
+        const turningOn = !e.currentTarget.classList.contains('active');
+        dupFilter.value = turningOn ? 'manual' : 'all';
+        btnSearch.click();
+    });
+
+    // Styled replacement for window.confirm(). Resolves true on confirm, false on cancel/Esc/backdrop.
+    const showConfirmDialog = ({ title, message, detailHtml = '', confirmText = 'Confirm', icon = 'fa-question', tone = 'danger' }) => {
+        const overlay = document.getElementById('app-confirm');
+        if (!overlay) return Promise.resolve(window.confirm(message));
+
+        const okBtn = document.getElementById('app-confirm-ok');
+        const cancelBtn = document.getElementById('app-confirm-cancel');
+        const detailEl = document.getElementById('app-confirm-detail');
+        const iconEl = document.getElementById('app-confirm-icon');
+
+        document.getElementById('app-confirm-title').textContent = title;
+        document.getElementById('app-confirm-message').textContent = message;
+        detailEl.innerHTML = detailHtml;
+        detailEl.hidden = !detailHtml;
+        iconEl.innerHTML = `<i class="fas ${icon}"></i>`;
+        iconEl.className = `app-confirm-icon ${tone}`;
+        okBtn.textContent = confirmText;
+        okBtn.className = `app-confirm-btn ${tone}`;
+
+        const previouslyFocused = document.activeElement;
+        overlay.hidden = false;
+        cancelBtn.focus(); // safer default for a destructive action
+
+        return new Promise((resolve) => {
+            const finish = (result) => {
+                overlay.hidden = true;
+                okBtn.removeEventListener('click', onOk);
+                cancelBtn.removeEventListener('click', onCancel);
+                overlay.removeEventListener('click', onBackdrop);
+                document.removeEventListener('keydown', onKey, true);
+                if (previouslyFocused && previouslyFocused.focus) previouslyFocused.focus();
+                resolve(result);
+            };
+            const onOk = () => finish(true);
+            const onCancel = () => finish(false);
+            const onBackdrop = (e) => { if (e.target === overlay) finish(false); };
+            const onKey = (e) => {
+                if (e.key === 'Escape') { e.stopPropagation(); finish(false); }
+            };
+            okBtn.addEventListener('click', onOk);
+            cancelBtn.addEventListener('click', onCancel);
+            overlay.addEventListener('click', onBackdrop);
+            document.addEventListener('keydown', onKey, true);
+        });
+    };
+
+    // Undo a manual duplicate link from the Duplicate Cluster modal
+    window.removeManualDuplicate = async (propertyId, openedFromId) => {
+        const listing = (lastDuplicateGroupListings || []).find(l => String(l.id) === String(propertyId));
+        const detailHtml = listing ? `
+            <div class="app-confirm-detail-title"><i class="fas fa-building"></i> ${esc(listing.display_source || listing.source || 'Listing')}</div>
+            <div class="app-confirm-detail-meta">Ref: ${esc(listing.reference || 'N/A')} · ${formatPrice(listing.price)}</div>
+            ${listing.manual_linked_by ? `<div class="app-confirm-detail-meta">Manually added by ${esc(listing.manual_linked_by)}</div>` : ''}
+        ` : '';
+
+        const confirmed = await showConfirmDialog({
+            title: 'Remove manual link?',
+            message: 'This listing will no longer be grouped as a duplicate, unless it also matches automatically on price, plot and bedrooms.',
+            detailHtml,
+            confirmText: 'Remove link',
+            icon: 'fa-unlink',
+            tone: 'danger'
+        });
+        if (!confirmed) return;
+
+        try {
+            const res = await fetch(`/api/properties/${encodeURIComponent(propertyId)}/manual-duplicate`, { method: 'DELETE' });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to remove manual link');
+
+            showToast(data.still_grouped
+                ? 'Manual link removed. The listing is still grouped because it matches automatically.'
+                : 'Manual link removed.', 'success');
+
+            // Reopen from a listing that is still in a group, or close if the group is gone
+            const reopenId = propertyId === openedFromId ? null : openedFromId;
+            if (reopenId) {
+                window.openDuplicateGroupModal(reopenId);
+            } else {
+                window.closeDuplicateModal();
+            }
+            fetchProperties(getFilters());
+        } catch (err) {
+            showToast(`Error: ${err.message}`, 'error');
+        }
+    };
+
+    // "Mark as Duplicate": link listings the automatic matching missed
+    const markDupModal = document.getElementById('mark-duplicate-modal');
+    const markDupSelectedEl = document.getElementById('mark-dup-selected');
+    const markDupResultsEl = document.getElementById('mark-dup-results');
+    const markDupSearchInput = document.getElementById('mark-dup-search-input');
+    const markDupConfirm = document.getElementById('mark-dup-confirm');
+    const markDupHint = document.getElementById('mark-dup-hint');
+    let markDupSelection = new Map(); // id -> property
+
+    const markDupRow = (prop, action) => {
+        const id = String(prop.id);
+        const beds = prop.num_beds ?? prop.bedrooms;
+        const plot = prop.land_area && !isNaN(parseFloat(prop.land_area)) ? `${parseFloat(prop.land_area).toFixed(0)} m²` : '—';
+        const ref = prop.sardo_reference || '';
+        const agentRef = prop.display_reference || prop.reference || '';
+        const button = action === 'remove'
+            ? `<button type="button" class="mark-dup-row-btn remove" data-remove-id="${esc(id)}" title="Remove from selection"><i class="fas fa-times"></i></button>`
+            : (markDupSelection.has(id)
+                ? `<span class="mark-dup-row-added"><i class="fas fa-check"></i> Added</span>`
+                : `<button type="button" class="mark-dup-row-btn add" data-add-id="${esc(id)}"><i class="fas fa-plus"></i> Add</button>`);
+        return `
+            <div class="mark-dup-row">
+                <div class="mark-dup-row-main">
+                    <div class="mark-dup-row-title">
+                        <strong>${esc(ref)}</strong>${agentRef ? ` · ${esc(agentRef)}` : ''}
+                        ${statusBadge(prop.property_status)}
+                        ${prop.duplicate_count > 1 ? `<span class="mark-dup-row-grouped" title="Already in a duplicate group"><i class="fas fa-copy"></i> +${prop.duplicate_count - 1}</span>` : ''}
+                    </div>
+                    <div class="mark-dup-row-meta">
+                        ${esc(prop.display_source || prop.website_source || '')} · ${esc(prop.location || '—')} ·
+                        ${formatPrice(prop.property_price ?? prop.price)} · ${esc(beds ?? '—')} beds · Plot ${plot}
+                    </div>
+                </div>
+                ${button}
+            </div>`;
+    };
+
+    const renderMarkDupSelection = () => {
+        const items = Array.from(markDupSelection.values());
+        markDupSelectedEl.innerHTML = items.length
+            ? items.map(p => markDupRow(p, 'remove')).join('')
+            : '<div class="mark-dup-empty">No listings selected yet.</div>';
+        document.getElementById('mark-dup-selected-count').textContent = items.length;
+        markDupConfirm.disabled = items.length < 2;
+        markDupHint.textContent = items.length < 2
+            ? `Select at least two listings (${items.length} selected).`
+            : `${items.length} listings will be grouped as the same property.`;
+    };
+
+    let markDupLastResults = [];
+    const renderMarkDupResults = () => {
+        markDupResultsEl.innerHTML = markDupLastResults.map(p => markDupRow(p, 'add')).join('');
+    };
+
+    const searchMarkDup = async () => {
+        const term = markDupSearchInput.value.trim();
+        if (!term) return;
+        markDupResultsEl.innerHTML = '<div class="mark-dup-empty"><i class="fas fa-circle-notch fa-spin"></i> Searching...</div>';
+        try {
+            // Reference search with no other filters covers every status, so sold/delisted listings can be linked too.
+            const res = await fetch('/api/properties', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reference: term, page: 1, limit: 10 })
+            });
+            if (!res.ok) throw new Error(`Server returned HTTP ${res.status}`);
+            const data = await res.json();
+            markDupLastResults = data.properties || [];
+            if (!markDupLastResults.length) {
+                markDupResultsEl.innerHTML = '<div class="mark-dup-empty">No listings found.</div>';
+                return;
+            }
+            renderMarkDupResults();
+            if (data.total_count > markDupLastResults.length) {
+                markDupResultsEl.insertAdjacentHTML('beforeend',
+                    `<div class="mark-dup-empty">Showing ${markDupLastResults.length} of ${data.total_count}. Refine the search to narrow it down.</div>`);
+            }
+        } catch (err) {
+            markDupResultsEl.innerHTML = `<div class="mark-dup-empty error">Search failed: ${esc(err.message)}</div>`;
+        }
+    };
+
+    const closeMarkDupModal = () => { if (markDupModal) markDupModal.hidden = true; };
+
+    const openMarkDupModal = () => {
+        if (!markDupModal) return;
+        markDupSelection = new Map();
+        currentProperties
+            .filter(p => selectedPropertyIds.has(String(p.id)) || selectedPropertyIds.has(p.id))
+            .forEach(p => markDupSelection.set(String(p.id), p));
+        markDupLastResults = [];
+        markDupResultsEl.innerHTML = '';
+        markDupSearchInput.value = '';
+        renderMarkDupSelection();
+        markDupModal.hidden = false;
+        markDupSearchInput.focus();
+    };
+
+    if (markDupModal) {
+        document.getElementById('btn-mark-duplicates')?.addEventListener('click', openMarkDupModal);
+        markDupModal.querySelectorAll('[data-close-mark-dup]').forEach(b => b.addEventListener('click', closeMarkDupModal));
+        markDupModal.addEventListener('click', (e) => { if (e.target === markDupModal) closeMarkDupModal(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !markDupModal.hidden) closeMarkDupModal(); });
+
+        document.getElementById('mark-dup-search-btn').addEventListener('click', searchMarkDup);
+        markDupSearchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); searchMarkDup(); }
+        });
+
+        markDupSelectedEl.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-remove-id]');
+            if (!btn) return;
+            markDupSelection.delete(btn.dataset.removeId);
+            renderMarkDupSelection();
+            renderMarkDupResults();
+        });
+        markDupResultsEl.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-add-id]');
+            if (!btn) return;
+            const prop = markDupLastResults.find(p => String(p.id) === btn.dataset.addId);
+            if (prop) markDupSelection.set(String(prop.id), prop);
+            renderMarkDupSelection();
+            renderMarkDupResults();
+        });
+
+        markDupConfirm.addEventListener('click', async () => {
+            const ids = Array.from(markDupSelection.keys());
+            if (ids.length < 2) return;
+            markDupConfirm.disabled = true;
+            try {
+                showLoading('Linking duplicate listings...');
+                const res = await fetch('/api/properties/duplicates/mark', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ property_ids: ids })
+                });
+                const data = await res.json();
+                hideLoading();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Failed to mark duplicates');
+                showToast(`${data.properties_linked} listings marked as duplicates.`, 'success');
+                closeMarkDupModal();
+                fetchProperties(getFilters());
+            } catch (err) {
+                hideLoading();
+                markDupConfirm.disabled = false;
+                showToast(`Error: ${err.message}`, 'error');
+            }
+        });
+    }
 
     // Close duplicate modal when clicking outside
     window.addEventListener('click', (event) => {

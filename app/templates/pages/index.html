@@ -142,7 +142,7 @@
                     <select id="filter-locations" multiple class="multi-select">
                         <!-- Populated via JS -->
                     </select>
-                    <small>Hold Ctrl/Cmd to select multiple</small>
+                    <small>Click to select multiple, then Search</small>
                 </div>
 
                 <div class="filter-section">
@@ -161,7 +161,7 @@
                     <select id="filter-statuses" multiple class="multi-select">
                         <!-- Populated via JS -->
                     </select>
-                    <small>Hold Ctrl/Cmd to select multiple</small>
+                    <small>Click to select multiple, then Search</small>
                     <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-weight:500;">
                         <input type="checkbox" id="filter-hide-delisted" checked style="width:auto; margin:0;">
                         Hide delisted properties
@@ -207,6 +207,16 @@
                 </div>
 
                 <div class="filter-section">
+                    <label>Duplicates</label>
+                    <select id="filter-duplicates" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: white;">
+                        <option value="all">All Properties</option>
+                        <option value="any">All Duplicates</option>
+                        <option value="manual">Manually Added Duplicates</option>
+                    </select>
+                    <small>Manually added includes sold and delisted listings</small>
+                </div>
+
+                <div class="filter-section">
                     <label>Bedrooms</label>
                     <div class="input-row">
                         <input type="number" id="filter-min-beds" placeholder="Min" min="0">
@@ -233,6 +243,9 @@
                 </div>
 
                 <div class="filter-actions">
+                    <p id="filter-pending-hint" class="filter-pending-hint" hidden>
+                        <i class="fas fa-circle-info"></i> Filters changed. Click Search to apply.
+                    </p>
                     <button id="btn-search" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
                     <button id="btn-clear" class="btn btn-secondary"><i class="fas fa-trash-alt"></i> Clear</button>
                 </div>
@@ -265,6 +278,12 @@
                             <input type="checkbox" id="select-all">
                             <label for="select-all">Select All</label>
                         </div>
+                        <button id="btn-show-manual-duplicates" class="btn-show-manual-duplicates" type="button" aria-pressed="false" title="Show every listing that was manually marked as a duplicate">
+                            <i class="fas fa-hand-pointer"></i> Manual Duplicates
+                        </button>
+                        <button id="btn-mark-duplicates" class="btn-mark-duplicates" hidden title="Link the selected properties as the same physical property">
+                            <i class="fas fa-link"></i> Mark as Duplicate (<span id="mark-duplicates-count">0</span>)
+                        </button>
                     </div>
                     <div class="view-toggle">
                         <button id="btn-view-table" class="btn-view active"><i class="fas fa-list"></i> Table</button>
@@ -705,6 +724,54 @@
         </div>
     </div>
 
+    <!-- Styled confirmation dialog (used instead of the browser's confirm()) -->
+    <div id="app-confirm" class="app-confirm-overlay" hidden>
+        <div class="app-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="app-confirm-title" aria-describedby="app-confirm-message">
+            <div id="app-confirm-icon" class="app-confirm-icon"><i class="fas fa-unlink"></i></div>
+            <h3 id="app-confirm-title">Are you sure?</h3>
+            <p id="app-confirm-message"></p>
+            <div id="app-confirm-detail" class="app-confirm-detail" hidden></div>
+            <div class="app-confirm-actions">
+                <button type="button" id="app-confirm-cancel" class="app-confirm-btn cancel">Cancel</button>
+                <button type="button" id="app-confirm-ok" class="app-confirm-btn danger">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mark as Duplicate Modal -->
+    <div id="mark-duplicate-modal" class="mark-dup-overlay" hidden>
+        <div class="mark-dup-dialog" role="dialog" aria-modal="true" aria-labelledby="mark-dup-title">
+            <div class="mark-dup-header">
+                <div>
+                    <h2 id="mark-dup-title"><i class="fas fa-link"></i> Mark as Duplicate</h2>
+                    <p>Link listings that are the same physical property but weren't matched automatically (e.g. agents listed different bedrooms or plot size).</p>
+                </div>
+                <button type="button" class="mark-dup-close" data-close-mark-dup aria-label="Close"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div class="mark-dup-body">
+                <h3>Selected listings <span id="mark-dup-selected-count">0</span></h3>
+                <div id="mark-dup-selected" class="mark-dup-list"></div>
+
+                <h3>Add another listing</h3>
+                <div class="mark-dup-search">
+                    <input type="text" id="mark-dup-search-input" placeholder="SARDO ref, agent reference or title...">
+                    <button type="button" id="mark-dup-search-btn" class="btn btn-secondary"><i class="fas fa-search"></i> Find</button>
+                </div>
+                <small>Searches all properties, including sold and delisted.</small>
+                <div id="mark-dup-results" class="mark-dup-list"></div>
+            </div>
+
+            <div class="mark-dup-footer">
+                <span id="mark-dup-hint">Select at least two listings.</span>
+                <div class="mark-dup-actions">
+                    <button type="button" class="btn btn-secondary" data-close-mark-dup>Cancel</button>
+                    <button type="button" id="mark-dup-confirm" class="btn btn-primary" disabled><i class="fas fa-link"></i> Mark as Duplicate</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- MFA Setup Modal -->
     <div id="mfa-setup-modal" class="modal-overlay" style="display:none; z-index: 2000;">
         <div class="modal-content" style="max-width: 400px; text-align: center; padding: 30px;">
@@ -1079,7 +1146,7 @@
          third-party CDN being reachable from the browser. -->
     <script src="/static/js/vendor/chart.umd.min.js?v=4.4.0"></script>
 
-    <script src="/static/js/main.js?v=6.1"></script>
+    <script src="/static/js/main.js?v=6.4"></script>
     <script src="/static/js/pages/market_intelligence.js?v=5.7"></script>
     <script>
         // Simple Toast logic

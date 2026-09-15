@@ -143,6 +143,7 @@ class PropertiesMixin:
                     sardo_reference,
                     group_id,
                     group_code,
+                    group_match_type,
                     is_representative,
                     COALESCE(duplicate_count, 1) as duplicate_count,
                     COALESCE(tags, '{}') as tags,
@@ -399,10 +400,99 @@ class PropertiesMixin:
     def recalculate_unique_property_groups(self) -> Dict:
         """Run the grouping engine to refresh all duplicate groups."""
         from app.services.grouping_service import GroupingEngine
-        engine = GroupingEngine(self.connection)
-        res = engine.run_grouping()
+        # The rebuild is one transaction; give it its own connection so it can't
+        # swallow (or be rolled back by) other requests on the shared one.
+        try:
+            conn = self._open_connection()
+        except Exception as e:
+            logging.error(f"Error opening connection for grouping: {e}")
+            return {'success': False, 'error': 'Database connection failed'}
+        try:
+            res = GroupingEngine(conn).run_grouping()
+        finally:
+            conn.close()
         self._cache.pop('statistics', None)
         return res
+
+    def mark_properties_as_duplicates(self, property_ids: List[str], created_by: str = None) -> Dict:
+        """Manually link properties as the same physical property, then regroup.
+
+        Every pair among the selected properties is stored, so removing one of
+        them later keeps the rest linked.
+        """
+        clean_ids = []
+        for pid in property_ids or []:
+            pid = str(pid).strip()
+            if pid and pid not in clean_ids:
+                clean_ids.append(pid)
+        if len(clean_ids) < 2:
+            return {'success': False, 'error': 'Select at least two properties to mark as duplicates'}
+
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return {'success': False, 'error': 'Database connection failed'}
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("SELECT id::text FROM properties WHERE id::text = ANY(%s::text[])", (clean_ids,))
+            found = {row[0] for row in cursor.fetchall()}
+            missing = [pid for pid in clean_ids if pid not in found]
+            if missing:
+                cursor.close()
+                return {'success': False, 'error': f'Property not found: {", ".join(missing)}'}
+
+            pairs = [(a, b, created_by) for i, a in enumerate(clean_ids) for b in clean_ids[i + 1:]]
+            links_created = 0
+            for a, b, user in pairs:
+                cursor.execute("""
+                    INSERT INTO manual_duplicate_links (property_id_a, property_id_b, created_by)
+                    VALUES (LEAST(%s::uuid, %s::uuid), GREATEST(%s::uuid, %s::uuid), %s)
+                    ON CONFLICT (property_id_a, property_id_b) DO NOTHING
+                """, (a, b, a, b, user))
+                links_created += cursor.rowcount
+            cursor.close()
+        except Exception as e:
+            logging.error(f"Error marking properties as duplicates: {e}")
+            return {'success': False, 'error': str(e)}
+
+        regroup = self.recalculate_unique_property_groups()
+        if not regroup.get('success'):
+            return {'success': False, 'error': f"Links saved but regrouping failed: {regroup.get('error')}"}
+        return {
+            'success': True,
+            'properties_linked': len(clean_ids),
+            'links_created': links_created
+        }
+
+    def remove_manual_duplicate_links(self, property_id: str) -> Dict:
+        """Remove every manual duplicate link involving a property, then regroup."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return {'success': False, 'error': 'Database connection failed'}
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                DELETE FROM manual_duplicate_links
+                WHERE property_id_a::text = %s OR property_id_b::text = %s
+            """, (property_id, property_id))
+            links_removed = cursor.rowcount
+            cursor.close()
+        except Exception as e:
+            logging.error(f"Error removing manual duplicate links for {property_id}: {e}")
+            return {'success': False, 'error': str(e)}
+
+        if links_removed == 0:
+            return {'success': False, 'error': 'This property has no manual duplicate links'}
+
+        regroup = self.recalculate_unique_property_groups()
+        if not regroup.get('success'):
+            return {'success': False, 'error': f"Links removed but regrouping failed: {regroup.get('error')}"}
+
+        # It can still be grouped if it also matches automatically (same price, plot and beds).
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT 1 FROM property_group_members WHERE property_id::text = %s", (property_id,))
+        still_grouped = cursor.fetchone() is not None
+        cursor.close()
+        return {'success': True, 'links_removed': links_removed, 'still_grouped': still_grouped}
 
     def get_sources(self) -> List[str]:
         """Get the distinct agent/source values, for the source filter."""

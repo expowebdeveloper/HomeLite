@@ -4,14 +4,24 @@ import datetime
 from typing import Dict, List, Optional
 import psycopg2.extras
 
+INACTIVE_STATUSES = ('Sold', 'Delisted', 'Withdrawn')
+
+
 class GroupingEngine:
     """
-    Engine to identify and group probable duplicate properties based on:
+    Engine to identify and group probable duplicate properties.
+
+    Automatic matches (active listings only):
     - Identical PRICE (property_price)
     - Identical PLOT M2 (land_area)
     - Identical BEDS (bedrooms)
     - DIFFERENT SOURCE (source)
-    
+
+    Manual matches: pairs a user marked in manual_duplicate_links, which catch
+    duplicates the agents listed with different beds/plot. These count whatever
+    the listing status. Automatic and manual matches that share a property are
+    merged into one group.
+
     Creates logical groupings in property_groups and property_group_members.
     """
 
@@ -21,114 +31,136 @@ class GroupingEngine:
 
     def run_grouping(self) -> Dict:
         """
-        Executes the grouping algorithm over all active listings.
+        Executes the grouping algorithm over all listings, rebuilding every group.
         """
+        # One transaction for the whole rebuild, so readers never see the tables
+        # half-deleted and a failure leaves the previous groups intact.
+        previous_autocommit = self.conn.autocommit
         try:
+            self.conn.autocommit = False
             cursor = self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-            
-            # Clear existing groups to do a fresh recalculation
-            # Since property_group_members cascades from property_groups,
-            # deleting groups deletes the members.
-            cursor.execute("DELETE FROM property_group_members")
-            cursor.execute("DELETE FROM property_groups")
-            
-            # Grouping Logic
+
             # We want to find sets of properties where price, land_area, and bedrooms are identical
             # AND there is more than 1 distinct source in the group.
-            
-            find_duplicates_query = """
-                SELECT 
-                    price as property_price, 
-                    land_area, 
-                    bedrooms as num_beds, 
-                    COUNT(DISTINCT source) as distinct_sources,
-                    array_agg(id) as property_ids
+            cursor.execute("""
+                SELECT array_agg(id::text) as property_ids
                 FROM properties
-                WHERE price IS NOT NULL 
-                  AND land_area IS NOT NULL 
+                WHERE price IS NOT NULL
+                  AND land_area IS NOT NULL
                   AND bedrooms IS NOT NULL
                   -- Only consider active/visible listings (not sold/delisted)
                   AND property_status NOT IN ('Sold', 'Delisted', 'Withdrawn')
                 GROUP BY price, land_area, bedrooms
                 HAVING COUNT(DISTINCT source) > 1
-            """
-            
-            cursor.execute(find_duplicates_query)
-            duplicate_groups = cursor.fetchall()
-            
-            total_groups = 0
-            total_properties_grouped = 0
-            
-            for group in duplicate_groups:
-                p_ids = group['property_ids']
-                if isinstance(p_ids, str):
-                    property_ids = p_ids.strip('{}').split(',')
-                else:
-                    property_ids = list(p_ids)
-                
-                # Create a new property group
-                group_code = f"UPG-{uuid.uuid4().hex[:6].upper()}"
-                
-                cursor.execute(
-                    "INSERT INTO property_groups (group_code) VALUES (%s) RETURNING id",
-                    (group_code,)
-                )
-                group_id = cursor.fetchone()['id']
-                total_groups += 1
-                
-                # Fetch full property details to determine the representative listing
+            """)
+            auto_sets = [row['property_ids'] for row in cursor.fetchall()]
+
+            cursor.execute("SELECT property_id_a::text AS a, property_id_b::text AS b FROM manual_duplicate_links")
+            manual_pairs = [(row['a'], row['b']) for row in cursor.fetchall()]
+
+            # Union-find over both kinds of match: anything connected is one physical property.
+            parent = {}
+
+            def find(x):
+                parent.setdefault(x, x)
+                while parent[x] != x:
+                    parent[x] = parent[parent[x]]
+                    x = parent[x]
+                return x
+
+            def union(a, b):
+                parent[find(a)] = find(b)
+
+            auto_ids = set()
+            for ids in auto_sets:
+                auto_ids.update(ids)
+                for other in ids[1:]:
+                    union(ids[0], other)
+
+            manual_ids = set()
+            for a, b in manual_pairs:
+                manual_ids.update((a, b))
+                union(a, b)
+
+            components = {}
+            for pid in parent:
+                components.setdefault(find(pid), []).append(pid)
+            groups = [members for members in components.values() if len(members) > 1]
+
+            # Fetch details for every grouped property once, to pick representatives
+            all_ids = [pid for members in groups for pid in members]
+            props = {}
+            if all_ids:
                 cursor.execute("""
-                    SELECT id, image_filename, image_filename_2, image_filename_3, last_seen_at, updated_at
+                    SELECT id::text AS id, property_status, image_filename, image_filename_2, image_filename_3,
+                           last_seen_at, updated_at
                     FROM properties
                     WHERE id = ANY(%s::uuid[])
-                """, (property_ids,))
-                
-                props = cursor.fetchall()
-                
-                # Determine representative
-                # Hierarchy:
-                # 1. Most complete property data (hard to measure perfectly, we will use image count)
-                # 2. Greatest number of images
-                # 3. Most recently updated
-                
-                def score_property(p):
-                    # Count images
-                    img_count = sum(1 for k in ('image_filename', 'image_filename_2', 'image_filename_3') if p.get(k))
-                    
-                    # Use last_seen_at or updated_at for recency
-                    recency = p.get('last_seen_at') or p.get('updated_at')
-                    recency_ts = recency.timestamp() if isinstance(recency, datetime.datetime) else 0
-                    
-                    return (img_count, recency_ts)
-                
-                representative_id = None
-                best_score = (-1, -1)
-                
-                for p in props:
-                    score = score_property(p)
-                    if score > best_score:
-                        best_score = score
-                        representative_id = p['id']
-                
+                """, (all_ids,))
+                props = {row['id']: row for row in cursor.fetchall()}
+
+            # Determine representative
+            # Hierarchy:
+            # 1. Live listing over Sold/Delisted, so a manually linked sold listing
+            #    never hides the live one from Unique Stock
+            # 2. Greatest number of images
+            # 3. Most recently updated
+            def score_property(p):
+                is_live = 0 if p.get('property_status') in INACTIVE_STATUSES else 1
+
+                # Count images
+                img_count = sum(1 for k in ('image_filename', 'image_filename_2', 'image_filename_3') if p.get(k))
+
+                # Use last_seen_at or updated_at for recency
+                recency = p.get('last_seen_at') or p.get('updated_at')
+                recency_ts = recency.timestamp() if isinstance(recency, datetime.datetime) else 0
+
+                return (is_live, img_count, recency_ts)
+
+            # Clear existing groups to do a fresh recalculation
+            # Since property_group_members cascades from property_groups,
+            # deleting groups deletes the members.
+            cursor.execute("DELETE FROM property_group_members")
+            cursor.execute("DELETE FROM property_groups")
+
+            total_properties_grouped = 0
+            match_type_counts = {'automatic': 0, 'manual': 0, 'mixed': 0}
+
+            for property_ids in groups:
+                has_auto = any(pid in auto_ids for pid in property_ids)
+                has_manual = any(pid in manual_ids for pid in property_ids)
+                match_type = 'mixed' if has_auto and has_manual else ('manual' if has_manual else 'automatic')
+                match_type_counts[match_type] += 1
+
+                # Create a new property group
+                group_code = f"UPG-{uuid.uuid4().hex[:6].upper()}"
+                cursor.execute(
+                    "INSERT INTO property_groups (group_code, match_type) VALUES (%s, %s) RETURNING id",
+                    (group_code, match_type)
+                )
+                group_id = cursor.fetchone()['id']
+
+                known = [pid for pid in property_ids if pid in props]
+                representative_id = max(known, key=lambda pid: score_property(props[pid])) if known else None
+
                 # Insert members
-                for pid in property_ids:
-                    is_rep = (pid == representative_id)
-                    cursor.execute("""
-                        INSERT INTO property_group_members (group_id, property_id, is_representative)
-                        VALUES (%s, %s, %s)
-                        ON CONFLICT (group_id, property_id) DO NOTHING
-                    """, (group_id, pid, is_rep))
-                    total_properties_grouped += 1
-            
+                psycopg2.extras.execute_batch(cursor, """
+                    INSERT INTO property_group_members (group_id, property_id, is_representative)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (group_id, property_id) DO NOTHING
+                """, [(group_id, pid, pid == representative_id) for pid in property_ids])
+                total_properties_grouped += len(property_ids)
+
             self.conn.commit()
             cursor.close()
-            
+
             return {
                 'success': True,
-                'groups_created': total_groups,
-                'properties_grouped': total_properties_grouped
+                'groups_created': len(groups),
+                'properties_grouped': total_properties_grouped,
+                'groups_by_match_type': match_type_counts
             }
-            
+
         except Exception as e:
             self.logger.error(f"Failed to run grouping engine: {e}")
             try:
@@ -136,6 +168,11 @@ class GroupingEngine:
             except:
                 pass
             return {'success': False, 'error': str(e)}
+        finally:
+            try:
+                self.conn.autocommit = previous_autocommit
+            except Exception:
+                pass
 
     def get_property_group_info(self, property_id: str) -> Optional[Dict]:
         """
@@ -158,24 +195,36 @@ class GroupingEngine:
             group_id = row['group_id']
             
             # Get group code
-            cursor.execute("SELECT group_code FROM property_groups WHERE id = %s", (group_id,))
-            group_code = cursor.fetchone()['group_code']
-            
-            # Get all properties in this group
+            cursor.execute("SELECT group_code, match_type FROM property_groups WHERE id = %s", (group_id,))
+            group_row = cursor.fetchone()
+
+            # Get all properties in this group, with who first linked each one manually (if anyone)
             cursor.execute("""
-                SELECT p.*, m.is_representative 
+                SELECT p.*, m.is_representative,
+                       ml.created_by AS manual_linked_by,
+                       ml.created_at AS manual_linked_at
                 FROM property_group_members m
                 JOIN properties p ON p.id = m.property_id
+                LEFT JOIN LATERAL (
+                    SELECT l.created_by, l.created_at
+                    FROM manual_duplicate_links l
+                    WHERE l.property_id_a = p.id OR l.property_id_b = p.id
+                    ORDER BY l.created_at ASC
+                    LIMIT 1
+                ) ml ON TRUE
                 WHERE m.group_id = %s
                 ORDER BY m.is_representative DESC, p.price ASC
             """, (group_id,))
-            
+
             members = [dict(r) for r in cursor.fetchall()]
+            for member in members:
+                member['is_manual'] = member['manual_linked_at'] is not None
             cursor.close()
-            
+
             return {
                 'has_group': True,
-                'group_code': group_code,
+                'group_code': group_row['group_code'],
+                'match_type': group_row['match_type'],
                 'total_agency_listings': len(members),
                 'listings': members
             }

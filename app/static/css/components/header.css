@@ -144,11 +144,32 @@
 
 .filter-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 12px;
     margin-top: 10px;
+    /* Keep Search reachable while picking filters further up the sidebar. */
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding: 10px 0;
+    background: rgba(255, 255, 255, 0.95);
 }
 
 .filter-actions .btn {
     flex: 1;
     justify-content: center;
+}
+
+/* Filters apply only on Search; flag unapplied changes so the user knows to click it. */
+.filter-pending-hint {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent-color);
+}
+
+#btn-search.filters-pending {
+    background-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
 }
