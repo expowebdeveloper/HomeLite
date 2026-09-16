@@ -1,4 +1,6 @@
+import hashlib
 import logging
+import re
 import uuid
 import datetime
 from typing import Dict, List, Optional
@@ -93,7 +95,7 @@ class GroupingEngine:
             if all_ids:
                 cursor.execute("""
                     SELECT id::text AS id, property_status, image_filename, image_filename_2, image_filename_3,
-                           last_seen_at, updated_at
+                           last_seen_at, updated_at, price, land_area, bedrooms
                     FROM properties
                     WHERE id = ANY(%s::uuid[])
                 """, (all_ids,))
@@ -129,38 +131,78 @@ class GroupingEngine:
             # Insert every group in ONE statement, then every member in one more.
             # A round trip per group took over a minute against a remote database,
             # which is longer than the web request is allowed to run.
+            # property_groups has extra columns on some deployments (match_key is NOT
+            # NULL there). Insert whichever of them this database actually has.
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns WHERE table_name = 'property_groups'
+            """)
+            group_columns = {row['column_name'] for row in cursor.fetchall()}
+            optional_columns = [c for c in ('match_key', 'price', 'plot_area', 'bedrooms') if c in group_columns]
+
+            def as_int(value):
+                digits = re.sub(r'[^0-9]', '', str(value or ''))
+                return int(digits) if digits else None
+
             group_rows = []
+            representatives = []
             for property_ids in groups:
                 has_auto = any(pid in auto_ids for pid in property_ids)
                 has_manual = any(pid in manual_ids for pid in property_ids)
                 match_type = 'mixed' if has_auto and has_manual else ('manual' if has_manual else 'automatic')
                 match_type_counts[match_type] += 1
-                group_rows.append((f"UPG-{uuid.uuid4().hex[:6].upper()}", match_type))
+
+                known = [pid for pid in property_ids if pid in props]
+                representative_id = max(known, key=lambda pid: score_property(props[pid])) if known else None
+                representatives.append(representative_id)
+                rep = props.get(representative_id) or {}
+
+                row = [f"UPG-{uuid.uuid4().hex[:6].upper()}", match_type]
+                for column in optional_columns:
+                    if column == 'match_key':
+                        # Stable and unique per group: a digest of its members.
+                        row.append(hashlib.md5('|'.join(sorted(property_ids)).encode()).hexdigest())
+                    elif column == 'price':
+                        row.append(rep.get('price'))
+                    elif column == 'plot_area':
+                        row.append(as_int(rep.get('land_area')))
+                    elif column == 'bedrooms':
+                        row.append(as_int(rep.get('bedrooms')))
+                group_rows.append(tuple(row))
 
             if group_rows:
+                column_sql = ', '.join(['group_code', 'match_type'] + optional_columns)
                 inserted = psycopg2.extras.execute_values(
                     cursor,
-                    "INSERT INTO property_groups (group_code, match_type) VALUES %s RETURNING id",
+                    f"INSERT INTO property_groups ({column_sql}) VALUES %s RETURNING id",
                     group_rows,
                     fetch=True
                 )
                 group_ids = [row['id'] for row in inserted]
 
                 member_rows = []
-                for group_id, property_ids in zip(group_ids, groups):
-                    known = [pid for pid in property_ids if pid in props]
-                    representative_id = max(known, key=lambda pid: score_property(props[pid])) if known else None
+                for group_id, property_ids, representative_id in zip(group_ids, groups, representatives):
                     for pid in property_ids:
                         # is_auto_matched: matched on price/plot/beds, as opposed to
                         # being pulled into the group only by a manual link.
                         member_rows.append((group_id, pid, pid == representative_id, pid in auto_ids))
                 total_properties_grouped = len(member_rows)
 
-                psycopg2.extras.execute_values(cursor, """
-                    INSERT INTO property_group_members (group_id, property_id, is_representative, is_auto_matched)
-                    VALUES %s
-                    ON CONFLICT (group_id, property_id) DO NOTHING
-                """, member_rows, template="(%s, %s::uuid, %s, %s)", page_size=1000)
+                cursor.execute("""
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'property_group_members' AND column_name = 'is_auto_matched'
+                """)
+                if cursor.fetchone():
+                    psycopg2.extras.execute_values(cursor, """
+                        INSERT INTO property_group_members (group_id, property_id, is_representative, is_auto_matched)
+                        VALUES %s
+                        ON CONFLICT (group_id, property_id) DO NOTHING
+                    """, member_rows, template="(%s, %s::uuid, %s, %s)", page_size=1000)
+                else:
+                    psycopg2.extras.execute_values(cursor, """
+                        INSERT INTO property_group_members (group_id, property_id, is_representative)
+                        VALUES %s
+                        ON CONFLICT (group_id, property_id) DO NOTHING
+                    """, [r[:3] for r in member_rows], template="(%s, %s::uuid, %s)", page_size=1000)
 
             self.conn.commit()
             cursor.close()
