@@ -116,14 +116,25 @@ function energyBadge(rating) {
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
         c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-    // Duplicate badge extras for groups that include a manually linked listing
-    const isManualGroup = (prop) => prop.group_match_type === 'manual' || prop.group_match_type === 'mixed';
-    const manualDuplicateIcon = (prop) => isManualGroup(prop)
-        ? ' <i class="fas fa-hand-pointer manual-dup-icon" aria-hidden="true"></i>'
-        : '';
-    const duplicateBadgeTitle = (prop) => isManualGroup(prop)
-        ? ' title="Duplicate group includes a manually added listing"'
-        : '';
+    // Duplicate badge for a listing. A listing the user linked by hand shows only the
+    // "Manual" tag; "+N" is reserved for duplicates the scraper matched automatically.
+    const duplicateBadge = (prop, cls) => {
+        const isCard = cls === 'btn-duplicate-card';
+        const badges = [];
+
+        // "+N": duplicates the scraper matched on price, plot and bedrooms.
+        if (prop.duplicate_count > 1 && prop.auto_matched) {
+            badges.push(`<button class="${cls}" onclick="event.stopPropagation(); window.openDuplicateGroupModal('${prop.id}')"><i class="fas fa-copy"></i> +${prop.duplicate_count - 1}</button>`);
+        }
+
+        // "Manual": linked by a user. Shown alongside "+N" when the listing is both.
+        if (prop.has_manual_link) {
+            const others = prop.duplicate_count > 1 ? ` (${prop.duplicate_count} listings)` : '';
+            badges.push(`<button class="btn-manual-link${isCard ? ' card' : ''}" title="Manually marked as a duplicate${others} - click to view or remove" onclick="event.stopPropagation(); window.manageManualLink('${prop.id}', ${prop.duplicate_count > 1})"><i class="fas fa-hand-pointer"></i> Manual</button>`);
+        }
+
+        return badges.join('');
+    };
 
     // Utility: Format Currency
     const formatCurrency = (value) => {
@@ -289,7 +300,7 @@ function energyBadge(rating) {
                             </div>
                             ${statusBadge(prop.property_status)}
                         </div>
-                        ${prop.duplicate_count > 1 ? `<button class="btn-duplicate-card" onclick="event.stopPropagation(); window.openDuplicateGroupModal('${prop.id}')"${duplicateBadgeTitle(prop)}><i class="fas fa-copy"></i> +${prop.duplicate_count - 1}${manualDuplicateIcon(prop)}</button>` : ''}
+                        ${duplicateBadge(prop, 'btn-duplicate-card')}
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Ref: ${prop.sardo_reference || 'N/A'}</span>
                             ${isOffMarket ? `<span style="color: #f59e0b; font-size: 0.8rem; font-weight: 700;"><i class="fas fa-lock"></i> Confidential</span>` : ''}
@@ -410,7 +421,7 @@ function energyBadge(rating) {
                 <td>${formatDate(prop.first_seen_at)}</td>
                 <td><span style="font-weight: 600;">${calculateDOM(prop.first_seen_at)}</span></td>
                 <td>${energyBadge(prop.energy_rating)}</td>
-                <td><span class="source-badge">${prop.display_source || 'N/A'}</span> ${prop.duplicate_count > 1 ? `<button class="btn-duplicate" onclick="event.stopPropagation(); window.openDuplicateGroupModal('${prop.id}')"${duplicateBadgeTitle(prop)}><i class="fas fa-copy"></i> +${prop.duplicate_count - 1}${manualDuplicateIcon(prop)}</button>` : ''}</td>
+                <td><span class="source-badge">${prop.display_source || 'N/A'}</span> ${duplicateBadge(prop, 'btn-duplicate')}</td>
                 <td>${statusBadge(prop.property_status)}</td>
                 <td>${prop.sardo_reference || 'N/A'}</td>
                 <td>
@@ -1584,6 +1595,31 @@ function energyBadge(rating) {
         }
     };
 
+    // Manual badge on a listing row: view the group, or unlink when no group exists
+    window.manageManualLink = async (propertyId, isGrouped) => {
+        if (isGrouped) {
+            window.openDuplicateGroupModal(propertyId);
+            return;
+        }
+        const confirmed = await showConfirmDialog({
+            title: 'Remove manual link?',
+            message: 'This listing is manually linked as a duplicate but is not currently grouped. Removing the link clears the manual duplicate mark.',
+            confirmText: 'Remove link',
+            icon: 'fa-unlink',
+            tone: 'danger'
+        });
+        if (!confirmed) return;
+        try {
+            const res = await fetch(`/api/properties/${encodeURIComponent(propertyId)}/manual-duplicate`, { method: 'DELETE' });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to remove manual link');
+            showToast('Manual link removed.', 'success');
+            fetchProperties(getFilters());
+        } catch (err) {
+            showToast(`Error: ${err.message}`, 'error');
+        }
+    };
+
     // "Manual Duplicates" quick button: one click lists every manually added duplicate,
     // a second click goes back to all properties. Uses the sidebar Duplicates filter.
     document.getElementById('btn-show-manual-duplicates')?.addEventListener('click', (e) => {
@@ -1820,7 +1856,11 @@ function energyBadge(rating) {
                 const data = await res.json();
                 hideLoading();
                 if (!res.ok || !data.success) throw new Error(data.error || 'Failed to mark duplicates');
-                showToast(`${data.properties_linked} listings marked as duplicates.`, 'success');
+                if (data.regrouped === false) {
+                    showToast(data.warning || 'Listings linked, but the duplicate groups could not be rebuilt.', 'error');
+                } else {
+                    showToast(`${data.properties_linked} listings marked as duplicates.`, 'success');
+                }
                 closeMarkDupModal();
                 fetchProperties(getFilters());
             } catch (err) {

@@ -144,6 +144,8 @@ class PropertiesMixin:
                     group_id,
                     group_code,
                     group_match_type,
+                    has_manual_link,
+                    auto_matched,
                     is_representative,
                     COALESCE(duplicate_count, 1) as duplicate_count,
                     COALESCE(tags, '{}') as tags,
@@ -455,12 +457,13 @@ class PropertiesMixin:
             return {'success': False, 'error': str(e)}
 
         regroup = self.recalculate_unique_property_groups()
-        if not regroup.get('success'):
-            return {'success': False, 'error': f"Links saved but regrouping failed: {regroup.get('error')}"}
         return {
             'success': True,
             'properties_linked': len(clean_ids),
-            'links_created': links_created
+            'links_created': links_created,
+            'regrouped': bool(regroup.get('success')),
+            'warning': None if regroup.get('success')
+                       else f"Listings linked, but the duplicate groups could not be rebuilt: {regroup.get('error')}"
         }
 
     def remove_manual_duplicate_links(self, property_id: str) -> Dict:
@@ -484,8 +487,6 @@ class PropertiesMixin:
             return {'success': False, 'error': 'This property has no manual duplicate links'}
 
         regroup = self.recalculate_unique_property_groups()
-        if not regroup.get('success'):
-            return {'success': False, 'error': f"Links removed but regrouping failed: {regroup.get('error')}"}
 
         # It can still be grouped if it also matches automatically (same price, plot and beds).
         cursor = self.connection.cursor()

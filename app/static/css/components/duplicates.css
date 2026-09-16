@@ -78,13 +78,6 @@
     transform: rotate(-12deg) scale(1.15);
 }
 
-/* Manually linked duplicates: small marker on the +N badge */
-.manual-dup-icon {
-    font-size: 9px;
-    margin-left: 2px;
-    opacity: 0.85;
-}
-
 /* "Manually added" badge and remove action in the Duplicate Cluster modal */
 .manual-dup-badge {
     display: inline-flex;
@@ -551,4 +544,37 @@
 .app-confirm-btn:focus-visible {
     outline: 3px solid rgba(99, 102, 241, 0.45);
     outline-offset: 2px;
+}
+
+/* "Manual" badge on a listing that was linked by hand */
+.btn-manual-link {
+    background: #fffbeb;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 800;
+    margin-left: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    transition: var(--transition-fast);
+}
+
+.btn-manual-link:hover {
+    background: #f59e0b;
+    border-color: #d97706;
+    color: #ffffff;
+}
+
+.btn-manual-link.card {
+    margin-left: 0;
+    justify-content: center;
+    width: calc(100% - 6px);
+    margin-right: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
 }

@@ -88,8 +88,13 @@ class BaseRepository:
                            pgm.id as member_id,
                            pgm.group_id,
                            pgm.is_representative,
+                           COALESCE(pgm.is_auto_matched, FALSE) as auto_matched,
                            pg.group_code,
                            pg.match_type as group_match_type,
+                           EXISTS (
+                               SELECT 1 FROM manual_duplicate_links l
+                               WHERE l.property_id_a = p_inner.id OR l.property_id_b = p_inner.id
+                           ) as has_manual_link,
                            (SELECT COUNT(*) FROM property_group_members WHERE group_id = pgm.group_id) as duplicate_count
                     FROM properties p_inner
                     LEFT JOIN property_group_members pgm ON pgm.property_id = p_inner.id

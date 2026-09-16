@@ -126,30 +126,41 @@ class GroupingEngine:
             total_properties_grouped = 0
             match_type_counts = {'automatic': 0, 'manual': 0, 'mixed': 0}
 
+            # Insert every group in ONE statement, then every member in one more.
+            # A round trip per group took over a minute against a remote database,
+            # which is longer than the web request is allowed to run.
+            group_rows = []
             for property_ids in groups:
                 has_auto = any(pid in auto_ids for pid in property_ids)
                 has_manual = any(pid in manual_ids for pid in property_ids)
                 match_type = 'mixed' if has_auto and has_manual else ('manual' if has_manual else 'automatic')
                 match_type_counts[match_type] += 1
+                group_rows.append((f"UPG-{uuid.uuid4().hex[:6].upper()}", match_type))
 
-                # Create a new property group
-                group_code = f"UPG-{uuid.uuid4().hex[:6].upper()}"
-                cursor.execute(
-                    "INSERT INTO property_groups (group_code, match_type) VALUES (%s, %s) RETURNING id",
-                    (group_code, match_type)
+            if group_rows:
+                inserted = psycopg2.extras.execute_values(
+                    cursor,
+                    "INSERT INTO property_groups (group_code, match_type) VALUES %s RETURNING id",
+                    group_rows,
+                    fetch=True
                 )
-                group_id = cursor.fetchone()['id']
+                group_ids = [row['id'] for row in inserted]
 
-                known = [pid for pid in property_ids if pid in props]
-                representative_id = max(known, key=lambda pid: score_property(props[pid])) if known else None
+                member_rows = []
+                for group_id, property_ids in zip(group_ids, groups):
+                    known = [pid for pid in property_ids if pid in props]
+                    representative_id = max(known, key=lambda pid: score_property(props[pid])) if known else None
+                    for pid in property_ids:
+                        # is_auto_matched: matched on price/plot/beds, as opposed to
+                        # being pulled into the group only by a manual link.
+                        member_rows.append((group_id, pid, pid == representative_id, pid in auto_ids))
+                total_properties_grouped = len(member_rows)
 
-                # Insert members
-                psycopg2.extras.execute_batch(cursor, """
-                    INSERT INTO property_group_members (group_id, property_id, is_representative)
-                    VALUES (%s, %s, %s)
+                psycopg2.extras.execute_values(cursor, """
+                    INSERT INTO property_group_members (group_id, property_id, is_representative, is_auto_matched)
+                    VALUES %s
                     ON CONFLICT (group_id, property_id) DO NOTHING
-                """, [(group_id, pid, pid == representative_id) for pid in property_ids])
-                total_properties_grouped += len(property_ids)
+                """, member_rows, template="(%s, %s::uuid, %s, %s)", page_size=1000)
 
             self.conn.commit()
             cursor.close()
