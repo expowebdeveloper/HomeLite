@@ -8,6 +8,7 @@ import psycopg2
 import psycopg2.extras
 import logging
 import datetime
+import time
 from typing import Dict, List
 from app.config import Config
 
@@ -202,6 +203,10 @@ class ScrapersMixin:
     # is treated as dead, not live. Without this a crashed scraper would show as
     # "running" forever �€� which is exactly what happened to runs #1 and #2.
     STALE_HEARTBEAT_SECONDS = 180
+    # Auto-closing a run is destructive, so allow a wider margin than the UI label:
+    # the scraper heartbeats every ~15s, so 10 minutes of silence is a dead process,
+    # not a slow page or a blip talking to the database.
+    STALE_CLOSE_SECONDS = 600
 
     def get_scraper_activity(self, limit: int = 25) -> Dict:
         """Current state of every scraper, plus the most recent runs.
@@ -216,6 +221,12 @@ class ScrapersMixin:
         if not self.connection or self.connection.closed:
             if not self.connect():
                 return {'runs': [], 'active_count': 0, 'server_time': None}
+
+        # Close crashed runs first, at most once a minute so live polling stays cheap.
+        last_sweep = self._cache.get('stale_run_sweep', {}).get('time', 0)
+        if time.time() - last_sweep > 60:
+            self._cache['stale_run_sweep'] = {'time': time.time(), 'data': None}
+            self.mark_stalled_runs_failed()
 
         try:
             cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -407,7 +418,7 @@ class ScrapersMixin:
                  WHERE run_status = 'running'
                    AND now() - COALESCE(last_heartbeat_at, started_at)
                        > (%s * INTERVAL '1 second')
-            """, (self.STALE_HEARTBEAT_SECONDS,))
+            """, (self.STALE_CLOSE_SECONDS,))
             n = cursor.rowcount
             self.connection.commit()
             cursor.close()
