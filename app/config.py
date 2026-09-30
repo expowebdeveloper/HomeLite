@@ -111,6 +111,7 @@ class Config:
         "MaproRealEstateScraper": "Mapro",
         "QuintadoLagoScraper": "QDL",
         "VendiciPropertiesScraper": "Vendici",
+        "Vale do Lobo": "Vale do Lobo",
         "Manual / Off-Market": "Manual / Off-Market",
 
         # Legacy / historical spellings, kept so old rows still map correctly
