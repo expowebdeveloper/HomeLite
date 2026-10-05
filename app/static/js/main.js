@@ -101,7 +101,9 @@ function energyBadge(rating) {
     // Helper: Render custom property tags badges
     const renderTagsBadges = (tags) => {
         if (!tags || !Array.isArray(tags) || tags.length === 0) return '';
-        return `<div class="tags-cloud-container" style="margin-top: 6px;">` +
+        // card-tags-clamped limits this to two rows in the grid; the full set is shown
+        // in the View Details modal, which renders prop.tags unclamped.
+        return `<div class="tags-cloud-container card-tags-clamped" style="margin-top: 6px;">` +
             tags.map(t => `<span class="property-tag-badge" title="Tag: ${esc(t)}"><i class="fas fa-tag" style="font-size: 9px; opacity: 0.8;"></i> ${esc(t)}</span>`).join('') +
             `</div>`;
     };
@@ -282,7 +284,7 @@ function energyBadge(rating) {
                     <div class="card-price-badge">${price}</div>
                 </div>
                 <div class="card-content">
-                    <h4 class="card-title">${prop.title && prop.title !== 'N/A' ? prop.title : (prop.property_type || 'Property')} in ${prop.location || 'Unknown'}</h4>
+                    <h4 class="card-title" title="${esc(`${prop.title && prop.title !== 'N/A' ? prop.title : (prop.property_type || 'Property')} in ${prop.location || 'Unknown'}`)}">${prop.title && prop.title !== 'N/A' ? prop.title : (prop.property_type || 'Property')} in ${prop.location || 'Unknown'}</h4>
                     <div class="card-features">
                         <span title="Bedrooms"><i class="fas fa-bed"></i> ${prop.num_beds || '-'}</span>
                         <span title="Bathrooms"><i class="fas fa-bath"></i> ${prop.num_baths || '-'}</span>
@@ -401,7 +403,12 @@ function energyBadge(rating) {
 
             // Format values safely
             const price = formatPrice(prop.property_price);
-            const livingArea = (prop.living_area && !isNaN(parseFloat(prop.living_area))) ? parseFloat(prop.living_area).toFixed(0) : '—';
+            // The Build column can show either the built area or, where the agency
+            // publishes one, the total/gross surface. Only Engel & Volkers currently
+            // supplies total_surface; every other source leaves it null, so those rows
+            // show an em dash rather than being back-filled with the build figure.
+            const areaRaw = prop[areaMetric];
+            const livingArea = (areaRaw && !isNaN(parseFloat(areaRaw))) ? parseFloat(areaRaw).toFixed(0) : '—';
             const landArea = (prop.land_area && !isNaN(parseFloat(prop.land_area))) ? parseFloat(prop.land_area).toFixed(0) : '—';
             const isOffMarket = prop.market_visibility === 'off_market' || prop.source_type === 'manual' || prop.website_source === 'Manual / Off-Market' || (prop.property_url && prop.property_url.startsWith('sardo://'));
             const offMarketTag = isOffMarket ? '<span style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 6px;"><i class="fas fa-user-secret"></i> VIP OFF-MARKET</span>' : '';
@@ -1408,7 +1415,7 @@ function energyBadge(rating) {
             } else {
                 currentSortBy = sortBy;
                 currentSortDir = 'ASC';
-                if (sortBy === 'price' || sortBy === 'living_area' || sortBy === 'land_area' || sortBy === 'bedrooms' || sortBy === 'bathrooms') {
+                if (sortBy === 'price' || sortBy === 'living_area' || sortBy === 'total_surface' || sortBy === 'land_area' || sortBy === 'bedrooms' || sortBy === 'bathrooms') {
                     currentSortDir = 'DESC'; // Default to DESC for high values first
                 }
             }
@@ -1437,6 +1444,13 @@ function energyBadge(rating) {
     });
 
     updateTableSortUI(); // initial state
+
+    // The Build/Total-Surface switcher is defined outside this closure (so it can run
+    // before the table exists), so it signals a change rather than calling in directly.
+    document.addEventListener('sardo:areametricchange', () => {
+        currentPage = 1;
+        fetchProperties(getFilters());
+    });
 
     // Mobile Sidebar Toggle
     const mobileFilterToggle = document.getElementById('mobile-filter-toggle');
@@ -2542,4 +2556,76 @@ function energyBadge(rating) {
 
     // Initialize
     loadMetadata();
+});
+
+
+/* ------------------------------------------------------------------ *
+ *  Build column metric switcher
+ *
+ *  Agencies do not publish the same measurements. Engel & Volkers gives a
+ *  total/gross surface that includes terraces and parking (483 m² against a
+ *  264 m² build); the other nine sources publish only the built area. Rather
+ *  than add a column that is empty for ~98% of rows, the Build column switches
+ *  between the two and shows an em dash where a property has no total surface.
+ * ------------------------------------------------------------------ */
+let areaMetric = 'living_area';
+const AREA_METRIC_KEY = 'sardo.areaMetric';
+
+try {
+    const saved = localStorage.getItem(AREA_METRIC_KEY);
+    if (saved === 'living_area' || saved === 'total_surface') areaMetric = saved;
+} catch (e) { /* private mode or blocked storage: the default stands */ }
+
+function applyAreaMetric(metric, { rerender = true } = {}) {
+    areaMetric = metric;
+    const label = document.getElementById('areaMetricLabel');
+    const header = document.getElementById('areaMetricHeader');
+    const menu = document.getElementById('areaMetricMenu');
+    const text = metric === 'total_surface' ? 'Total Surface (m²)' : 'Build (m²)';
+
+    if (label) label.textContent = text;
+    // Keep sorting on whichever figure is actually displayed.
+    if (header) header.dataset.sort = metric;
+    if (menu) {
+        menu.querySelectorAll('.area-metric-option').forEach(btn =>
+            btn.classList.toggle('is-active', btn.dataset.metric === metric));
+    }
+    try { localStorage.setItem(AREA_METRIC_KEY, metric); } catch (e) { /* ignore */ }
+
+    if (rerender) document.dispatchEvent(new CustomEvent('sardo:areametricchange'));
+}
+
+function closeAreaMetricMenu() {
+    const menu = document.getElementById('areaMetricMenu');
+    const toggle = document.getElementById('areaMetricToggle');
+    if (menu) menu.hidden = true;
+    if (toggle) toggle.setAttribute('aria-expanded', 'false');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const toggle = document.getElementById('areaMetricToggle');
+    const menu = document.getElementById('areaMetricMenu');
+    if (!toggle || !menu) return;
+
+    applyAreaMetric(areaMetric, { rerender: false });
+
+    toggle.addEventListener('click', (event) => {
+        // The <th> is itself a sort control, so the caret must not reach it.
+        event.stopPropagation();
+        event.preventDefault();
+        const open = menu.hidden;
+        menu.hidden = !open;
+        toggle.setAttribute('aria-expanded', String(open));
+    });
+
+    menu.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const option = event.target.closest('.area-metric-option');
+        if (!option) return;
+        applyAreaMetric(option.dataset.metric);
+        closeAreaMetricMenu();
+    });
+
+    document.addEventListener('click', closeAreaMetricMenu);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAreaMetricMenu(); });
 });

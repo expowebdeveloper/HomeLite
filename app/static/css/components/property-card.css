@@ -94,11 +94,13 @@
     font-weight: 700;
     color: var(--text-primary);
     margin-bottom: 15px;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
     line-height: 1.3;
+    /* One line, so every card in the grid is the same height and titles of wildly
+       different lengths stop pushing the features row out of alignment. The full title
+       stays available via the element's title attribute on hover, and in View Details. */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .card-features {

@@ -330,8 +330,20 @@
                                     </th>
                                     <th class="sortable" data-sort="bathrooms">Baths <i
                                             class="fas fa-sort sort-icon"></i></th>
-                                    <th class="sortable" data-sort="living_area">Build (m²) <i
-                                            class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable area-metric-th" id="areaMetricHeader"
+                                        data-sort="living_area"><span id="areaMetricLabel">Build (m²)</span> <i
+                                            class="fas fa-sort sort-icon"></i><button type="button"
+                                            class="area-metric-toggle" id="areaMetricToggle"
+                                            title="Choose which area this column shows"
+                                            aria-haspopup="true" aria-expanded="false"><i
+                                                class="fas fa-caret-down"></i></button>
+                                        <div class="area-metric-menu" id="areaMetricMenu" hidden>
+                                            <button type="button" class="area-metric-option is-active"
+                                                data-metric="living_area">Build (m²)</button>
+                                            <button type="button" class="area-metric-option"
+                                                data-metric="total_surface">Total Surface (m²)</button>
+                                        </div>
+                                    </th>
                                     <th class="sortable" data-sort="land_area">Plot (m²) <i
                                             class="fas fa-sort sort-icon"></i></th>
                                     <th>Year</th>

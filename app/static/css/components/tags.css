@@ -139,3 +139,26 @@
     border: 1px solid var(--border-color);
     border-radius: 8px;
 }
+
+/* ------------------------------------------------------------------ *
+ *  Grid card tag cloud — clamped to two rows
+ *
+ *  Amenity tags run to a dozen or more on prime listings, which pushed the
+ *  footer down and made cards in the same row wildly different heights. Two
+ *  rows is enough to convey the flavour; the complete set is in the View
+ *  Details modal, whose #modal-tags-list is deliberately NOT clamped.
+ *
+ *  The badges wrap, so the height has to be pinned per row: height is fixed on
+ *  the badge and the container allows exactly two of them plus one gap.
+ * ------------------------------------------------------------------ */
+.tags-cloud-container.card-tags-clamped {
+    --tag-row-height: 21px;
+    --tag-row-gap: 6px;
+    max-height: calc(var(--tag-row-height) * 2 + var(--tag-row-gap));
+    overflow: hidden;
+}
+
+.tags-cloud-container.card-tags-clamped .property-tag-badge {
+    height: var(--tag-row-height);
+    box-sizing: border-box;
+}

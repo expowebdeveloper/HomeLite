@@ -111,6 +111,9 @@ class Config:
         "MaproRealEstateScraper": "Mapro",
         "QuintadoLagoScraper": "QDL",
         "VendiciPropertiesScraper": "Vendici",
+        "EngelvolkersScraper": "Engel & Volkers",
+        "FineandcountryScraper": "Fine & Country",
+        "ValedoloboScraper": "Vale do Lobo",
         "Vale do Lobo": "Vale do Lobo",
         "Manual / Off-Market": "Manual / Off-Market",
 
