@@ -106,6 +106,8 @@ class Config:
     SOURCE_NAME_MAPPING = {
         # Currently present in the database
         "WaratahpropertiesScraper": "Waratah",
+        "QuintahomesScraper": "Quintahomes",
+        "TheQuintaAgencyScraper": "TheQuintaAgency",
         "QuintaProperty": "QP Savills",
         "OlivehomesScraper": "Olive Homes",
         "MaproRealEstateScraper": "Mapro",
