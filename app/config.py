@@ -108,6 +108,7 @@ class Config:
         "WaratahpropertiesScraper": "Waratah",
         "QuintahomesScraper": "Quintahomes",
         "TheQuintaAgencyScraper": "TheQuintaAgency",
+        "PortmanScraper": "Portman",
         "QuintaProperty": "QP Savills",
         "OlivehomesScraper": "Olive Homes",
         "MaproRealEstateScraper": "Mapro",
