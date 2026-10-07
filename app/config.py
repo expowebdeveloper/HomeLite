@@ -124,7 +124,8 @@ class Config:
         "QuintapropertyScraper": "QP Savills",
         "QuintadolagoScraper": "QDL",
         "LibertyrealestateScraper": "Liberty",
-        "AlgarvePropScraper": "Gatehouse"
+        "AlgarvePropScraper": "Gatehouse",
+        "EngelvolkersValedoloboScraper": "Engel & Volkers"
     }
 
     @staticmethod
