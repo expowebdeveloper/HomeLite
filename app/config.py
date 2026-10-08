@@ -108,6 +108,10 @@ class Config:
         "WaratahpropertiesScraper": "Waratah",
         "QuintahomesScraper": "Quintahomes",
         "TheQuintaAgencyScraper": "TheQuintaAgency",
+<<<<<<< HEAD
+=======
+        "PortmanScraper": "Portman",
+>>>>>>> 8941827816e36cafddffff06820c23b098116edc
         "QuintaProperty": "QP Savills",
         "OlivehomesScraper": "Olive Homes",
         "MaproRealEstateScraper": "Mapro",
@@ -123,7 +127,8 @@ class Config:
         "QuintapropertyScraper": "QP Savills",
         "QuintadolagoScraper": "QDL",
         "LibertyrealestateScraper": "Liberty",
-        "AlgarvePropScraper": "Gatehouse"
+        "AlgarvePropScraper": "Gatehouse",
+        "EngelvolkersValedoloboScraper": "Engel & Volkers"
     }
 
     @staticmethod
