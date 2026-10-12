@@ -108,10 +108,7 @@ class Config:
         "WaratahpropertiesScraper": "Waratah",
         "QuintahomesScraper": "Quintahomes",
         "TheQuintaAgencyScraper": "TheQuintaAgency",
-<<<<<<< HEAD
-=======
         "PortmanScraper": "Portman",
->>>>>>> 8941827816e36cafddffff06820c23b098116edc
         "QuintaProperty": "QP Savills",
         "OlivehomesScraper": "Olive Homes",
         "MaproRealEstateScraper": "Mapro",
@@ -120,6 +117,8 @@ class Config:
         "EngelvolkersScraper": "Engel & Volkers",
         "FineandcountryScraper": "Fine & Country",
         "ValedoloboScraper": "Vale do Lobo",
+        "GoldentreeScraper": "Golden Tree",
+        "OneselectpropertiesScraper": "One Select",
         "Vale do Lobo": "Vale do Lobo",
         "Manual / Off-Market": "Manual / Off-Market",
 
