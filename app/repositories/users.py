@@ -251,6 +251,8 @@ class UsersMixin:
                 ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP,
                 ADD COLUMN IF NOT EXISTS trusted_devices JSONB DEFAULT '[]'::jsonb,
                 ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'user',
+                ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT FALSE,
                 ADD COLUMN IF NOT EXISTS can_view_scrapers BOOLEAN DEFAULT TRUE,
                 ADD COLUMN IF NOT EXISTS can_view_reports BOOLEAN DEFAULT TRUE,
                 ADD COLUMN IF NOT EXISTS can_manage_users BOOLEAN DEFAULT FALSE;
