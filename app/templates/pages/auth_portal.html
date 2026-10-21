@@ -277,7 +277,7 @@
         <div id="twofa-fields" style="display:none;">
             <div class="info-badge">
                 <i class="fas fa-info-circle"></i>
-                <span>Enter your email address. If you have the Authenticator App enabled, you'll be asked for your code — no password needed.</span>
+                <span>Enter your email address to sign in with 2FA (Authenticator App code or Email Verification code).</span>
             </div>
 
             <!-- Shown when 2FA is not enabled on this account -->
@@ -373,7 +373,8 @@
             </button>
         </form>
 
-        <div class="links">
+        <div class="links" style="display: flex; flex-direction: column; gap: 10px; margin-top: 18px;">
+            <a href="#" id="totp-to-email-link" onclick="switchToEmailOtp(event)" style="color: var(--primary-color); font-weight: 600; font-size: 13.5px;"><i class="fas fa-envelope"></i> Send code to my email instead</a>
             <a href="#" onclick="switchView('view-login')">← Back to Login</a>
         </div>
     </div>
@@ -399,6 +400,49 @@
         <div class="links">
             <a href="#" onclick="switchView('view-login')">← Back to Login</a>
         </div>
+    </div>
+
+
+    <!-- ===== CREATE PERMANENT PASSWORD PANEL (MANDATORY ON FIRST LOGIN) ===== -->
+    <div id="view-create-password" class="auth-panel">
+        <div class="logo">
+            <div class="logo-icon"><i class="fas fa-shield-alt"></i></div>
+        </div>
+        <h2>Create Your Password</h2>
+        <p class="subtitle" id="create-password-subtitle">You are logged in with a temporary password. Please set your permanent password to secure your account.</p>
+
+        <div id="create-password-error" class="error-msg"></div>
+        <div id="create-password-success" class="success-msg"></div>
+
+        <form id="form-create-password">
+            <div class="form-group">
+                <label>New Permanent Password <span style="color: var(--danger-color, #ef4444);">*</span></label>
+                <div style="position: relative;">
+                    <input type="password" id="initial-new-password" required minlength="8" placeholder="Minimum 8 characters" style="padding-right: 42px;">
+                    <span onclick="togglePasswordVisibility('initial-new-password', this)" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-muted); padding: 4px;">
+                        <i class="far fa-eye"></i>
+                    </span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-muted); margin-top: 6px;">
+                    <i class="fas fa-info-circle" style="color: var(--primary-color);"></i>
+                    <span>Minimum 8 characters required</span>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 14px;">
+                <label>Confirm Permanent Password <span style="color: var(--danger-color, #ef4444);">*</span></label>
+                <div style="position: relative;">
+                    <input type="password" id="initial-confirm-password" required minlength="8" placeholder="Re-enter your permanent password" style="padding-right: 42px;">
+                    <span onclick="togglePasswordVisibility('initial-confirm-password', this)" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-muted); padding: 4px;">
+                        <i class="far fa-eye"></i>
+                    </span>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full" id="btn-save-initial-password" style="margin-top: 22px;">
+                <i class="fas fa-check-circle"></i> Save Password &amp; Continue
+            </button>
+        </form>
     </div>
 
     <!-- ===== RESET PASSWORD PANEL ===== -->
@@ -461,12 +505,34 @@
         document.querySelectorAll('.error-msg, .success-msg').forEach(el => el.style.display = 'none');
 
         // Don't change the URL for intermediate auth views — keeps tempToken alive
-        if (['view-otp', 'view-totp'].includes(viewId)) return;
+        if (['view-otp', 'view-totp', 'view-create-password'].includes(viewId)) return;
 
         let newPath = '/login';
         if (viewId === 'view-forgot-password')newPath = '/forgot-password';
         if (viewId === 'view-reset-password') newPath = window.location.pathname + window.location.search;
         window.history.pushState({}, '', newPath);
+    }
+
+    
+    
+    function togglePasswordVisibility(inputId, btn) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        const isPassword = input.type === 'password';
+        input.type = isPassword ? 'text' : 'password';
+        const icon = btn.querySelector('i');
+        if (icon) {
+            icon.className = isPassword ? 'far fa-eye-slash' : 'far fa-eye';
+        }
+    }
+
+    function showInactivePopup() {
+        const m = document.getElementById('modal-inactive-user');
+        if (m) m.style.display = 'flex';
+    }
+    function closeInactiveModal() {
+        const m = document.getElementById('modal-inactive-user');
+        if (m) m.style.display = 'none';
     }
 
     function showMsg(id, msg, type = 'error') {
@@ -521,6 +587,12 @@
             const data = await res.json();
 
             if (res.ok) {
+                if (data.must_change_password) {
+                    tempToken = data.temp_token;
+                    switchView('view-create-password');
+                    document.getElementById('initial-new-password').focus();
+                    return;
+                }
                 if (data.require_otp) {
                     // Always-OTP flow: show OTP panel
                     tempToken = data.temp_token;
@@ -536,7 +608,7 @@
                     await finalizeLogin(data.access_token, data.refresh_token, data.mfa_setup_required);
                 }
             } else {
-                showMsg('login-error', data.error || 'Invalid credentials');
+                if (data.inactive || (data.error && (data.error.includes('inactive') || data.error.includes('deactivated')))) { showInactivePopup(); } showMsg('login-error', data.error || 'Invalid credentials');
             }
         } catch {
             showMsg('login-error', 'Network error. Please try again.');
@@ -641,6 +713,12 @@
             const data = await res.json();
 
             if (res.ok) {
+                if (data.must_change_password) {
+                    tempToken = data.temp_token;
+                    switchView('view-create-password');
+                    document.getElementById('initial-new-password').focus();
+                    return;
+                }
                 if (data.device_token) localStorage.setItem('device_token', data.device_token);
                 await finalizeLogin(data.access_token, data.refresh_token, data.mfa_setup_required);
             } else {
@@ -673,18 +751,40 @@
             });
             const data = await res.json();
 
-            if (res.ok && data.require_totp) {
-                tempToken = data.temp_token;
-                // Hide any previous "not enabled" notice
+            if (res.ok) {
                 document.getElementById('twofa-not-enabled').style.display = 'none';
-                switchView('view-totp');
-                document.getElementById('totp-code').focus();
-            } else if (res.status === 403) {
-                // 2FA not enabled on this account — show friendly inline notice
-                document.getElementById('twofa-not-enabled').style.display = 'block';
+                if (data.require_totp) {
+                    tempToken = data.temp_token;
+                    switchView('view-totp');
+                    document.getElementById('totp-code').focus();
+                } else if (data.require_otp) {
+                    tempToken = data.temp_token;
+                    const maskedEmail = data.masked_email ? ` (${data.masked_email})` : '';
+                    document.getElementById('otp-subtitle').textContent =
+                        `A 6-digit 2FA code has been sent to your email${maskedEmail}. Enter it below.`;
+                    switchView('view-otp');
+                    document.getElementById('otp-code').focus();
+                    startResendCooldown(data.cooldown || 30);
+                }
+            } else if (res.status === 403 || res.status === 400) {
+                const noticeEl = document.getElementById('twofa-not-enabled');
+                noticeEl.innerHTML = `
+                    <div style="display:flex; gap:12px; align-items:flex-start;">
+                        <i class="fas fa-exclamation-triangle" style="color:#d97706; font-size:18px; margin-top:1px; flex-shrink:0;"></i>
+                        <div>
+                            <p style="margin:0 0 6px 0; font-weight:700; font-size:14px; color:#92400e;">2FA Notice</p>
+                            <p style="margin:0; font-size:13px; color:#92400e; line-height:1.5;">${data.error || '2FA is not enabled for this account. Please sign in with your password first.'}</p>
+                            <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+                                <button type="button" class="btn btn-primary" style="padding:8px 14px; font-size:13px;" onclick="setLoginMode('standard')">
+                                    <i class="fas fa-key"></i> Use Password
+                                </button>
+                            </div>
+                        </div>
+                    </div>`;
+                noticeEl.style.display = 'block';
                 document.getElementById('login-error').style.display = 'none';
             } else {
-                showMsg('login-error', data.error || 'Authenticator App not enabled for this account.');
+                showMsg('login-error', data.error || 'Could not verify 2FA.');
             }
         } catch {
             showMsg('login-error', 'Network error. Please try again.');
@@ -715,6 +815,12 @@
             const data = await res.json();
 
             if (res.ok) {
+                if (data.must_change_password) {
+                    tempToken = data.temp_token;
+                    switchView('view-create-password');
+                    document.getElementById('initial-new-password').focus();
+                    return;
+                }
                 if (data.device_token) localStorage.setItem('device_token', data.device_token);
                 await finalizeLogin(data.access_token, data.refresh_token, data.mfa_setup_required);
             } else {
@@ -788,6 +894,115 @@
     });
 
     initRouter();
+
+    // ====================================================
+    // Create Permanent Password (First Login)
+    // ====================================================
+    document.getElementById('form-create-password').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const p1 = document.getElementById('initial-new-password').value;
+        const p2 = document.getElementById('initial-confirm-password').value;
+        document.getElementById('create-password-error').style.display = 'none';
+        document.getElementById('create-password-success').style.display = 'none';
+
+        if (p1.length < 8) {
+            showMsg('create-password-error', 'Password must be at least 8 characters long.');
+            return;
+        }
+        if (p1 !== p2) {
+            showMsg('create-password-error', 'Passwords do not match.');
+            return;
+        }
+
+        const btn = document.getElementById('btn-save-initial-password');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Saving Password...';
+
+        try {
+            const res = await fetch('/api/auth/set-initial-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    temp_token: tempToken,
+                    new_password: p1,
+                    confirm_password: p2
+                })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                showMsg('create-password-success', 'Password created successfully! Logging you in...', 'success');
+                if (data.device_token) localStorage.setItem('device_token', data.device_token);
+                setTimeout(async () => {
+                    await finalizeLogin(data.access_token, data.refresh_token, data.mfa_setup_required);
+                }, 800);
+            } else {
+                showMsg('create-password-error', data.error || 'Failed to save password.');
+            }
+        } catch {
+            showMsg('create-password-error', 'Network error. Please try again.');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check-circle"></i> Save Password &amp; Continue';
+        }
+    });
+
+
+    async function switchToEmailOtp(e) {
+        if (e) e.preventDefault();
+        if (!tempToken) return;
+        const link = document.getElementById('totp-to-email-link');
+        const originalText = link ? link.innerHTML : '';
+        if (link) {
+            link.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Sending code...';
+            link.style.pointerEvents = 'none';
+        }
+
+        try {
+            const res = await fetch('/api/auth/switch-to-email-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ temp_token: tempToken })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                if (data.temp_token) tempToken = data.temp_token;
+                const maskedEmail = data.masked_email ? ` (${data.masked_email})` : '';
+                document.getElementById('otp-subtitle').textContent =
+                    `A 6-digit code has been sent to your email${maskedEmail}. Enter it below.`;
+                switchView('view-otp');
+                document.getElementById('otp-code').focus();
+                startResendCooldown(data.cooldown || 30);
+            } else {
+                showMsg('totp-error', data.error || 'Failed to send email verification code.');
+            }
+        } catch {
+            showMsg('totp-error', 'Network error. Please try again.');
+        } finally {
+            if (link) {
+                link.innerHTML = originalText;
+                link.style.pointerEvents = '';
+            }
+        }
+    }
+
 </script>
+
+<!-- Inactive Account Modal Popup -->
+<div class="modal-overlay" id="modal-inactive-user" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(5px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: white; border-radius: 18px; padding: 32px 28px; max-width: 440px; width: 100%; text-align: center; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); animation: modalFadeIn 0.25s ease-out;">
+        <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(239, 68, 68, 0.12); color: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 28px; margin: 0 auto 18px auto;">
+            <i class="fas fa-user-slash"></i>
+        </div>
+        <h3 style="font-size: 20px; font-weight: 700; color: #0f172a; margin: 0 0 10px 0; font-family: 'Outfit', sans-serif;">Account Inactive</h3>
+        <p style="font-size: 14.5px; color: #64748b; line-height: 1.5; margin: 0 0 24px 0; font-family: 'Outfit', sans-serif;">
+            Your account is inactive or has been restricted by the administrator. Please contact your system administrator to restore access.
+        </p>
+        <button type="button" class="btn btn-primary" style="width: 100%; border-radius: 24px; padding: 11px; font-size: 14px; font-weight: 600; font-family: 'Outfit', sans-serif;" onclick="closeInactiveModal()">
+            Understood
+        </button>
+    </div>
+</div>
+
 </body>
 </html>

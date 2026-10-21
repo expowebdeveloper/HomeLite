@@ -17,17 +17,37 @@ class UsersMixin:
     """User accounts, passwords, OTP and TOTP/MFA state."""
 
     
-    def create_user(self, email: str, username: str, password_hash: str) -> bool:
-        """Create a new user."""
+    def create_user(
+        self,
+        email: str,
+        username: str,
+        password_hash: str,
+        role: str = 'user',
+        can_view_scrapers: bool = True,
+        can_view_reports: bool = True,
+        can_manage_users: bool = False,
+        two_factor_enabled: bool = False,
+        is_active: bool = True,
+        must_change_password: bool = False
+    ) -> bool:
+        """Create a new user with role and permission configurations."""
         if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
             cursor = self.connection.cursor()
             cursor.execute("""
-                INSERT INTO users (email, username, password_hash)
-                VALUES (%s, %s, %s)
-            """, (email, username, password_hash))
+                INSERT INTO users (
+                    email, username, password_hash, role,
+                    can_view_scrapers, can_view_reports, can_manage_users,
+                    two_factor_enabled, mfa_enabled, is_active, must_change_password
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                email, username, password_hash, role,
+                can_view_scrapers, can_view_reports, can_manage_users,
+                two_factor_enabled, False, is_active, must_change_password
+            ))
             self.connection.commit()
             cursor.close()
             return True
@@ -196,7 +216,11 @@ class UsersMixin:
                 ADD COLUMN IF NOT EXISTS last_login_device VARCHAR(255),
                 ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0,
                 ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP,
-                ADD COLUMN IF NOT EXISTS trusted_devices JSONB DEFAULT '[]'::jsonb;
+                ADD COLUMN IF NOT EXISTS trusted_devices JSONB DEFAULT '[]'::jsonb,
+                ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'user',
+                ADD COLUMN IF NOT EXISTS can_view_scrapers BOOLEAN DEFAULT TRUE,
+                ADD COLUMN IF NOT EXISTS can_view_reports BOOLEAN DEFAULT TRUE,
+                ADD COLUMN IF NOT EXISTS can_manage_users BOOLEAN DEFAULT FALSE;
             """)
             self.connection.commit()
             cursor.close()
@@ -277,7 +301,7 @@ class UsersMixin:
                   AND event_type IN ('login_success', 'api_login_success')
                   AND (device_fingerprint = %s OR (browser = %s AND os = %s))
                 LIMIT 1
-            """, (user_id, fingerprint, browser, os))
+            """, (user_id, fingerprint, browser, os_info))
             result = cursor.fetchone()
             cursor.close()
             return result is None
@@ -396,18 +420,25 @@ class UsersMixin:
             logging.error(f"Error updating backup codes: {e}")
             return False
 
-    def update_user_password(self, user_id: int, new_password_hash: str) -> bool:
-        """Update a user's password hash."""
+    def update_user_password(self, user_id: int, new_password_hash: str, must_change_password: Optional[bool] = None) -> bool:
+        """Update a user's password hash, optionally setting must_change_password flag."""
         if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
         try:
             cursor = self.connection.cursor()
-            cursor.execute("""
-                UPDATE users
-                SET password_hash = %s
-                WHERE id = %s
-            """, (new_password_hash, user_id))
+            if must_change_password is not None:
+                cursor.execute("""
+                    UPDATE users
+                    SET password_hash = %s, must_change_password = %s
+                    WHERE id = %s
+                """, (new_password_hash, must_change_password, user_id))
+            else:
+                cursor.execute("""
+                    UPDATE users
+                    SET password_hash = %s
+                    WHERE id = %s
+                """, (new_password_hash, user_id))
             self.connection.commit()
             cursor.close()
             return True
@@ -443,3 +474,301 @@ class UsersMixin:
             except Exception:
                 pass
             return False
+
+    def get_all_users(self) -> list:
+        """Fetch all users without exposing password hashes."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return []
+        try:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("""
+                SELECT id, username, email, role, is_active,
+                       can_view_scrapers, can_view_reports, can_manage_users,
+                       two_factor_enabled, mfa_enabled, last_login, created_at
+                FROM users
+                ORDER BY id ASC
+            """)
+            rows = cursor.fetchall()
+            cursor.close()
+            return [dict(r) for r in rows] if rows else []
+        except Exception as e:
+            logging.error(f"Error fetching all users: {e}")
+            return []
+
+    def update_user_permissions(
+        self,
+        user_id: int,
+        role: str,
+        can_view_scrapers: bool,
+        can_view_reports: bool,
+        can_manage_users: bool
+    ) -> bool:
+        """Update role and permissions for a user."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return False
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                UPDATE users
+                SET role = %s,
+                    can_view_scrapers = %s,
+                    can_view_reports = %s,
+                    can_manage_users = %s
+                WHERE id = %s
+            """, (role, can_view_scrapers, can_view_reports, can_manage_users, user_id))
+            self.connection.commit()
+            cursor.close()
+            return True
+        except Exception as e:
+            logging.error(f"Error updating user permissions: {e}")
+            try:
+                self.connection.rollback()
+            except Exception:
+                pass
+            return False
+
+    def delete_user(self, user_id: int) -> bool:
+        """Delete a user account and associated session/activity data."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return False
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("DELETE FROM user_sessions WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM user_otps WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM login_activity WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
+            self.connection.commit()
+            cursor.close()
+            return True
+        except Exception as e:
+            logging.error(f"Error deleting user {user_id}: {e}")
+            try:
+                self.connection.rollback()
+            except Exception:
+                pass
+            return False
+
+    def set_user_active_status(self, user_id: int, is_active: bool) -> bool:
+        """Activate or deactivate a user account."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return False
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("UPDATE users SET is_active = %s WHERE id = %s", (is_active, user_id))
+            if not is_active:
+                cursor.execute("DELETE FROM user_sessions WHERE user_id = %s", (user_id,))
+            self.connection.commit()
+            cursor.close()
+            return True
+        except Exception as e:
+            logging.error(f"Error changing user active status: {e}")
+            try:
+                self.connection.rollback()
+            except Exception:
+                pass
+            return False
+
+    def get_user_login_history(self, user_id: int, limit: int = 50) -> list:
+        """Fetch login activity history for a specific user."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return []
+        try:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("""
+                SELECT id, user_id, username, ip_address, country, user_agent, event_type, created_at
+                FROM login_activity
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                LIMIT %s
+            """, (user_id, limit))
+            rows = cursor.fetchall()
+            cursor.close()
+            return [dict(r) for r in rows] if rows else []
+        except Exception as e:
+            logging.error(f"Error fetching user login history: {e}")
+            return []
+
+    def get_password_requests(self) -> list:
+        """Fetch all password reset requests."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return []
+        try:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("""
+                SELECT pr.id, pr.user_id, pr.email, pr.status, pr.created_at, pr.resolved_at, pr.temp_password,
+                       u.username
+                FROM password_requests pr
+                LEFT JOIN users u ON u.id = pr.user_id
+                ORDER BY pr.created_at DESC
+            """)
+            rows = cursor.fetchall()
+            cursor.close()
+            return [dict(r) for r in rows] if rows else []
+        except Exception as e:
+            logging.error(f"Error fetching password requests: {e}")
+            return []
+
+    def create_password_request(self, email: str, user_id = None) -> bool:
+        """Create a new password request record."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return False
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                INSERT INTO password_requests (email, user_id, status)
+                VALUES (%s, %s, 'waiting')
+            """, (email, user_id))
+            self.connection.commit()
+            cursor.close()
+            return True
+        except Exception as e:
+            logging.error(f"Error creating password request: {e}")
+            try:
+                self.connection.rollback()
+            except Exception:
+                pass
+            return False
+
+    def resolve_password_request(self, request_id: int, temp_password = None) -> bool:
+        """Mark a password request as done."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return False
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                UPDATE password_requests
+                SET status = 'done', resolved_at = CURRENT_TIMESTAMP, temp_password = %s
+                WHERE id = %s
+            """, (temp_password, request_id))
+            self.connection.commit()
+            cursor.close()
+            return True
+        except Exception as e:
+            logging.error(f"Error resolving password request: {e}")
+            try:
+                self.connection.rollback()
+            except Exception:
+                pass
+            return False
+
+    def get_all_roles(self) -> list:
+        """Fetch all roles (system built-in and custom) with active user counts."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return []
+        try:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("""
+                SELECT cr.*,
+                       COALESCE(u_counts.user_count, 0) AS user_count
+                FROM custom_roles cr
+                LEFT JOIN (
+                    SELECT role, COUNT(*) AS user_count
+                    FROM users
+                    GROUP BY role
+                ) u_counts ON u_counts.role = cr.role_key
+                ORDER BY cr.id ASC
+            """)
+            rows = cursor.fetchall()
+            cursor.close()
+            return [dict(r) for r in rows] if rows else []
+        except Exception as e:
+            logging.error(f"Error fetching roles: {e}")
+            return []
+
+    def create_custom_role(self, name: str, description: str, permissions: dict) -> Optional[dict]:
+        """Create a new custom role with specified permissions."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return None
+        import re
+        role_key = re.sub(r'[^a-z0-9_]+', '_', name.strip().lower()).strip('_')
+        if not role_key:
+            return None
+        try:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("""
+                INSERT INTO custom_roles (
+                    name, role_key, description, is_system,
+                    can_view_dashboard, can_view_reports, can_export_reports,
+                    can_view_scrapers, can_run_scrapers, can_manage_users, can_manage_settings
+                ) VALUES (%s, %s, %s, FALSE, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING *;
+            """, (
+                name.strip(),
+                role_key,
+                (description or '').strip(),
+                bool(permissions.get('can_view_dashboard', True)),
+                bool(permissions.get('can_view_reports', False)),
+                bool(permissions.get('can_export_reports', False)),
+                bool(permissions.get('can_view_scrapers', False)),
+                bool(permissions.get('can_run_scrapers', False)),
+                bool(permissions.get('can_manage_users', False)),
+                bool(permissions.get('can_manage_settings', False))
+            ))
+            row = cursor.fetchone()
+            self.connection.commit()
+            cursor.close()
+            return dict(row) if row else None
+        except Exception as e:
+            logging.error(f"Error creating custom role: {e}")
+            try:
+                self.connection.rollback()
+            except Exception:
+                pass
+            return None
+
+    def delete_custom_role(self, role_id: int) -> tuple:
+        """Delete a custom role. Automatically deactivates all users assigned to it."""
+        if not self.connection or self.connection.closed:
+            if not self.connect():
+                return False, "Database connection failed."
+        try:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("SELECT * FROM custom_roles WHERE id = %s", (role_id,))
+            role = cursor.fetchone()
+            if not role:
+                cursor.close()
+                return False, "Role not found."
+            if role['is_system']:
+                cursor.close()
+                return False, "Built-in system roles cannot be deleted."
+
+            role_key = role['role_key']
+
+            # Deactivate all users assigned to this deleted role and clear their permissions
+            cursor.execute("""
+                UPDATE users
+                SET is_active = FALSE,
+                    can_view_scrapers = FALSE,
+                    can_view_reports = FALSE,
+                    can_manage_users = FALSE
+                WHERE role = %s
+            """, (role_key,))
+
+            # Invalidate all active sessions for those users
+            cursor.execute("""
+                DELETE FROM user_sessions
+                WHERE user_id IN (SELECT id FROM users WHERE role = %s)
+            """, (role_key,))
+
+            # Delete the role
+            cursor.execute("DELETE FROM custom_roles WHERE id = %s", (role_id,))
+            self.connection.commit()
+            cursor.close()
+            return True, f"Role '{role['name']}' deleted successfully. Assigned users have been deactivated."
+        except Exception as e:
+            logging.error(f"Error deleting custom role: {e}")
+            try:
+                self.connection.rollback()
+            except Exception:
+                pass
+            return False, str(e)

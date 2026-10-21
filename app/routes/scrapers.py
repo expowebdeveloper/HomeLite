@@ -1,20 +1,18 @@
-"""Scraper activity, log streaming and the status report."""
+﻿"""Scraper activity, log streaming and the status report."""
 
 from app.repositories import DatabaseManager
-
-from flask import Blueprint
+from flask import Blueprint, request, jsonify
+from flask_login import login_required
 from app.extensions import db_manager
 from app.utils.formatting import display_source_name
-from flask import request, jsonify
-from flask_login import login_required
+from app.services.auth_service import scraper_access_required, report_access_required
 
 bp = Blueprint('scrapers', __name__)
 
 
-
-
 @bp.route('/api/scrapers/activity', methods=['GET'])
 @login_required
+@scraper_access_required
 def scrapers_activity():
     """Current state of every scraper run, for live polling.
 
@@ -41,6 +39,7 @@ def scrapers_activity():
 
 @bp.route('/api/scrapers/logs/<int:run_id>', methods=['GET'])
 @login_required
+@scraper_access_required
 def scraper_run_logs(run_id):
     """Log lines for one run.
 
@@ -63,6 +62,7 @@ def scraper_run_logs(run_id):
 
 @bp.route('/api/reports/status', methods=['GET'])
 @login_required
+@report_access_required
 def status_report():
     """Status + market-movement figures, optionally scoped to a date range.
 

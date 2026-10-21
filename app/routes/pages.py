@@ -1,11 +1,10 @@
-"""Server-rendered pages."""
+﻿"""Server-rendered pages."""
 
-from flask import Blueprint
-from flask import render_template
+from flask import Blueprint, render_template
 from flask_login import login_required
+from app.services.auth_service import scraper_access_required, report_access_required
 
 bp = Blueprint('pages', __name__)
-
 
 
 @bp.route('/')
@@ -13,8 +12,10 @@ bp = Blueprint('pages', __name__)
 def index():
     return render_template('pages/index.html')
 
+
 @bp.route('/reports')
 @login_required
+@report_access_required
 def reports():
     """Property status / market movement report page (spec section 6)."""
     return render_template('pages/reports.html')
@@ -22,6 +23,7 @@ def reports():
 
 @bp.route('/scraper-logs')
 @login_required
+@scraper_access_required
 def scraper_logs():
     """Live scraper activity + log console."""
     return render_template('pages/scraper_logs.html')

@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+﻿from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
@@ -17,6 +17,22 @@ class User:
     last_login: Optional[datetime] = None
     last_login_ip: Optional[str] = None
     last_login_device: Optional[str] = None
+    role: str = 'user'
+    can_view_scrapers: bool = True
+    can_view_reports: bool = True
+    can_manage_users: bool = False
+
+    @property
+    def is_admin(self) -> bool:
+        return self.role in ('super_admin', 'admin') or self.can_manage_users
+
+    @property
+    def can_access_scrapers(self) -> bool:
+        return self.is_admin or self.can_view_scrapers
+
+    @property
+    def can_access_reports(self) -> bool:
+        return self.is_admin or self.can_view_reports
     
     @classmethod
     def from_db_row(cls, row: Dict[str, Any]) -> 'User':
@@ -32,7 +48,11 @@ class User:
             backup_codes=row.get('backup_codes', []),
             last_login=row.get('last_login'),
             last_login_ip=row.get('last_login_ip'),
-            last_login_device=row.get('last_login_device')
+            last_login_device=row.get('last_login_device'),
+            role=row.get('role', 'user'),
+            can_view_scrapers=row.get('can_view_scrapers', True),
+            can_view_reports=row.get('can_view_reports', True),
+            can_manage_users=row.get('can_manage_users', False)
         )
 
 @dataclass
@@ -81,4 +101,3 @@ class UserOTP:
     expires_at: datetime
     attempts: int
     created_at: datetime
-

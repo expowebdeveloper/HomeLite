@@ -1,18 +1,18 @@
-"""Aggregated analytics for the Market Intelligence dashboard."""
+﻿"""Aggregated analytics for the Market Intelligence dashboard."""
 
-from flask import Blueprint, current_app
+from flask import Blueprint, current_app, request, jsonify
+from flask_login import login_required
 from app.extensions import db_manager
 from app.utils.formatting import display_source_name
-from datetime import datetime, timedelta
-from flask import request, jsonify
-from flask_login import login_required
+from app.services.auth_service import report_access_required
+from datetime import datetime
 
 bp = Blueprint('market_intelligence', __name__)
 
 
-
 @bp.route('/api/market-intelligence', methods=['POST'])
 @login_required
+@report_access_required
 def market_intelligence():
     """Aggregated analytics powering the Market Intelligence dashboard.
 

@@ -28,7 +28,7 @@ class EmailSender:
         """True if the minimum SMTP settings are present."""
         return bool(self.host and self.username and self.password)
 
-    def send(self, to, subject, body, attachments=None):
+    def send(self, to, subject, body, attachments=None, html_body=None):
         """Send an email.
 
         Args:
@@ -53,6 +53,9 @@ class EmailSender:
         msg['To'] = to if isinstance(to, str) else ', '.join(to)
         msg['Subject'] = subject
         msg.set_content(body)
+
+        if html_body:
+            msg.add_alternative(html_body, subtype='html')
 
         for att in (attachments or []):
             mimetype = att.get('mimetype') or 'application/octet-stream'

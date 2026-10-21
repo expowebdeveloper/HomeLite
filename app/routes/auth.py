@@ -18,9 +18,9 @@ from app.extensions import db_manager
 from app.extensions import fernet
 from app.models.user import User
 from app.services.auth_service import _complete_login_flow
-from app.services.auth_service import api_require_auth
+from app.services.auth_service import api_require_auth, admin_required
 from app.services.email_service import _send_otp_email
-from app.services.email_service import _send_password_reset_email
+from app.services.email_service import _send_password_reset_email, _send_temporary_password_email
 from app.utils.request_utils import get_client_ip
 from app.utils.request_utils import get_country
 from app.utils.security import _generate_backend_fingerprint
@@ -96,7 +96,15 @@ def api_sync_cookie():
     if not user_data:
         return jsonify({'error': 'User not found'}), 404
         
-    user = User(id=user_data['id'], username=user_data['username'], email=user_data.get('email'))
+    user = User(
+        id=user_data['id'],
+        username=user_data['username'],
+        email=user_data.get('email'),
+        role=user_data.get('role', 'user'),
+        can_view_scrapers=user_data.get('can_view_scrapers', True),
+        can_view_reports=user_data.get('can_view_reports', True),
+        can_manage_users=user_data.get('can_manage_users', False),
+    )
     login_user(user)
     session['refresh_token'] = refresh_token
     return jsonify({'message': 'Cookie synced successfully'})
@@ -113,6 +121,7 @@ def api_forgot_password():
     user_data = db_manager.get_user_by_identifier(email)
     
     if user_data and user_data.get('email'):
+        db_manager.create_password_request(email, user_data.get('id'))
         # Generate single-use reset token
         pw_hash_fragment = user_data['password_hash'][:10] if user_data.get('password_hash') else 'nohash'
         reset_payload = {
@@ -218,6 +227,23 @@ def api_login():
             'api_login_failed', username=identifier, user_id=None,
             ip_address=ip, country=country, user_agent=user_agent_str, browser=browser, os=os_info)
         return jsonify({'error': 'Invalid credentials'}), 401
+
+    # Check active status
+    if user_data.get('is_active') is False:
+        db_manager.log_login_activity(
+            'api_login_deactivated', username=user_data['username'], user_id=user_data['id'],
+            ip_address=ip, country=country, user_agent=user_agent_str, browser=browser, os=os_info)
+        return jsonify({'error': 'Your account is inactive. Please contact the administrator.', 'inactive': True}), 403
+
+    # Check if assigned role still exists (or was deleted by super admin)
+    all_roles = db_manager.get_all_roles()
+    valid_role_keys = {r['role_key'] for r in all_roles}
+    if user_data.get('role') not in valid_role_keys and user_data.get('role') != 'super_admin':
+        db_manager.set_user_active_status(user_data['id'], False)
+        db_manager.log_login_activity(
+            'api_login_role_deleted', username=user_data['username'], user_id=user_data['id'],
+            ip_address=ip, country=country, user_agent=user_agent_str, browser=browser, os=os_info)
+        return jsonify({'error': 'Your account is inactive. Please contact the administrator.', 'inactive': True}), 403
         
     # Check Lockout
     if user_data.get('locked_until') and user_data['locked_until'] > datetime.utcnow():
@@ -225,6 +251,23 @@ def api_login():
         
     if verify_and_upgrade_password(user_data, password):
         db_manager.reset_failed_login(user_data['id'])
+
+        # Mandatory initial password creation for users with temporary passwords
+        if user_data.get('must_change_password'):
+            temp_payload = {
+                'sub': str(user_data['id']),
+                'type': 'must_change_password',
+                'exp': datetime.utcnow() + timedelta(minutes=15),
+                'iat': datetime.utcnow()
+            }
+            temp_token = jwt.encode(temp_payload, Config.JWT_SECRET_KEY, algorithm='HS256')
+            return jsonify({
+                'must_change_password': True,
+                'temp_token': temp_token,
+                'email': user_data.get('email'),
+                'username': user_data.get('username'),
+                'message': 'Please create your permanent password to continue.'
+            })
         
         # Check Trusted Device Token (bypasses OTP for known devices)
         mfa_bypassed = False
@@ -303,25 +346,64 @@ def api_login_2fa():
         # User doesn't exist
         return jsonify({'error': 'No account found with this email address.'}), 401
 
-    if not user_data.get('mfa_enabled'):
-        # User exists but hasn't enabled 2FA
-        return jsonify({'error': 'Authenticator App login is not enabled for this account'}), 403
+    if user_data.get('is_active') is False:
+        return jsonify({'error': 'Your account is inactive. Please contact the administrator.', 'inactive': True}), 403
 
-    # Issue temp token for TOTP verification
-    temp_payload = {
-        'sub': str(user_data['id']),
-        'type': 'mfa_pending',
-        'exp': datetime.utcnow() + timedelta(minutes=5),
-        'iat': datetime.utcnow(),
-        'trust_device': False
-    }
-    temp_token = jwt.encode(temp_payload, Config.JWT_SECRET_KEY, algorithm='HS256')
+    all_roles = db_manager.get_all_roles()
+    valid_role_keys = {r['role_key'] for r in all_roles}
+    if user_data.get('role') not in valid_role_keys and user_data.get('role') != 'super_admin':
+        db_manager.set_user_active_status(user_data['id'], False)
+        return jsonify({'error': 'Your account is inactive. Please contact the administrator.', 'inactive': True}), 403
 
-    return jsonify({
-        'message': 'Enter your Authenticator App code to log in',
-        'require_totp': True,
-        'temp_token': temp_token
-    })
+    # If user still has temporary password, require setting permanent password first
+    if user_data.get('must_change_password'):
+        return jsonify({'error': 'You are currently on a temporary password. Please sign in with your password first to set your permanent password.'}), 400
+
+    has_totp = bool(user_data.get('mfa_enabled') and user_data.get('google_auth_secret'))
+    has_email_2fa = bool(user_data.get('two_factor_enabled', True))
+
+    if has_totp:
+        temp_payload = {
+            'sub': str(user_data['id']),
+            'type': 'mfa_pending',
+            'exp': datetime.utcnow() + timedelta(minutes=5),
+            'iat': datetime.utcnow(),
+            'trust_device': False
+        }
+        temp_token = jwt.encode(temp_payload, Config.JWT_SECRET_KEY, algorithm='HS256')
+        return jsonify({
+            'message': 'Enter your Authenticator App code to log in',
+            'require_totp': True,
+            'can_use_email': has_email_2fa,
+            'temp_token': temp_token
+        })
+    elif has_email_2fa:
+        code = _generate_otp()
+        expires_at = time.time() + Config.OTP_EXPIRY_SECONDS
+        db_manager.store_otp(user_data['id'], _hash_otp(code), expires_at)
+        try:
+            _send_otp_email(code, user_data.get('email'))
+        except Exception as e:
+            current_app.logger.error(f"Failed to send 2FA OTP email: {e}")
+
+        temp_payload = {
+            'sub': str(user_data['id']),
+            'type': 'email_otp_pending',
+            'exp': datetime.utcnow() + timedelta(minutes=5),
+            'iat': datetime.utcnow(),
+            'trust_device': False
+        }
+        temp_token = jwt.encode(temp_payload, Config.JWT_SECRET_KEY, algorithm='HS256')
+        masked = _mask_email(user_data.get('email') or '')
+        return jsonify({
+            'message': '2FA verification code sent to your email',
+            'require_otp': True,
+            'temp_token': temp_token,
+            'masked_email': masked,
+            'cooldown': Config.OTP_RESEND_COOLDOWN_SECONDS
+        })
+    else:
+        return jsonify({'error': '2FA is not enabled for this account. Please sign in with your password.'}), 403
 
 @bp.route('/api/auth/verify-otp', methods=['POST'])
 def api_verify_otp():
@@ -343,6 +425,9 @@ def api_verify_otp():
     if not user_data:
         return jsonify({'error': 'User not found'}), 404
         
+    if user_data.get('is_active') is False:
+        return jsonify({'error': 'Your account is inactive. Please contact the administrator.', 'inactive': True}), 403
+
     active_otp = db_manager.get_active_otp(user_id)
     if not active_otp:
         return jsonify({'error': 'OTP has expired. Please login again.'}), 401
@@ -367,6 +452,21 @@ def api_verify_otp():
         
     # Success
     db_manager.clear_otp(user_id)
+    if user_data.get('must_change_password'):
+        temp_payload = {
+            'sub': str(user_data['id']),
+            'type': 'must_change_password',
+            'exp': datetime.utcnow() + timedelta(minutes=15),
+            'iat': datetime.utcnow()
+        }
+        temp_token = jwt.encode(temp_payload, Config.JWT_SECRET_KEY, algorithm='HS256')
+        return jsonify({
+            'must_change_password': True,
+            'temp_token': temp_token,
+            'email': user_data.get('email'),
+            'username': user_data.get('username'),
+            'message': 'Please create your permanent password to continue.'
+        })
     return _complete_login_flow(user_data, payload.get('trust_device'))
 
 
@@ -396,6 +496,9 @@ def api_resend_otp():
 
     # Cooldown: block rapid re-requests. get_active_otp().created_at is the DB
     # time the current code was issued; compare against UTC now.
+    if user_data.get('is_active') is False:
+        return jsonify({'error': 'Your account is inactive. Please contact the administrator.', 'inactive': True}), 403
+
     active_otp = db_manager.get_active_otp(user_id)
     if active_otp and active_otp.get('created_at'):
         try:
@@ -703,3 +806,431 @@ def api_login_history():
         return jsonify({'error': 'User not found'}), 404
     history = db_manager.get_login_history(limit=50, username=user_data['username'])
     return jsonify({'history': history})
+
+
+# ---------------------------------------------------------------------------
+# Super Admin User Management Routes
+# ---------------------------------------------------------------------------
+
+@bp.route('/user-management')
+@login_required
+@admin_required
+def user_management():
+    """Super Admin console matching the modern tabbed management system."""
+    users = db_manager.get_all_users()
+    roles = db_manager.get_all_roles()
+    return render_template('pages/user_management.html', users=users, roles=roles)
+
+
+@bp.route('/api/admin/users', methods=['GET'])
+@login_required
+@admin_required
+def api_admin_get_users():
+    """Fetch all users with roles, status and permission flags."""
+    users = db_manager.get_all_users()
+    return jsonify({'users': users})
+
+
+@bp.route('/api/admin/users', methods=['POST'])
+@login_required
+@admin_required
+def api_admin_create_user():
+    """Create a new user. Defaults to Sub-Admin as requested."""
+    data = request.json or {}
+    email = (data.get('email') or '').strip().lower()
+    username = (data.get('name') or data.get('username') or '').strip()
+    password = data.get('password')
+    role = data.get('role', 'sub_admin')
+    is_active = bool(data.get('is_active', True))
+    two_factor_enabled = bool(data.get('two_factor_enabled', True))
+
+    if not username or not email or not password:
+        return jsonify({'error': 'Name, email, and password are required.'}), 400
+
+    if '@' not in email:
+        return jsonify({'error': 'Please provide a valid email address.'}), 400
+
+    # Role defaults (supports system and dynamic custom roles)
+    all_roles = db_manager.get_all_roles()
+    matched_role = next((r for r in all_roles if r['role_key'] == role), None)
+
+    if matched_role:
+        can_view_scrapers = bool(data.get('can_view_scrapers', matched_role.get('can_view_scrapers', False)))
+        can_view_reports = bool(data.get('can_view_reports', matched_role.get('can_view_reports', False)))
+        can_manage_users = bool(data.get('can_manage_users', matched_role.get('can_manage_users', False)))
+    elif role == 'super_admin':
+        can_view_scrapers = True
+        can_view_reports = True
+        can_manage_users = True
+    elif role == 'restricted_user':
+        can_view_scrapers = False
+        can_view_reports = False
+        can_manage_users = False
+    else:  # sub_admin default
+        can_view_scrapers = bool(data.get('can_view_scrapers', True))
+        can_view_reports = bool(data.get('can_view_reports', True))
+        can_manage_users = bool(data.get('can_manage_users', False))
+
+    if db_manager.get_user_by_identifier(username) or db_manager.get_user_by_identifier(email):
+        return jsonify({'error': 'A user with this username or email already exists.'}), 409
+
+    pw_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    success = db_manager.create_user(
+        email=email,
+        username=username,
+        password_hash=pw_hash,
+        role=role,
+        can_view_scrapers=can_view_scrapers,
+        can_view_reports=can_view_reports,
+        can_manage_users=can_manage_users,
+        two_factor_enabled=two_factor_enabled,
+        is_active=is_active,
+        must_change_password=True
+    )
+
+    if success:
+        new_user = db_manager.get_user_by_identifier(email)
+        email_sent = False
+        try:
+            email_sent = bool(_send_temporary_password_email(email, username, password))
+        except Exception as e:
+            current_app.logger.error(f"Failed to email temporary credentials: {e}")
+        return jsonify({
+            'message': f"User '{username}' created successfully. Temporary password emailed.",
+            'user': new_user,
+            'email_sent': email_sent
+        }), 201
+    return jsonify({'error': 'Failed to create user. Please check database logs.'}), 500
+
+
+@bp.route('/api/admin/users/<int:user_id>', methods=['PUT'])
+@login_required
+@admin_required
+def api_admin_update_user(user_id):
+    """Update role, active state, permissions, or 2FA for a user."""
+    target_user = db_manager.get_user_by_id(user_id)
+    if not target_user:
+        return jsonify({'error': 'User not found.'}), 404
+
+    data = request.json or {}
+    role = data.get('role', target_user.get('role', 'sub_admin'))
+
+    all_roles = db_manager.get_all_roles()
+    matched_role = next((r for r in all_roles if r['role_key'] == role), None)
+
+    if matched_role:
+        can_view_scrapers = bool(data.get('can_view_scrapers', matched_role.get('can_view_scrapers', False)))
+        can_view_reports = bool(data.get('can_view_reports', matched_role.get('can_view_reports', False)))
+        can_manage_users = bool(data.get('can_manage_users', matched_role.get('can_manage_users', False)))
+    elif role == 'super_admin':
+        can_view_scrapers = True
+        can_view_reports = True
+        can_manage_users = True
+    elif role == 'restricted_user':
+        can_view_scrapers = False
+        can_view_reports = False
+        can_manage_users = False
+    else:
+        can_view_scrapers = bool(data.get('can_view_scrapers', target_user.get('can_view_scrapers', True)))
+        can_view_reports = bool(data.get('can_view_reports', target_user.get('can_view_reports', True)))
+        can_manage_users = bool(data.get('can_manage_users', target_user.get('can_manage_users', False)))
+
+    perm_success = db_manager.update_user_permissions(
+        user_id=user_id,
+        role=role,
+        can_view_scrapers=can_view_scrapers,
+        can_view_reports=can_view_reports,
+        can_manage_users=can_manage_users
+    )
+
+    if 'is_active' in data:
+        db_manager.set_user_active_status(user_id, bool(data['is_active']))
+
+    if 'two_factor_enabled' in data:
+        db_manager.set_mfa_status(user_id, bool(data['two_factor_enabled']))
+
+    if perm_success:
+        return jsonify({'message': 'User updated successfully.'})
+    return jsonify({'error': 'Failed to update user.'}), 500
+
+
+@bp.route('/api/admin/users/<int:user_id>/toggle-status', methods=['POST'])
+@login_required
+@admin_required
+def api_admin_toggle_user_status(user_id):
+    """Activate or deactivate a user account."""
+    if getattr(current_user, 'id', None) == user_id:
+        return jsonify({'error': 'You cannot deactivate your own account.'}), 400
+
+    target_user = db_manager.get_user_by_id(user_id)
+    if not target_user:
+        return jsonify({'error': 'User not found.'}), 404
+
+    current_status = target_user.get('is_active', True)
+    new_status = not current_status
+    success = db_manager.set_user_active_status(user_id, new_status)
+
+    if success:
+        status_label = 'activated' if new_status else 'deactivated'
+        return jsonify({
+            'message': f"User '{target_user.get('username')}' has been {status_label}.",
+            'is_active': new_status
+        })
+    return jsonify({'error': 'Failed to change user status.'}), 500
+
+
+@bp.route('/api/admin/users/<int:user_id>/temp-password', methods=['POST'])
+@login_required
+@admin_required
+def api_admin_set_temp_password(user_id):
+    """Generate or reset a temporary password for any user."""
+    target_user = db_manager.get_user_by_id(user_id)
+    if not target_user:
+        return jsonify({'error': 'User not found.'}), 404
+
+    data = request.json or {}
+    temp_password = data.get('temp_password')
+    if not temp_password:
+        import string, random
+        chars = string.ascii_letters + string.digits
+        parts = [''.join(random.choices(chars, k=4)) for _ in range(3)]
+        temp_password = '-'.join(parts)
+
+    pw_hash = bcrypt.hashpw(temp_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    success = db_manager.update_user_password(user_id, pw_hash, must_change_password=True)
+
+    if success:
+        email_sent = False
+        try:
+            email_sent = bool(_send_temporary_password_email(
+                target_user.get('email'),
+                target_user.get('username'),
+                temp_password
+            ))
+        except Exception as e:
+            current_app.logger.error(f"Failed to email temporary password: {e}")
+        return jsonify({
+            'message': f"Temporary password generated for '{target_user.get('username')}'.",
+            'temp_password': temp_password,
+            'email_sent': email_sent
+        })
+    return jsonify({'error': 'Failed to update password.'}), 500
+
+
+@bp.route('/api/admin/users/<int:user_id>/history', methods=['GET'])
+@login_required
+@admin_required
+def api_admin_get_user_history(user_id):
+    """Get detailed login activity history for a specific user."""
+    target_user = db_manager.get_user_by_id(user_id)
+    if not target_user:
+        return jsonify({'error': 'User not found.'}), 404
+
+    history = db_manager.get_user_login_history(user_id, limit=50)
+    return jsonify({'user': target_user, 'history': history})
+
+
+@bp.route('/api/admin/password-requests', methods=['GET'])
+@login_required
+@admin_required
+def api_admin_get_password_requests():
+    """List password requests submitted by users."""
+    requests = db_manager.get_password_requests()
+    return jsonify({'requests': requests})
+
+
+@bp.route('/api/admin/password-requests/<int:request_id>/resolve', methods=['POST'])
+@login_required
+@admin_required
+def api_admin_resolve_password_request(request_id):
+    """Generate temporary password and mark password request resolved."""
+    import string, random
+    chars = string.ascii_letters + string.digits
+    parts = [''.join(random.choices(chars, k=4)) for _ in range(3)]
+    temp_password = '-'.join(parts)
+
+    pw_hash = bcrypt.hashpw(temp_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+    # Find the request
+    reqs = db_manager.get_password_requests()
+    target_req = next((r for r in reqs if r['id'] == request_id), None)
+    if not target_req:
+        return jsonify({'error': 'Request not found.'}), 404
+
+    if target_req.get('user_id'):
+        db_manager.update_user_password(target_req['user_id'], pw_hash)
+
+    db_manager.resolve_password_request(request_id, temp_password)
+    return jsonify({
+        'message': f"Request resolved with temporary password.",
+        'temp_password': temp_password
+    })
+
+
+@bp.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def api_admin_delete_user(user_id):
+    """Delete a user account."""
+    if getattr(current_user, 'id', None) == user_id:
+        return jsonify({'error': 'You cannot delete your own account.'}), 400
+
+    target_user = db_manager.get_user_by_id(user_id)
+    if not target_user:
+        return jsonify({'error': 'User not found.'}), 404
+
+    success = db_manager.delete_user(user_id)
+    if success:
+        return jsonify({'message': f"User '{target_user.get('username')}' deleted successfully."})
+    return jsonify({'error': 'Failed to delete user.'}), 500
+
+@bp.route('/api/admin/roles', methods=['GET'])
+@login_required
+@admin_required
+def api_admin_get_roles():
+    """Fetch all roles (system + custom) with user counts."""
+    roles = db_manager.get_all_roles()
+    return jsonify({'roles': roles})
+
+
+@bp.route('/api/admin/roles', methods=['POST'])
+@login_required
+@admin_required
+def api_admin_create_role():
+    """Create a new custom role with granular permissions."""
+    data = request.json or {}
+    name = (data.get('name') or '').strip()
+    description = (data.get('description') or '').strip()
+    permissions = data.get('permissions') or {}
+
+    if not name:
+        return jsonify({'error': 'Role name is required.'}), 400
+
+    new_role = db_manager.create_custom_role(name, description, permissions)
+    if new_role:
+        return jsonify({'message': f"Role '{name}' created successfully.", 'role': new_role}), 201
+    return jsonify({'error': 'Failed to create role. Name or key may already exist.'}), 400
+
+
+@bp.route('/api/admin/roles/<int:role_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def api_admin_delete_role(role_id):
+    """Delete a custom role if unused and not system built-in."""
+    success, message = db_manager.delete_custom_role(role_id)
+    if success:
+        return jsonify({'message': message})
+    return jsonify({'error': message}), 400
+
+
+@bp.route('/api/auth/set-initial-password', methods=['POST'])
+def api_set_initial_password():
+    """Set a permanent password on first login (minimum 8 characters)."""
+    data = request.json or {}
+    temp_token = data.get('temp_token')
+    new_password = data.get('new_password')
+    confirm_password = data.get('confirm_password')
+
+    if not temp_token:
+        return jsonify({'error': 'Missing temporary session token. Please sign in again.'}), 401
+
+    if not new_password or not confirm_password:
+        return jsonify({'error': 'Both password fields are required.'}), 400
+
+    if new_password != confirm_password:
+        return jsonify({'error': 'Passwords do not match.'}), 400
+
+    if len(new_password) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters long.'}), 400
+
+    try:
+        payload = jwt.decode(temp_token, Config.JWT_SECRET_KEY, algorithms=['HS256'])
+        if payload.get('type') != 'must_change_password':
+            return jsonify({'error': 'Invalid token type for password setup.'}), 401
+        user_id = int(payload['sub'])
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'Your session has expired. Please sign in again.'}), 401
+    except Exception:
+        return jsonify({'error': 'Invalid or corrupted session token.'}), 401
+
+    user_data = db_manager.get_user_by_id(user_id)
+    if not user_data:
+        return jsonify({'error': 'User not found.'}), 404
+
+    if user_data.get('is_active') is False:
+        return jsonify({'error': 'Your account is inactive. Please contact the administrator.', 'inactive': True}), 403
+
+    pw_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    success = db_manager.update_user_password(user_id, pw_hash, must_change_password=False)
+    if not success:
+        return jsonify({'error': 'Failed to save new password. Please try again.'}), 500
+
+    ip = get_client_ip()
+    country = get_country(ip)
+    user_agent_str = request.headers.get('User-Agent', '')
+    user_agent_parsed = parse(user_agent_str)
+    browser = f"{user_agent_parsed.browser.family} {user_agent_parsed.browser.version_string}"
+    os_info = f"{user_agent_parsed.os.family} {user_agent_parsed.os.version_string}"
+
+    db_manager.log_login_activity(
+        'initial_password_created',
+        username=user_data['username'],
+        user_id=user_id,
+        ip_address=ip,
+        country=country,
+        user_agent=user_agent_str,
+        browser=browser,
+        os=os_info
+    )
+
+    updated_user = db_manager.get_user_by_id(user_id)
+    return _complete_login_flow(updated_user, trust_device=False)
+
+
+@bp.route('/api/auth/switch-to-email-otp', methods=['POST'])
+def api_switch_to_email_otp():
+    """Allow user on TOTP screen to fall back to Email 2FA OTP."""
+    data = request.json or {}
+    temp_token = data.get('temp_token')
+    if not temp_token:
+        return jsonify({'error': 'Missing temporary token'}), 400
+
+    try:
+        payload = jwt.decode(temp_token, Config.JWT_SECRET_KEY, algorithms=['HS256'])
+        if payload.get('type') not in ['mfa_pending', 'email_otp_pending']:
+            return jsonify({'error': 'Invalid token type'}), 401
+        user_id = int(payload['sub'])
+    except Exception:
+        return jsonify({'error': 'Invalid or expired temporary token'}), 401
+
+    user_data = db_manager.get_user_by_id(user_id)
+    if not user_data:
+        return jsonify({'error': 'User not found'}), 404
+
+    if user_data.get('is_active') is False:
+        return jsonify({'error': 'Your account is inactive. Please contact the administrator.', 'inactive': True}), 403
+
+    code = _generate_otp()
+    expires_at = time.time() + Config.OTP_EXPIRY_SECONDS
+    db_manager.store_otp(user_id, _hash_otp(code), expires_at)
+    try:
+        _send_otp_email(code, user_data.get('email'))
+    except Exception as e:
+        current_app.logger.error(f"Failed to send 2FA OTP email: {e}")
+
+    new_payload = {
+        'sub': str(user_id),
+        'type': 'email_otp_pending',
+        'exp': datetime.utcnow() + timedelta(minutes=5),
+        'iat': datetime.utcnow(),
+        'trust_device': False
+    }
+    new_token = jwt.encode(new_payload, Config.JWT_SECRET_KEY, algorithm='HS256')
+    masked = _mask_email(user_data.get('email') or '')
+    return jsonify({
+        'message': 'Verification code sent to your email',
+        'require_otp': True,
+        'temp_token': new_token,
+        'masked_email': masked,
+        'cooldown': Config.OTP_RESEND_COOLDOWN_SECONDS
+    })

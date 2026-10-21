@@ -1,4 +1,4 @@
-"""Login orchestration and the API bearer-token guard."""
+﻿"""Login orchestration and the API bearer-token guard."""
 
 import jwt
 import os
@@ -11,11 +11,10 @@ from app.utils.request_utils import get_client_ip
 from app.utils.request_utils import get_country
 from app.utils.security import _generate_backend_fingerprint
 from datetime import datetime, timedelta
-from flask import current_app, jsonify, request, session
+from flask import current_app, jsonify, redirect, request, session, url_for
 from flask_login import current_user
 from functools import wraps
 from user_agents import parse
-
 
 
 def _complete_login_flow(user_data, trust_device=False):
@@ -31,11 +30,20 @@ def _complete_login_flow(user_data, trust_device=False):
     accept_lang = request.headers.get('Accept-Language', '')
     fingerprint = _generate_backend_fingerprint(user_agent_str, accept_lang, ip_subnet)
     
+    role = user_data.get('role', 'user')
+    can_view_scrapers = user_data.get('can_view_scrapers', True)
+    can_view_reports = user_data.get('can_view_reports', True)
+    can_manage_users = user_data.get('can_manage_users', False)
+
     # Issue Tokens
     access_payload = {
         'sub': str(user_data['id']),
         'username': user_data['username'],
         'email': user_data.get('email'),
+        'role': role,
+        'can_view_scrapers': can_view_scrapers,
+        'can_view_reports': can_view_reports,
+        'can_manage_users': can_manage_users,
         'exp': datetime.utcnow() + timedelta(seconds=Config.JWT_ACCESS_EXPIRY),
         'iat': datetime.utcnow()
     }
@@ -79,12 +87,23 @@ def _complete_login_flow(user_data, trust_device=False):
         'access_token': access_token,
         'refresh_token': refresh_token,
         'expires_in': Config.JWT_ACCESS_EXPIRY,
-        'mfa_setup_required': not (user_data.get('mfa_enabled') or user_data.get('two_factor_enabled'))
+        'mfa_setup_required': not (user_data.get('mfa_enabled') or user_data.get('two_factor_enabled')),
+        'user': {
+            'id': user_data['id'],
+            'username': user_data['username'],
+            'email': user_data.get('email'),
+            'role': role,
+            'can_view_scrapers': can_view_scrapers,
+            'can_view_reports': can_view_reports,
+            'can_manage_users': can_manage_users,
+            'must_change_password': bool(user_data.get('must_change_password', False))
+        }
     }
     if device_token:
         res['device_token'] = device_token
         
     return jsonify(res)
+
 
 def api_require_auth(f):
     """Decorator to protect API routes with JWT or Flask-Login session."""
@@ -108,4 +127,94 @@ def api_require_auth(f):
         except jwt.InvalidTokenError:
             return jsonify({'error': 'Invalid token'}), 401
         return f(*args, **kwargs)
+    return decorated
+
+
+def admin_required(f):
+    """Decorator ensuring the user has administrator privileges."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if current_app.config.get('LOGIN_DISABLED'):
+            return f(*args, **kwargs)
+        if current_user.is_authenticated:
+            if not getattr(current_user, 'is_admin', False):
+                if request.path.startswith('/api/'):
+                    return jsonify({'error': 'Forbidden: Administrator privileges required.'}), 403
+                return redirect(url_for('pages.index'))
+            return f(*args, **kwargs)
+
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            try:
+                payload = jwt.decode(auth_header.split(' ')[1], Config.JWT_SECRET_KEY, algorithms=['HS256'])
+                request.user_id = payload['sub']
+                if payload.get('role') not in ('super_admin', 'admin') and not payload.get('can_manage_users'):
+                    return jsonify({'error': 'Forbidden: Administrator privileges required.'}), 403
+                return f(*args, **kwargs)
+            except Exception:
+                return jsonify({'error': 'Unauthorized'}), 401
+
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'Unauthorized'}), 401
+        return redirect(url_for('auth.auth_portal'))
+    return decorated
+
+
+def scraper_access_required(f):
+    """Decorator ensuring the user has permission to access Scraper Logs."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if current_app.config.get('LOGIN_DISABLED'):
+            return f(*args, **kwargs)
+        if current_user.is_authenticated:
+            if not getattr(current_user, 'can_access_scrapers', False):
+                if request.path.startswith('/api/'):
+                    return jsonify({'error': 'Forbidden: Access to Scraper Logs is restricted.'}), 403
+                return redirect(url_for('pages.index'))
+            return f(*args, **kwargs)
+
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            try:
+                payload = jwt.decode(auth_header.split(' ')[1], Config.JWT_SECRET_KEY, algorithms=['HS256'])
+                request.user_id = payload['sub']
+                if payload.get('role') not in ('super_admin', 'admin') and not payload.get('can_view_scrapers', True):
+                    return jsonify({'error': 'Forbidden: Access to Scraper Logs is restricted.'}), 403
+                return f(*args, **kwargs)
+            except Exception:
+                return jsonify({'error': 'Unauthorized'}), 401
+
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'Unauthorized'}), 401
+        return redirect(url_for('auth.auth_portal'))
+    return decorated
+
+
+def report_access_required(f):
+    """Decorator ensuring the user has permission to access Market Reports."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if current_app.config.get('LOGIN_DISABLED'):
+            return f(*args, **kwargs)
+        if current_user.is_authenticated:
+            if not getattr(current_user, 'can_access_reports', False):
+                if request.path.startswith('/api/'):
+                    return jsonify({'error': 'Forbidden: Access to Market Reports is restricted.'}), 403
+                return redirect(url_for('pages.index'))
+            return f(*args, **kwargs)
+
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            try:
+                payload = jwt.decode(auth_header.split(' ')[1], Config.JWT_SECRET_KEY, algorithms=['HS256'])
+                request.user_id = payload['sub']
+                if payload.get('role') not in ('super_admin', 'admin') and not payload.get('can_view_reports', True):
+                    return jsonify({'error': 'Forbidden: Access to Market Reports is restricted.'}), 403
+                return f(*args, **kwargs)
+            except Exception:
+                return jsonify({'error': 'Unauthorized'}), 401
+
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'Unauthorized'}), 401
+        return redirect(url_for('auth.auth_portal'))
     return decorated

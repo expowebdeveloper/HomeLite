@@ -42,11 +42,13 @@
                     <i class="fas fa-plus-circle" style="color: var(--accent-color);"></i> <span>Add Off-Market<span class="label-long"> Property</span></span>
                 </button>
 
+                {% if current_user.can_access_scrapers %}
                 <a href="{{ url_for('pages.scraper_logs') }}" class="btn btn-secondary" id="btn-scraper-logs"
                    style="text-decoration: none; display: flex; align-items: center; gap: 8px; margin-left: 15px; position: relative;">
                     <i class="fas fa-terminal"></i> Scraper Logs
                     <span id="scraper-live-dot" style="display:none; width:8px; height:8px; border-radius:50%; background:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,.2);"></span>
                 </a>
+                {% endif %}
 
                 <div class="user-profile-dropdown" style="position: relative; margin-left: 20px;">
                     <button class="btn btn-secondary profile-toggle-btn" id="profileToggleBtn" onclick="toggleProfileMenu(event)" style="display: flex; align-items: center; gap: 8px; border-radius: 20px; padding: 6px 14px; cursor: pointer; background: white; border: 1px solid var(--border-color);">
@@ -74,12 +76,21 @@
                         </div>
                         
                         <div style="padding: 8px;">
+                            {% if current_user.can_access_reports %}
                             <a href="{{ url_for('pages.reports') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text-secondary); text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='var(--surface-hover)'; this.style.color='var(--primary-color)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
                                 <i class="fas fa-chart-line" style="width: 16px; text-align: center;"></i> Market Reports
                             </a>
+                            {% endif %}
+                            {% if current_user.can_access_scrapers %}
                             <a href="{{ url_for('pages.scraper_logs') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text-secondary); text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='var(--surface-hover)'; this.style.color='var(--primary-color)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
                                 <i class="fas fa-terminal" style="width: 16px; text-align: center;"></i> Scraper Logs
                             </a>
+                            {% endif %}
+                            {% if current_user.is_admin %}
+                            <a href="{{ url_for('auth.user_management') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text-secondary); text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='var(--surface-hover)'; this.style.color='var(--primary-color)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
+                                <i class="fas fa-users-cog" style="width: 16px; text-align: center; color: var(--primary-color);"></i> User Management
+                            </a>
+                            {% endif %}
                             <a href="{{ url_for('auth.login_history') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text-secondary); text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='var(--surface-hover)'; this.style.color='var(--primary-color)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
                                 <i class="fas fa-history" style="width: 16px; text-align: center;"></i> Login History
                             </a>
