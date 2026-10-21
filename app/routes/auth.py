@@ -17,6 +17,7 @@ from app.config import Config
 from app.extensions import db_manager
 from app.extensions import fernet
 from app.models.user import User
+from app.repositories.users import is_protected_superadmin
 from app.services.auth_service import _complete_login_flow
 from app.services.auth_service import api_require_auth, admin_required
 from app.services.email_service import _send_otp_email
@@ -228,22 +229,29 @@ def api_login():
             ip_address=ip, country=country, user_agent=user_agent_str, browser=browser, os=os_info)
         return jsonify({'error': 'Invalid credentials'}), 401
 
+    # Ensure protected super admins always remain super_admin and active
+    is_protected = is_protected_superadmin(user_data)
+    if is_protected:
+        user_data['is_active'] = True
+        user_data['role'] = 'super_admin'
+
     # Check active status
-    if user_data.get('is_active') is False:
+    if not is_protected and user_data.get('is_active') is False:
         db_manager.log_login_activity(
             'api_login_deactivated', username=user_data['username'], user_id=user_data['id'],
             ip_address=ip, country=country, user_agent=user_agent_str, browser=browser, os=os_info)
         return jsonify({'error': 'Your account is inactive. Please contact the administrator.', 'inactive': True}), 403
 
     # Check if assigned role still exists (or was deleted by super admin)
-    all_roles = db_manager.get_all_roles()
-    valid_role_keys = {r['role_key'] for r in all_roles}
-    if user_data.get('role') not in valid_role_keys and user_data.get('role') != 'super_admin':
-        db_manager.set_user_active_status(user_data['id'], False)
-        db_manager.log_login_activity(
-            'api_login_role_deleted', username=user_data['username'], user_id=user_data['id'],
-            ip_address=ip, country=country, user_agent=user_agent_str, browser=browser, os=os_info)
-        return jsonify({'error': 'Your account is inactive. Please contact the administrator.', 'inactive': True}), 403
+    if not is_protected:
+        all_roles = db_manager.get_all_roles()
+        valid_role_keys = {'super_admin', 'sub_admin', 'restricted_user'} | {r['role_key'] for r in all_roles if r.get('role_key')}
+        if user_data.get('role') not in valid_role_keys:
+            db_manager.set_user_active_status(user_data['id'], False)
+            db_manager.log_login_activity(
+                'api_login_role_deleted', username=user_data['username'], user_id=user_data['id'],
+                ip_address=ip, country=country, user_agent=user_agent_str, browser=browser, os=os_info)
+            return jsonify({'error': 'Your account is inactive. Please contact the administrator.', 'inactive': True}), 403
         
     # Check Lockout
     if user_data.get('locked_until') and user_data['locked_until'] > datetime.utcnow():
@@ -346,14 +354,20 @@ def api_login_2fa():
         # User doesn't exist
         return jsonify({'error': 'No account found with this email address.'}), 401
 
-    if user_data.get('is_active') is False:
+    is_protected = is_protected_superadmin(user_data)
+    if is_protected:
+        user_data['is_active'] = True
+        user_data['role'] = 'super_admin'
+
+    if not is_protected and user_data.get('is_active') is False:
         return jsonify({'error': 'Your account is inactive. Please contact the administrator.', 'inactive': True}), 403
 
-    all_roles = db_manager.get_all_roles()
-    valid_role_keys = {r['role_key'] for r in all_roles}
-    if user_data.get('role') not in valid_role_keys and user_data.get('role') != 'super_admin':
-        db_manager.set_user_active_status(user_data['id'], False)
-        return jsonify({'error': 'Your account is inactive. Please contact the administrator.', 'inactive': True}), 403
+    if not is_protected:
+        all_roles = db_manager.get_all_roles()
+        valid_role_keys = {'super_admin', 'sub_admin', 'restricted_user'} | {r['role_key'] for r in all_roles if r.get('role_key')}
+        if user_data.get('role') not in valid_role_keys:
+            db_manager.set_user_active_status(user_data['id'], False)
+            return jsonify({'error': 'Your account is inactive. Please contact the administrator.', 'inactive': True}), 403
 
     # If user still has temporary password, require setting permanent password first
     if user_data.get('must_change_password'):
@@ -913,7 +927,12 @@ def api_admin_update_user(user_id):
         return jsonify({'error': 'User not found.'}), 404
 
     data = request.json or {}
-    role = data.get('role', target_user.get('role', 'sub_admin'))
+    if is_protected_superadmin(target_user):
+        role = 'super_admin'
+        if 'is_active' in data:
+            data['is_active'] = True
+    else:
+        role = data.get('role', target_user.get('role', 'sub_admin'))
 
     all_roles = db_manager.get_all_roles()
     matched_role = next((r for r in all_roles if r['role_key'] == role), None)
@@ -965,6 +984,9 @@ def api_admin_toggle_user_status(user_id):
     target_user = db_manager.get_user_by_id(user_id)
     if not target_user:
         return jsonify({'error': 'User not found.'}), 404
+
+    if is_protected_superadmin(target_user):
+        return jsonify({'error': 'Primary Super Admin accounts (Expoweb, Sardo) cannot be deactivated.'}), 400
 
     current_status = target_user.get('is_active', True)
     new_status = not current_status
@@ -1078,6 +1100,9 @@ def api_admin_delete_user(user_id):
     target_user = db_manager.get_user_by_id(user_id)
     if not target_user:
         return jsonify({'error': 'User not found.'}), 404
+
+    if is_protected_superadmin(target_user):
+        return jsonify({'error': 'Primary Super Admin accounts (Expoweb, Sardo) cannot be deleted.'}), 400
 
     success = db_manager.delete_user(user_id)
     if success:

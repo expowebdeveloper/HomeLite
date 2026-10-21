@@ -12,6 +12,30 @@ import logging
 import datetime
 from typing import Dict, Optional
 
+PROTECTED_SUPERADMIN_EMAILS = {
+    'expowebdeveloper@gmail.com',
+    'sardorealestate@gmail.com',
+    'admin@example.com'
+}
+
+PROTECTED_SUPERADMIN_USERNAMES = {
+    'expoweb',
+    'sardorealestate@gmail.com',
+    'admin'
+}
+
+
+def is_protected_superadmin(user_info) -> bool:
+    """Check if a user dict, email, or username represents an immutable root superadmin."""
+    if not user_info:
+        return False
+    if isinstance(user_info, dict):
+        email = (user_info.get('email') or '').strip().lower()
+        username = (user_info.get('username') or '').strip().lower()
+        return email in PROTECTED_SUPERADMIN_EMAILS or username in PROTECTED_SUPERADMIN_USERNAMES
+    s = str(user_info).strip().lower()
+    return s in PROTECTED_SUPERADMIN_EMAILS or s in PROTECTED_SUPERADMIN_USERNAMES
+
 
 class UsersMixin:
     """User accounts, passwords, OTP and TOTP/MFA state."""
@@ -92,7 +116,16 @@ class UsersMixin:
                 cursor.execute(f"SELECT * FROM users WHERE {where_sql}", params)
                 user = cursor.fetchone()
                 cursor.close()
-                return dict(user) if user else None
+                if not user:
+                    return None
+                u_dict = dict(user)
+                if is_protected_superadmin(u_dict):
+                    u_dict['role'] = 'super_admin'
+                    u_dict['is_active'] = True
+                    u_dict['can_view_scrapers'] = True
+                    u_dict['can_view_reports'] = True
+                    u_dict['can_manage_users'] = True
+                return u_dict
             except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
                 # Connection-level failure: discard it and retry once on a fresh one.
                 logging.warning(f"Connection lost fetching user {what} (attempt {attempt}): {e}")
@@ -491,7 +524,19 @@ class UsersMixin:
             """)
             rows = cursor.fetchall()
             cursor.close()
-            return [dict(r) for r in rows] if rows else []
+            if not rows:
+                return []
+            result = []
+            for r in rows:
+                u_dict = dict(r)
+                if is_protected_superadmin(u_dict):
+                    u_dict['role'] = 'super_admin'
+                    u_dict['is_active'] = True
+                    u_dict['can_view_scrapers'] = True
+                    u_dict['can_view_reports'] = True
+                    u_dict['can_manage_users'] = True
+                result.append(u_dict)
+            return result
         except Exception as e:
             logging.error(f"Error fetching all users: {e}")
             return []
@@ -505,6 +550,12 @@ class UsersMixin:
         can_manage_users: bool
     ) -> bool:
         """Update role and permissions for a user."""
+        target = self.get_user_by_id(user_id)
+        if target and is_protected_superadmin(target):
+            role = 'super_admin'
+            can_view_scrapers = True
+            can_view_reports = True
+            can_manage_users = True
         if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
@@ -531,6 +582,10 @@ class UsersMixin:
 
     def delete_user(self, user_id: int) -> bool:
         """Delete a user account and associated session/activity data."""
+        target = self.get_user_by_id(user_id)
+        if target and is_protected_superadmin(target):
+            logging.warning(f"Prevented deletion of protected super admin user {user_id} ({target.get('username')})")
+            return False
         if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
@@ -553,6 +608,11 @@ class UsersMixin:
 
     def set_user_active_status(self, user_id: int, is_active: bool) -> bool:
         """Activate or deactivate a user account."""
+        if not is_active:
+            target = self.get_user_by_id(user_id)
+            if target and is_protected_superadmin(target):
+                logging.warning(f"Prevented deactivation of protected super admin user {user_id} ({target.get('username')})")
+                return False
         if not self.connection or self.connection.closed:
             if not self.connect():
                 return False
@@ -679,10 +739,26 @@ class UsersMixin:
             """)
             rows = cursor.fetchall()
             cursor.close()
-            return [dict(r) for r in rows] if rows else []
+            system_fallback = [
+                {'id': 1, 'name': 'Super admin', 'role_key': 'super_admin', 'description': 'Full permissions across all modules. Cannot be changed or deleted.', 'is_system': True, 'can_view_dashboard': True, 'can_view_reports': True, 'can_export_reports': True, 'can_view_scrapers': True, 'can_run_scrapers': True, 'can_manage_users': True, 'can_manage_settings': True, 'user_count': 0},
+                {'id': 2, 'name': 'Sub-Admin', 'role_key': 'sub_admin', 'description': 'Works applications end to end: reports, scrapers, and pipeline monitoring.', 'is_system': True, 'can_view_dashboard': True, 'can_view_reports': True, 'can_export_reports': True, 'can_view_scrapers': True, 'can_run_scrapers': True, 'can_manage_users': False, 'can_manage_settings': False, 'user_count': 0},
+                {'id': 3, 'name': 'Restricted User', 'role_key': 'restricted_user', 'description': 'Access limited to Dashboard and Market Intelligence overview.', 'is_system': True, 'can_view_dashboard': True, 'can_view_reports': False, 'can_export_reports': False, 'can_view_scrapers': False, 'can_run_scrapers': False, 'can_manage_users': False, 'can_manage_settings': False, 'user_count': 0}
+            ]
+            if not rows:
+                return system_fallback
+            result = [dict(r) for r in rows]
+            existing_keys = {r.get('role_key') for r in result}
+            for sf in system_fallback:
+                if sf['role_key'] not in existing_keys:
+                    result.append(sf)
+            return result
         except Exception as e:
             logging.error(f"Error fetching roles: {e}")
-            return []
+            return [
+                {'id': 1, 'name': 'Super admin', 'role_key': 'super_admin', 'description': 'Full permissions across all modules. Cannot be changed or deleted.', 'is_system': True, 'can_view_dashboard': True, 'can_view_reports': True, 'can_export_reports': True, 'can_view_scrapers': True, 'can_run_scrapers': True, 'can_manage_users': True, 'can_manage_settings': True, 'user_count': 0},
+                {'id': 2, 'name': 'Sub-Admin', 'role_key': 'sub_admin', 'description': 'Works applications end to end: reports, scrapers, and pipeline monitoring.', 'is_system': True, 'can_view_dashboard': True, 'can_view_reports': True, 'can_export_reports': True, 'can_view_scrapers': True, 'can_run_scrapers': True, 'can_manage_users': False, 'can_manage_settings': False, 'user_count': 0},
+                {'id': 3, 'name': 'Restricted User', 'role_key': 'restricted_user', 'description': 'Access limited to Dashboard and Market Intelligence overview.', 'is_system': True, 'can_view_dashboard': True, 'can_view_reports': False, 'can_export_reports': False, 'can_view_scrapers': False, 'can_run_scrapers': False, 'can_manage_users': False, 'can_manage_settings': False, 'user_count': 0}
+            ]
 
     def create_custom_role(self, name: str, description: str, permissions: dict) -> Optional[dict]:
         """Create a new custom role with specified permissions."""
