@@ -228,67 +228,87 @@ def _build_temporary_password_html(username, user_email, temp_password, login_ur
 def _build_otp_html(code, minutes):
     """HTML template for 2FA verification code."""
     inner_html = f"""
-        <h1 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 700; color: #0f172a; line-height: 1.3;">
+        <h1 style="margin: 0 0 12px 0; font-size: 24px; font-weight: 800; color: #071A33; line-height: 1.3; letter-spacing: -0.3px;">
             Two-Factor Verification Code
         </h1>
-        <p style="margin: 0 0 20px 0; font-size: 14.5px; line-height: 1.6; color: #475569;">
-            Enter the following one-time verification code to complete your SARDO360 sign-in:
+        <p style="margin: 0 0 22px 0; font-size: 14.5px; line-height: 1.65; color: #475569;">
+            Enter the following one-time verification code to complete your secure sign-in to the <strong>SARDO360 Property Insight</strong> portal:
         </p>
 
-        <!-- Big OTP Display -->
+        <!-- Big OTP Display in Executive Gold & Navy Card -->
         <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 24px 0;">
             <tr>
                 <td align="center">
-                    <div style="display: inline-block; background-color: #eef2ff; border: 2px solid #6366f1; border-radius: 12px; padding: 14px 28px; font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: 800; color: #4338ca; letter-spacing: 6px;">
-                        {code}
+                    <div style="display: inline-block; background: linear-gradient(135deg, #FAF5EB 0%, #F5E8D0 100%); border: 2px solid #D3A24A; border-radius: 14px; padding: 16px 36px; box-shadow: 0 6px 18px rgba(211, 162, 74, 0.18);">
+                        <span style="font-family: 'SFMono-Regular', Consolas, 'Courier New', monospace; font-size: 34px; font-weight: 800; color: #071A33; letter-spacing: 8px;">
+                            {code}
+                        </span>
                     </div>
                 </td>
             </tr>
         </table>
 
-        <p style="text-align: center; font-size: 13px; color: #64748b; margin: 0 0 16px 0;">
-            This code expires in <strong>{minutes} minute(s)</strong>.
+        <p style="text-align: center; font-size: 13.5px; color: #64748B; margin: 0 0 20px 0;">
+            This one-time passcode expires in <strong style="color: #071A33;">{minutes} minute(s)</strong>.
         </p>
-        <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; margin: 0;">
-            If you did not attempt to log in to your account, someone may be trying to access it. You can safely ignore this email, or contact your administrator if you suspect unauthorized activity.
-        </p>
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 16px; margin: 0;">
+            <tr>
+                <td>
+                    <p style="font-size: 12px; color: #64748B; line-height: 1.55; margin: 0;">
+                        <strong style="color: #071A33;">Security Note:</strong> Never share this code with anyone. SARDO administrators will never ask for your verification code. If you did not initiate this login, please contact your administrator immediately.
+                    </p>
+                </td>
+            </tr>
+        </table>
     """
     return _get_sardo_email_base(
         title="Your SARDO360 Login Code",
         badge_text="Security Verification",
-        inner_html=inner_html
+        inner_html=inner_html,
+        footer_note="If you did not request this login code, please contact sardorealestate@gmail.com."
     )
 
 
 def _build_password_reset_html(reset_link):
     """HTML template for password reset."""
     inner_html = f"""
-        <h1 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 700; color: #0f172a; line-height: 1.3;">
+        <h1 style="margin: 0 0 14px 0; font-size: 24px; font-weight: 800; color: #071A33; line-height: 1.3; letter-spacing: -0.3px;">
             Password Reset Request
         </h1>
-        <p style="margin: 0 0 20px 0; font-size: 14.5px; line-height: 1.6; color: #475569;">
-            We received a request to reset your password for SARDO360. If you did not make this request, you can safely ignore this email.
+        <p style="margin: 0 0 22px 0; font-size: 14.5px; line-height: 1.65; color: #475569;">
+            We received an official request to reset the password for your <strong>SARDO360</strong> portal account. If you submitted this request, click the button below to choose your new password:
         </p>
+
         <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 28px 0;">
             <tr>
                 <td align="center">
-                    <a href="{reset_link}" target="_blank" style="display: inline-block; background-color: #6366f1; background-image: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: #ffffff !important; text-decoration: none; font-size: 14.5px; font-weight: 700; padding: 13px 34px; border-radius: 25px; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35); text-align: center;">
-                        Reset Password &rarr;
+                    <a href="{reset_link}" target="_blank" style="display: inline-block; background-color: #071A33; background: linear-gradient(135deg, #071A33 0%, #0B2545 60%, #163A63 100%); color: #ffffff !important; text-decoration: none; font-size: 14.5px; font-weight: 700; padding: 14px 38px; border-radius: 30px; letter-spacing: 0.5px; box-shadow: 0 6px 18px rgba(7, 26, 51, 0.25); text-align: center;">
+                        Reset Your Password &rarr;
                     </a>
                 </td>
             </tr>
         </table>
-        <p style="text-align: center; font-size: 12px; color: #94a3b8; margin: 0 0 20px 0;">
-            Or copy and paste this link: <a href="{reset_link}" style="color: #6366f1; text-decoration: underline;">{reset_link}</a>
+
+        <p style="text-align: center; font-size: 12.5px; color: #64748B; margin: 0 0 20px 0;">
+            Or copy and paste this link into your browser:<br />
+            <a href="{reset_link}" style="color: #071A33; font-weight: 600; text-decoration: underline; word-break: break-all;">{reset_link}</a>
         </p>
-        <p style="font-size: 12px; color: #94a3b8; margin: 0;">
-            This link will expire in 15 minutes.
-        </p>
+
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 12px 16px; margin: 0;">
+            <tr>
+                <td>
+                    <p style="font-size: 12px; color: #92400E; line-height: 1.5; margin: 0;">
+                        <strong>Note:</strong> This secure link will automatically expire in <strong>15 minutes</strong>. If you did not request a password reset, you can safely ignore this email.
+                    </p>
+                </td>
+            </tr>
+        </table>
     """
     return _get_sardo_email_base(
         title="Password Reset Request - SARDO360",
         badge_text="Password Reset",
-        inner_html=inner_html
+        inner_html=inner_html,
+        footer_note="If you did not request a password reset, please contact sardorealestate@gmail.com."
     )
 
 def _otp_recipients(user_email=None):
@@ -324,6 +344,128 @@ The {Config.APP_TITLE} Team
         current_app.logger.error(f"Failed to send password reset email: {e}")
 
 
+def _build_security_alert_html(reason_str, ip, country, browser, os_info, timestamp_str, login_url=None):
+    """HTML template matching SARDO360 executive branding for login security alerts."""
+    if not login_url:
+        try:
+            from flask import has_request_context, request
+            if has_request_context():
+                login_url = f"{request.host_url.rstrip('/')}/login"
+            else:
+                login_url = "https://360portal.sardorealestate.com/login"
+        except Exception:
+            login_url = "https://360portal.sardorealestate.com/login"
+
+    inner_html = f"""
+        <h1 style="margin: 0 0 14px 0; font-size: 24px; font-weight: 800; color: #071A33; line-height: 1.3; letter-spacing: -0.3px;">
+            Security Alert: New Sign-In Detected
+        </h1>
+        <p style="margin: 0 0 24px 0; font-size: 14.5px; line-height: 1.65; color: #475569;">
+            We detected a successful sign-in to your <strong>SARDO360</strong> account from a <strong>{reason_str}</strong>. Please review the access details below to confirm this activity was authorized by you.
+        </p>
+
+        <!-- Access Details Card -->
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #FAFAFC; border: 1px solid #E2E8F0; border-left: 4px solid #D3A24A; border-radius: 12px; margin: 0 0 26px 0; box-shadow: 0 3px 10px rgba(11, 37, 69, 0.03);">
+            <tr>
+                <td style="padding: 22px 24px;">
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="border-bottom: 1px solid #E8ECEF; padding-bottom: 12px; margin-bottom: 16px;">
+                        <tr>
+                            <td align="left">
+                                <span style="font-size: 11px; font-weight: 800; color: #071A33; text-transform: uppercase; letter-spacing: 1px;">
+                                    Session Details
+                                </span>
+                            </td>
+                            <td align="right">
+                                <span style="font-size: 11px; font-weight: 700; color: #B45309; background: #FEF3C7; border: 1px solid #FDE68A; padding: 3px 10px; border-radius: 12px; letter-spacing: 0.3px;">
+                                    ● Unrecognized Origin
+                                </span>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                        <tr>
+                            <td style="padding-bottom: 12px; font-size: 12px; color: #64748B; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; width: 140px; vertical-align: middle;">
+                                IP Address
+                            </td>
+                            <td style="padding-bottom: 12px; font-size: 14px; color: #071A33; font-weight: 700;">
+                                <code style="font-family: 'SFMono-Regular', Consolas, 'Courier New', monospace; background: #EDF2F7; padding: 3px 8px; border-radius: 6px; font-size: 13px;">{ip}</code>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding-bottom: 12px; font-size: 12px; color: #64748B; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; vertical-align: middle;">
+                                Location
+                            </td>
+                            <td style="padding-bottom: 12px; font-size: 14px; color: #071A33; font-weight: 600;">
+                                {country or 'Unknown'}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding-bottom: 12px; font-size: 12px; color: #64748B; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; vertical-align: middle;">
+                                Browser
+                            </td>
+                            <td style="padding-bottom: 12px; font-size: 14px; color: #071A33; font-weight: 600;">
+                                {browser or 'Unknown'}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding-bottom: 12px; font-size: 12px; color: #64748B; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; vertical-align: middle;">
+                                Operating System
+                            </td>
+                            <td style="padding-bottom: 12px; font-size: 14px; color: #071A33; font-weight: 600;">
+                                {os_info or 'Unknown'}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="font-size: 12px; color: #64748B; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; vertical-align: middle;">
+                                Timestamp
+                            </td>
+                            <td style="font-size: 13.5px; color: #475569; font-weight: 600;">
+                                {timestamp_str}
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+
+        <!-- Security Action Guidance -->
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 0 0 28px 0;">
+            <tr>
+                <td style="background-color: #FEF2F2; border: 1px solid #FECACA; border-left: 4px solid #EF4444; border-radius: 8px; padding: 14px 18px;">
+                    <div style="font-weight: 700; color: #991B1B; font-size: 13.5px; margin-bottom: 4px;">
+                        Did not recognize this sign-in?
+                    </div>
+                    <div style="font-size: 12.5px; color: #B91C1C; line-height: 1.5;">
+                        If this wasn't you, someone may have compromised your credentials. Please sign in immediately to change your password and revoke any active sessions from your Account Settings.
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <!-- Portal Action Button -->
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 0 0 24px 0;">
+            <tr>
+                <td align="center">
+                    <a href="{login_url}" target="_blank" style="display: inline-block; background-color: #071A33; background: linear-gradient(135deg, #071A33 0%, #0B2545 60%, #163A63 100%); color: #ffffff !important; text-decoration: none; font-size: 14.5px; font-weight: 700; padding: 14px 38px; border-radius: 30px; letter-spacing: 0.5px; box-shadow: 0 6px 18px rgba(7, 26, 51, 0.25); text-align: center;">
+                        Review Account &bull; Sign In &rarr;
+                    </a>
+                </td>
+            </tr>
+        </table>
+
+        <p style="font-size: 12.5px; color: #94A3B8; line-height: 1.5; margin: 0; text-align: center;">
+            If this was you, no action is required and you can safely ignore this alert.
+        </p>
+    """
+    return _get_sardo_email_base(
+        title=f"Security Alert: New Sign-In from a {reason_str} - SARDO360",
+        badge_text="Security Alert",
+        inner_html=inner_html,
+        footer_note="If you suspect unauthorized activity, contact sardorealestate@gmail.com immediately."
+    )
+
+
 def _send_security_alert_email(user_email, is_new_device, is_new_location, ip, country, browser, os_info):
     """Send a security alert email when a new device or location is detected."""
     if not user_email:
@@ -335,7 +477,8 @@ def _send_security_alert_email(user_email, is_new_device, is_new_location, ip, c
     if is_new_location:
         reasons.append("new location")
         
-    reason_str = " and ".join(reasons)
+    reason_str = " and ".join(reasons) if reasons else "new device"
+    time_str = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
     
     subject = f"Security Alert: New Login from a {reason_str}"
     body = (
@@ -345,11 +488,15 @@ def _send_security_alert_email(user_email, is_new_device, is_new_location, ip, c
         f"- Location: {country or 'Unknown'}\n"
         f"- Browser: {browser or 'Unknown'}\n"
         f"- Operating System: {os_info or 'Unknown'}\n"
-        f"- Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n"
+        f"- Time: {time_str}\n\n"
         f"If this was you, you can safely ignore this email.\n"
         f"If you do not recognize this activity, please contact the administrator immediately and change your password."
     )
-    email_sender.send(to=[user_email], subject=subject, body=body)
+    html_body = _build_security_alert_html(reason_str, ip, country, browser, os_info, time_str)
+    try:
+        email_sender.send(to=[user_email], subject=subject, body=body, html_body=html_body)
+    except Exception as e:
+        current_app.logger.error(f"Failed to send security alert email to {user_email}: {e}")
 
 def _send_otp_email(code, user_email=None):
     """Email the OTP code to the effective recipient(s)."""

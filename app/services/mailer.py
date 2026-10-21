@@ -54,6 +54,29 @@ class EmailSender:
         msg['Subject'] = subject
         msg.set_content(body)
 
+        if not html_body and body:
+            # Ensure every email sent throughout the application uses the SARDO360 executive template
+            try:
+                from app.services.email_service import _get_sardo_email_base
+                paragraphs = [p.strip() for p in body.split('\n\n') if p.strip()]
+                formatted_p = []
+                for p in paragraphs:
+                    lines = [l.strip() for l in p.split('\n') if l.strip()]
+                    formatted_p.append('<p style="margin: 0 0 16px 0; font-size: 14.5px; line-height: 1.65; color: #475569;">' + '<br />'.join(lines) + '</p>')
+                inner_html = f"""
+                    <h1 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 800; color: #071A33; line-height: 1.3;">
+                        {subject}
+                    </h1>
+                    {''.join(formatted_p)}
+                """
+                html_body = _get_sardo_email_base(
+                    title=subject,
+                    badge_text="Notification",
+                    inner_html=inner_html
+                )
+            except Exception as e:
+                logging.warning(f"Could not wrap email body with SARDO luxury base template: {e}")
+
         if html_body:
             msg.add_alternative(html_body, subtype='html')
 
