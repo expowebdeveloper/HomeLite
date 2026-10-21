@@ -3,18 +3,14 @@ import sys
 import logging
 import psycopg2
 
-sys.path.insert(0, os.path.abspath(r'..\HomeLite'))
-from app.config import Config
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import Config
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 def run():
     config = Config()
-    if config.DB_HOST not in ('localhost', '127.0.0.1'):
-        logging.error(f"ABORTING: Expected local database, but DB_HOST is '{config.DB_HOST}'")
-        return False
-
-    logging.info(f"Connecting to LOCAL database {config.DB_NAME} at {config.DB_HOST}:{config.DB_PORT}...")
+    logging.info(f"Connecting to database {config.DB_NAME} at {config.DB_HOST}:{config.DB_PORT} as {config.DB_USER}...")
     try:
         conn = psycopg2.connect(
             host=config.DB_HOST,
@@ -78,19 +74,14 @@ def run():
         conn.commit()
         cursor.close()
         conn.close()
-        logging.info("Migration 012 completed successfully on local database.")
-
-        # Also write the migration file to HomeLite/migrations/012_add_custom_roles_table.py
-        migration_file = os.path.abspath(r'..\HomeLite\migrations\012_add_custom_roles_table.py')
-        with open(__file__, 'r', encoding='utf-8') as src:
-            code = src.read()
-        with open(migration_file, 'w', encoding='utf-8') as dst:
-            dst.write(code)
-        logging.info(f"Saved migration script to {migration_file}")
+        logging.info("Migration 012 completed successfully.")
         return True
 
     except Exception as e:
-        logging.error(f"Migration failed: {e}")
+        logging.error(f"Migration 012 failed: {e}")
+        if 'conn' in locals() and conn:
+            conn.rollback()
+            conn.close()
         return False
 
 if __name__ == '__main__':

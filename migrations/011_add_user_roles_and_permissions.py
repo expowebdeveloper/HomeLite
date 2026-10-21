@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Migration 011: Add Role, Permission and Account Status Columns to Users Table
 
@@ -27,13 +27,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 def run_migration():
     config = Config()
-    
-    # Safety assertion: verify target database host is local
-    if config.DB_HOST not in ('localhost', '127.0.0.1'):
-        logging.error(f"ABORTING: Expected local database, but DB_HOST is '{config.DB_HOST}'")
-        return False
-
-    logging.info(f"Connecting to LOCAL database {config.DB_NAME} at {config.DB_HOST}:{config.DB_PORT}...")
+    logging.info(f"Connecting to database {config.DB_NAME} at {config.DB_HOST}:{config.DB_PORT} as {config.DB_USER}...")
 
     try:
         conn = psycopg2.connect(
@@ -85,7 +79,7 @@ def run_migration():
         conn.commit()
         cursor.close()
         conn.close()
-        logging.info("Migration 011 completed successfully on local database.")
+        logging.info("Migration 011 completed successfully.")
         return True
 
     except Exception as e:
