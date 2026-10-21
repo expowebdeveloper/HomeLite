@@ -45,7 +45,7 @@ EXPECTED_RULES = {
 }
 
 # The public surface of the data layer, which the mixin split had to preserve.
-EXPECTED_DB_METHOD_COUNT = 81
+EXPECTED_DB_METHOD_COUNT = 96  # +3 custom roles  # +3 manual duplicates, +1 STALE_CLOSE_SECONDS, +8 user mgmt
 
 _app = None
 
