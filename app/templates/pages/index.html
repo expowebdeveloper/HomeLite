@@ -76,7 +76,7 @@
                         </div>
                         
                         <div style="padding: 8px;">
-                            {% if current_user.can_access_reports %}
+                            {% if current_user.role == 'super_admin' %}
                             <a href="{{ url_for('pages.reports') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text-secondary); text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='var(--surface-hover)'; this.style.color='var(--primary-color)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
                                 <i class="fas fa-chart-line" style="width: 16px; text-align: center;"></i> Market Reports
                             </a>
@@ -91,9 +91,11 @@
                                 <i class="fas fa-users-cog" style="width: 16px; text-align: center; color: var(--primary-color);"></i> User Management
                             </a>
                             {% endif %}
+                            {% if current_user.role == 'super_admin' %}
                             <a href="{{ url_for('auth.login_history') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text-secondary); text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='var(--surface-hover)'; this.style.color='var(--primary-color)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
                                 <i class="fas fa-history" style="width: 16px; text-align: center;"></i> Login History
                             </a>
+                            {% endif %}
                             <a href="{{ url_for('auth.logout') }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: #dc2626; text-decoration: none; border-radius: 8px; font-size: 14px; transition: background 0.2s; margin-top: 4px;" onmouseover="this.style.background='rgba(220,38,38,0.1)';" onmouseout="this.style.background='transparent';">
                                 <i class="fas fa-sign-out-alt" style="width: 16px; text-align: center;"></i> Logout
                             </a>
@@ -263,6 +265,7 @@
 
                 <hr class="divider">
 
+                {% if current_user.role == 'super_admin' %}
                 <div class="export-section">
                     <h3><i class="fas fa-file-export"></i> Export</h3>
                     <label>Client Name</label>
@@ -274,6 +277,7 @@
                             Excel</button>
                     </div>
                 </div>
+                {% endif %}
             </aside>
 
             <!-- Main Grid Area -->
@@ -420,7 +424,7 @@
                                 </button>
                             </div>
                             <button class="mi-btn" id="mi-save-view"><i class="fas fa-bookmark"></i> Save View</button>
-                            <button class="mi-btn" id="mi-export-report"><i class="fas fa-file-export"></i> Export Report</button>
+                            {% if current_user.role == 'super_admin' %}<button class="mi-btn" id="mi-export-report"><i class="fas fa-file-export"></i> Export Report</button>{% endif %}
                             <button class="mi-btn mi-btn-dark" id="mi-share"><i class="fas fa-share-nodes"></i> Share</button>
                         </div>
                     </div>
@@ -1048,9 +1052,11 @@
                 <button id="tab-btn-global-tags" onclick="switchTagsModalTab('global')" style="padding: 16px 20px; font-weight: 700; font-size: 13px; color: var(--accent-hover); border: none; background: transparent; border-bottom: 3px solid var(--accent-hover); cursor: pointer; display: flex; align-items: center; gap: 8px;">
                     <i class="fas fa-layer-group"></i> Global Tags Library
                 </button>
+                {% if current_user.role != 'restricted_user' %}
                 <button id="tab-btn-csv-upload" onclick="switchTagsModalTab('csv')" style="padding: 16px 20px; font-weight: 600; font-size: 13px; color: var(--text-secondary); border: none; background: transparent; border-bottom: 3px solid transparent; cursor: pointer; display: flex; align-items: center; gap: 8px;">
                     <i class="fas fa-file-csv"></i> Bulk CSV Upload
                 </button>
+                {% endif %}
             </div>
  
             <!-- Tab 1: Global Tags Library View -->
@@ -1107,6 +1113,7 @@
                     <div style="text-align: center; color: var(--text-secondary); padding: 30px;"><i class="fas fa-circle-notch fa-spin"></i> Loading Global Tags Library...</div>
                 </div>
             </div>
+            {% if current_user.role != "restricted_user" %}
             <!-- Tab 2: Bulk CSV Upload View -->
             <div id="tags-tab-csv" style="display: none; padding: 24px; overflow-y: auto; flex: 1; background: transparent;">
                 <div style="background: rgba(255, 255, 255, 0.45); border: 1px solid rgba(255, 255, 255, 0.6); border-radius: var(--border-radius); padding: 14px 18px; margin-bottom: 20px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
@@ -1162,6 +1169,7 @@
                     <!-- Filled dynamically via JS -->
                 </div>
             </div>
+            {% endif %}
         </div>
     </div>
 

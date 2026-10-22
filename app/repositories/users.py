@@ -15,26 +15,60 @@ from typing import Dict, Optional
 PROTECTED_SUPERADMIN_EMAILS = {
     'expowebdeveloper@gmail.com',
     'sardorealestate@gmail.com',
-    'admin@example.com'
 }
 
 PROTECTED_SUPERADMIN_USERNAMES = {
     'expoweb',
+    'sardorealestate',
     'sardorealestate@gmail.com',
-    'admin'
+}
+
+CAN_DELETE_USERS_IDENTIFIERS = {
+    'expoweb',
+    'expowebdeveloper@gmail.com',
+    'sardorealestate',
+    'sardorealestate@gmail.com',
 }
 
 
 def is_protected_superadmin(user_info) -> bool:
-    """Check if a user dict, email, or username represents an immutable root superadmin."""
+    """Check if a user dict, object, email, or username represents an immutable root superadmin."""
     if not user_info:
         return False
     if isinstance(user_info, dict):
         email = (user_info.get('email') or '').strip().lower()
         username = (user_info.get('username') or '').strip().lower()
-        return email in PROTECTED_SUPERADMIN_EMAILS or username in PROTECTED_SUPERADMIN_USERNAMES
-    s = str(user_info).strip().lower()
-    return s in PROTECTED_SUPERADMIN_EMAILS or s in PROTECTED_SUPERADMIN_USERNAMES
+    elif hasattr(user_info, 'email') or hasattr(user_info, 'username'):
+        email = (getattr(user_info, 'email', '') or '').strip().lower()
+        username = (getattr(user_info, 'username', '') or '').strip().lower()
+    else:
+        s = str(user_info).strip().lower()
+        return s in PROTECTED_SUPERADMIN_EMAILS or s in PROTECTED_SUPERADMIN_USERNAMES
+    return email in PROTECTED_SUPERADMIN_EMAILS or username in PROTECTED_SUPERADMIN_USERNAMES
+
+
+def can_delete_users(user_info) -> bool:
+    """Check if the user has permission to delete users.
+    Strictly limited to Expoweb and Sardo Real Estate Super Admins.
+    """
+    if not user_info:
+        return False
+    if isinstance(user_info, dict):
+        email = (user_info.get('email') or '').strip().lower()
+        username = (user_info.get('username') or '').strip().lower()
+        role = (user_info.get('role') or '').strip().lower()
+    elif hasattr(user_info, 'email') or hasattr(user_info, 'username'):
+        email = (getattr(user_info, 'email', '') or '').strip().lower()
+        username = (getattr(user_info, 'username', '') or '').strip().lower()
+        role = (getattr(user_info, 'role', '') or '').strip().lower()
+    else:
+        s = str(user_info).strip().lower()
+        return s in CAN_DELETE_USERS_IDENTIFIERS
+
+    if role != 'super_admin':
+        return False
+
+    return email in CAN_DELETE_USERS_IDENTIFIERS or username in CAN_DELETE_USERS_IDENTIFIERS
 
 
 class UsersMixin:
@@ -583,7 +617,7 @@ class UsersMixin:
             return False
 
     def delete_user(self, user_id: int) -> bool:
-        """Delete a user account and associated session/activity data."""
+        """Delete a user account and completely purge all login records and user details."""
         target = self.get_user_by_id(user_id)
         if target and is_protected_superadmin(target):
             logging.warning(f"Prevented deletion of protected super admin user {user_id} ({target.get('username')})")
@@ -593,9 +627,27 @@ class UsersMixin:
                 return False
         try:
             cursor = self.connection.cursor()
-            cursor.execute("DELETE FROM user_sessions WHERE user_id = %s", (user_id,))
-            cursor.execute("DELETE FROM user_otps WHERE user_id = %s", (user_id,))
-            cursor.execute("DELETE FROM login_activity WHERE user_id = %s", (user_id,))
+            target_username = target.get('username') if target else None
+
+            # Purge all foreign key and user activity records
+            for tbl in ['user_sessions', 'user_otps', 'login_activity', 'trusted_devices', 'device_logins', 'location_logins', 'password_requests']:
+                try:
+                    cursor.execute(f"DELETE FROM {tbl} WHERE user_id = %s", (user_id,))
+                except Exception as e:
+                    logging.warning(f"Cleanup {tbl} by user_id {user_id}: {e}")
+
+            # Also purge login_activity by username if logged without user_id
+            if target_username:
+                try:
+                    cursor.execute("DELETE FROM login_activity WHERE username = %s", (target_username,))
+                except Exception:
+                    pass
+                try:
+                    cursor.execute("UPDATE manual_duplicate_links SET created_by = NULL WHERE created_by = %s", (target_username,))
+                except Exception:
+                    pass
+
+            # Finally delete the user record
             cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
             self.connection.commit()
             cursor.close()
@@ -743,8 +795,8 @@ class UsersMixin:
             cursor.close()
             system_fallback = [
                 {'id': 1, 'name': 'Super admin', 'role_key': 'super_admin', 'description': 'Full permissions across all modules. Cannot be changed or deleted.', 'is_system': True, 'can_view_dashboard': True, 'can_view_reports': True, 'can_export_reports': True, 'can_view_scrapers': True, 'can_run_scrapers': True, 'can_manage_users': True, 'can_manage_settings': True, 'user_count': 0},
-                {'id': 2, 'name': 'Sub-Admin', 'role_key': 'sub_admin', 'description': 'Works applications end to end: reports, scrapers, and pipeline monitoring.', 'is_system': True, 'can_view_dashboard': True, 'can_view_reports': True, 'can_export_reports': True, 'can_view_scrapers': True, 'can_run_scrapers': True, 'can_manage_users': False, 'can_manage_settings': False, 'user_count': 0},
-                {'id': 3, 'name': 'Restricted User', 'role_key': 'restricted_user', 'description': 'Access limited to Dashboard and Market Intelligence overview.', 'is_system': True, 'can_view_dashboard': True, 'can_view_reports': False, 'can_export_reports': False, 'can_view_scrapers': False, 'can_run_scrapers': False, 'can_manage_users': False, 'can_manage_settings': False, 'user_count': 0}
+                {'id': 2, 'name': 'Sub-Admin', 'role_key': 'sub_admin', 'description': 'Works scraper pipelines & live monitors. Sub-menus (/reports, /login-history) and data exports are restricted to Super Admin.', 'is_system': True, 'can_view_dashboard': True, 'can_view_reports': False, 'can_export_reports': False, 'can_view_scrapers': True, 'can_run_scrapers': True, 'can_manage_users': False, 'can_manage_settings': False, 'user_count': 0},
+                {'id': 3, 'name': 'Restricted User', 'role_key': 'restricted_user', 'description': 'Restricted access to: read reports & filters, market intelligence, manual tags (no bulk upload), off-market properties, and duplicate marking. Sub-menus (/reports, /login-history) and exports are excluded.', 'is_system': True, 'can_view_dashboard': True, 'can_view_reports': False, 'can_export_reports': False, 'can_view_scrapers': False, 'can_run_scrapers': False, 'can_manage_users': False, 'can_manage_settings': False, 'user_count': 0}
             ]
             if not rows:
                 return system_fallback
@@ -758,8 +810,8 @@ class UsersMixin:
             logging.error(f"Error fetching roles: {e}")
             return [
                 {'id': 1, 'name': 'Super admin', 'role_key': 'super_admin', 'description': 'Full permissions across all modules. Cannot be changed or deleted.', 'is_system': True, 'can_view_dashboard': True, 'can_view_reports': True, 'can_export_reports': True, 'can_view_scrapers': True, 'can_run_scrapers': True, 'can_manage_users': True, 'can_manage_settings': True, 'user_count': 0},
-                {'id': 2, 'name': 'Sub-Admin', 'role_key': 'sub_admin', 'description': 'Works applications end to end: reports, scrapers, and pipeline monitoring.', 'is_system': True, 'can_view_dashboard': True, 'can_view_reports': True, 'can_export_reports': True, 'can_view_scrapers': True, 'can_run_scrapers': True, 'can_manage_users': False, 'can_manage_settings': False, 'user_count': 0},
-                {'id': 3, 'name': 'Restricted User', 'role_key': 'restricted_user', 'description': 'Access limited to Dashboard and Market Intelligence overview.', 'is_system': True, 'can_view_dashboard': True, 'can_view_reports': False, 'can_export_reports': False, 'can_view_scrapers': False, 'can_run_scrapers': False, 'can_manage_users': False, 'can_manage_settings': False, 'user_count': 0}
+                {'id': 2, 'name': 'Sub-Admin', 'role_key': 'sub_admin', 'description': 'Works scraper pipelines & live monitors. Sub-menus (/reports, /login-history) and data exports are restricted to Super Admin.', 'is_system': True, 'can_view_dashboard': True, 'can_view_reports': False, 'can_export_reports': False, 'can_view_scrapers': True, 'can_run_scrapers': True, 'can_manage_users': False, 'can_manage_settings': False, 'user_count': 0},
+                {'id': 3, 'name': 'Restricted User', 'role_key': 'restricted_user', 'description': 'Restricted access to: read reports & filters, market intelligence, manual tags (no bulk upload), off-market properties, and duplicate marking. Sub-menus (/reports, /login-history) and exports are excluded.', 'is_system': True, 'can_view_dashboard': True, 'can_view_reports': False, 'can_export_reports': False, 'can_view_scrapers': False, 'can_run_scrapers': False, 'can_manage_users': False, 'can_manage_settings': False, 'user_count': 0}
             ]
 
     def create_custom_role(self, name: str, description: str, permissions: dict) -> Optional[dict]:
