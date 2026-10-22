@@ -17,7 +17,7 @@ from app.config import Config
 from app.extensions import db_manager
 from app.extensions import fernet
 from app.models.user import User
-from app.repositories.users import is_protected_superadmin
+from app.repositories.users import is_protected_superadmin, can_delete_users
 from app.services.auth_service import _complete_login_flow
 from app.services.auth_service import api_require_auth, admin_required
 from app.services.email_service import _send_otp_email
@@ -54,6 +54,9 @@ def auth_portal():
 @bp.route('/login-history')
 @login_required
 def login_history():
+    """View login history - Super Admin only."""
+    if getattr(current_user, 'role', '') != 'super_admin':
+        return redirect(url_for('pages.index'))
     history = db_manager.get_login_history(limit=100, username=current_user.username)
     return render_template('pages/login_history.html', history=history)
 
@@ -227,7 +230,7 @@ def api_login():
         db_manager.log_login_activity(
             'api_login_failed', username=identifier, user_id=None,
             ip_address=ip, country=country, user_agent=user_agent_str, browser=browser, os=os_info)
-        return jsonify({'error': 'Invalid credentials'}), 401
+        return jsonify({'error': 'Invalid login'}), 401
 
     # Ensure protected super admins always remain super_admin and active
     is_protected = is_protected_superadmin(user_data)
@@ -352,7 +355,7 @@ def api_login_2fa():
     user_data = db_manager.get_user_by_identifier(identifier)
     if not user_data:
         # User doesn't exist
-        return jsonify({'error': 'No account found with this email address.'}), 401
+        return jsonify({'error': 'Invalid login'}), 401
 
     is_protected = is_protected_superadmin(user_data)
     if is_protected:
@@ -833,7 +836,13 @@ def user_management():
     """Super Admin console matching the modern tabbed management system."""
     users = db_manager.get_all_users()
     roles = db_manager.get_all_roles()
-    return render_template('pages/user_management.html', users=users, roles=roles)
+    return render_template(
+        'pages/user_management.html',
+        users=users,
+        roles=roles,
+        can_delete_users=can_delete_users(current_user),
+        is_protected_superadmin=is_protected_superadmin
+    )
 
 
 @bp.route('/api/admin/users', methods=['GET'])
@@ -882,7 +891,7 @@ def api_admin_create_user():
         can_manage_users = False
     else:  # sub_admin default
         can_view_scrapers = bool(data.get('can_view_scrapers', True))
-        can_view_reports = bool(data.get('can_view_reports', True))
+        can_view_reports = bool(data.get('can_view_reports', False))
         can_manage_users = bool(data.get('can_manage_users', False))
 
     if db_manager.get_user_by_identifier(username) or db_manager.get_user_by_identifier(email):
@@ -951,7 +960,7 @@ def api_admin_update_user(user_id):
         can_manage_users = False
     else:
         can_view_scrapers = bool(data.get('can_view_scrapers', target_user.get('can_view_scrapers', True)))
-        can_view_reports = bool(data.get('can_view_reports', target_user.get('can_view_reports', True)))
+        can_view_reports = bool(data.get('can_view_reports', target_user.get('can_view_reports', False)))
         can_manage_users = bool(data.get('can_manage_users', target_user.get('can_manage_users', False)))
 
     perm_success = db_manager.update_user_permissions(
@@ -1093,7 +1102,10 @@ def api_admin_resolve_password_request(request_id):
 @login_required
 @admin_required
 def api_admin_delete_user(user_id):
-    """Delete a user account."""
+    """Delete a user account. Only permitted for Expoweb and Sardo Super Admins."""
+    if not can_delete_users(current_user):
+        return jsonify({'error': 'Only Expoweb and Sardo Super Admins have permission to delete users.'}), 403
+
     if getattr(current_user, 'id', None) == user_id:
         return jsonify({'error': 'You cannot delete your own account.'}), 400
 

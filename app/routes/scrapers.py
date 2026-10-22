@@ -2,7 +2,7 @@
 
 from app.repositories import DatabaseManager
 from flask import Blueprint, request, jsonify
-from flask_login import login_required
+from flask_login import login_required, current_user
 from app.extensions import db_manager
 from app.utils.formatting import display_source_name
 from app.services.auth_service import scraper_access_required, report_access_required
@@ -62,8 +62,9 @@ def scraper_run_logs(run_id):
 
 @bp.route('/api/reports/status', methods=['GET'])
 @login_required
-@report_access_required
 def status_report():
+    if getattr(current_user, 'role', '') != 'super_admin':
+        return jsonify({'error': 'Forbidden: Super Admin access required.'}), 403
     """Status + market-movement figures, optionally scoped to a date range.
 
     Movement figures (sold / delisted / new listings) come from
