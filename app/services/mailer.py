@@ -80,6 +80,39 @@ class EmailSender:
         if html_body:
             msg.add_alternative(html_body, subtype='html')
 
+            # Attach inline CID images if referenced in HTML
+            if 'cid:sardo-logo' in html_body:
+                try:
+                    import os
+                    logo_path = os.path.join(
+                        os.path.dirname(os.path.dirname(__file__)),
+                        'static', 'assets', 'sardo_logo_white.png'
+                    )
+                    if not os.path.exists(logo_path):
+                        fallback = os.path.join(
+                            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                            'logo.png'
+                        )
+                        if os.path.exists(fallback):
+                            logo_path = fallback
+
+                    if os.path.exists(logo_path):
+                        with open(logo_path, 'rb') as f:
+                            logo_data = f.read()
+
+                        html_part = msg.get_body('html')
+                        if html_part:
+                            html_part.add_related(
+                                logo_data,
+                                maintype='image',
+                                subtype='png',
+                                cid='<sardo-logo>',
+                                disposition='inline',
+                                filename='sardo_logo.png'
+                            )
+                except Exception as e:
+                    logging.warning(f"Could not attach inline sardo-logo CID image: {e}")
+
         for att in (attachments or []):
             mimetype = att.get('mimetype') or 'application/octet-stream'
             maintype, _, subtype = mimetype.partition('/')

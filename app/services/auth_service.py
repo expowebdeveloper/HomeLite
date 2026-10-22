@@ -197,7 +197,9 @@ def report_access_required(f):
         if current_app.config.get('LOGIN_DISABLED'):
             return f(*args, **kwargs)
         if current_user.is_authenticated:
-            if not getattr(current_user, 'can_access_reports', False):
+            # Restricted Users are explicitly permitted access to the Market Intelligence area
+            is_allowed = getattr(current_user, 'can_access_reports', False) or (getattr(current_user, 'role', '') == 'restricted_user' and '/market-intelligence' in request.path)
+            if not is_allowed:
                 if request.path.startswith('/api/'):
                     return jsonify({'error': 'Forbidden: Access to Market Reports is restricted.'}), 403
                 return redirect(url_for('pages.index'))

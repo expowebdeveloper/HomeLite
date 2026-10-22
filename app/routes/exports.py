@@ -6,7 +6,7 @@ from app.services.export_service import EXCEL_MIMETYPE
 from app.services.export_service import generate_excel_report
 from app.services.export_service import generate_pdf_report_file
 from flask import request, jsonify, send_file
-from flask_login import login_required
+from flask_login import login_required, current_user
 
 bp = Blueprint('exports', __name__)
 
@@ -16,6 +16,8 @@ bp = Blueprint('exports', __name__)
 @bp.route('/api/export/pdf', methods=['POST'])
 @login_required
 def export_pdf():
+    if getattr(current_user, 'role', '') != 'super_admin':
+        return jsonify({'error': 'Exporting reports and property data is restricted to Super Admin only.'}), 403
     data = request.json
     client_name = data.get('client_name', 'Client').strip() or 'Client'
     properties = data.get('properties', [])
@@ -35,6 +37,8 @@ def export_pdf():
 @bp.route('/api/export/excel', methods=['POST'])
 @login_required
 def export_excel():
+    if getattr(current_user, 'role', '') != 'super_admin':
+        return jsonify({'error': 'Exporting reports and property data is restricted to Super Admin only.'}), 403
     data = request.json
     client_name = data.get('client_name', 'Client').strip() or 'Client'
     properties = data.get('properties', [])

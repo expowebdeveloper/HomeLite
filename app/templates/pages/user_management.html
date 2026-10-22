@@ -846,6 +846,17 @@
             border-color: #c7d2fe;
         }
 
+        .action-btn-delete {
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.35);
+            background: rgba(239, 68, 68, 0.05);
+        }
+        .action-btn-delete:hover {
+            color: #dc2626;
+            background: #fef2f2;
+            border-color: #fca5a5;
+        }
+
         /* Pagination Controls (SARDO360 default theme) */
         .pagination-controls {
             display: flex;
@@ -1733,6 +1744,40 @@
             font-size: 11.5px !important;
             font-weight: 700;
             letter-spacing: 0.04em;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+
+        .matrix-table thead th:hover {
+            background: #0d274c !important;
+            color: #ffffff !important;
+        }
+
+        .matrix-table thead th:hover .matrix-role-name-row,
+        .matrix-table thead th:hover .matrix-role-name-row span,
+        .matrix-table thead th:hover div,
+        .matrix-table thead th:hover span {
+            color: #ffffff !important;
+        }
+
+        .matrix-table thead th:hover .matrix-role-members-pill {
+            background: rgba(255, 255, 255, 0.22) !important;
+            color: #ffffff !important;
+        }
+
+        .matrix-table thead th:hover i.fa-crown {
+            color: #D3A24A !important;
+        }
+        .matrix-table thead th:hover i.fa-user-shield {
+            color: #38bdf8 !important;
+        }
+        .matrix-table thead th:hover i.fa-user-lock {
+            color: #94a3b8 !important;
+        }
+        .matrix-table thead th:hover i.fa-user-cog {
+            color: #c084fc !important;
+        }
+        .matrix-table thead th:hover i.fa-layer-group {
+            color: #D3A24A !important;
         }
 
         .matrix-table thead th:first-child {
@@ -2576,6 +2621,16 @@
                                                 <i class="fas fa-history" style="font-size: 10.5px;"></i>
                                                 <span>History</span>
                                             </button>
+
+                                            {% if can_delete_users and u.id != current_user.id and not is_protected_superadmin(u) %}
+                                                <button class="action-btn action-btn-delete"
+                                                        id="btn-delete-{{ u.id }}"
+                                                        onclick="deleteUserAccount({{ u.id }}, '{{ u.username|escape }}')"
+                                                        title="Delete user account and all login data">
+                                                    <i class="fas fa-trash-alt" style="font-size: 10px;"></i>
+                                                    <span>Delete</span>
+                                                </button>
+                                            {% endif %}
                                         </div>
                                     </td>
                                 </tr>
@@ -2714,14 +2769,14 @@
                             <!-- Scrollable Capability Modules Grid -->
                             <div class="role-detail-body">
                                 <div class="role-modules-grid">
-                                    <!-- Module 1: Dashboard -->
+                                    <!-- Module 1: Dashboard & Search -->
                                     <div class="role-module-card">
                                         <div class="role-module-header">
                                             <div class="role-module-title">
                                                 <div class="role-module-icon role-module-icon-indigo">
                                                     <i class="fas fa-th-large"></i>
                                                 </div>
-                                                <span>Dashboard &amp; Overview</span>
+                                                <span>Dashboard &amp; Property Search</span>
                                             </div>
                                         </div>
                                         <div class="role-perm-items">
@@ -2734,10 +2789,19 @@
                                                     <i class="fas fa-check"></i> Granted
                                                 </span>
                                             </div>
+                                            <div class="role-perm-row">
+                                                <div class="role-perm-info">
+                                                    <span class="role-perm-code-tag">search</span>
+                                                    <span class="role-perm-desc">Read reports &amp; search with filters and tags</span>
+                                                </div>
+                                                <span class="perm-status-badge granted" id="badge-perm-search-filter">
+                                                    <i class="fas fa-check"></i> Granted
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <!-- Module 2: Market Intelligence -->
+                                    <!-- Module 2: Market Intelligence & Reports -->
                                     <div class="role-module-card">
                                         <div class="role-module-header">
                                             <div class="role-module-title">
@@ -2750,8 +2814,17 @@
                                         <div class="role-perm-items">
                                             <div class="role-perm-row">
                                                 <div class="role-perm-info">
-                                                    <span class="role-perm-code-tag">view</span>
-                                                    <span class="role-perm-desc">Active stock, analytics &amp; comparative data</span>
+                                                    <span class="role-perm-code-tag">intel</span>
+                                                    <span class="role-perm-desc">Access Market Intelligence area &amp; charts</span>
+                                                </div>
+                                                <span class="perm-status-badge granted" id="badge-perm-mi-access">
+                                                    <i class="fas fa-check"></i> Granted
+                                                </span>
+                                            </div>
+                                            <div class="role-perm-row">
+                                                <div class="role-perm-info">
+                                                    <span class="role-perm-code-tag">sub-menu</span>
+                                                    <span class="role-perm-desc">Market Reports sub-menu (/reports)</span>
                                                 </div>
                                                 <span class="perm-status-badge granted" id="badge-perm-rep-view">
                                                     <i class="fas fa-check"></i> Granted
@@ -2760,9 +2833,59 @@
                                             <div class="role-perm-row">
                                                 <div class="role-perm-info">
                                                     <span class="role-perm-code-tag">export</span>
-                                                    <span class="role-perm-desc">Export property data to CSV / Excel</span>
+                                                    <span class="role-perm-desc">Export property data to CSV / Excel / PDF</span>
                                                 </div>
                                                 <span class="perm-status-badge granted" id="badge-perm-rep-export">
+                                                    <i class="fas fa-check"></i> Granted
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Module 3: Property, Off-Market & Tags -->
+                                    <div class="role-module-card">
+                                        <div class="role-module-header">
+                                            <div class="role-module-title">
+                                                <div class="role-module-icon role-module-icon-amber">
+                                                    <i class="fas fa-tags"></i>
+                                                </div>
+                                                <span>Property, Off-Market &amp; Tags</span>
+                                            </div>
+                                        </div>
+                                        <div class="role-perm-items">
+                                            <div class="role-perm-row">
+                                                <div class="role-perm-info">
+                                                    <span class="role-perm-code-tag">off-mkt</span>
+                                                    <span class="role-perm-desc">Add &amp; manage Off-Market property assets</span>
+                                                </div>
+                                                <span class="perm-status-badge granted" id="badge-perm-off-market">
+                                                    <i class="fas fa-check"></i> Granted
+                                                </span>
+                                            </div>
+                                            <div class="role-perm-row">
+                                                <div class="role-perm-info">
+                                                    <span class="role-perm-code-tag">duplicate</span>
+                                                    <span class="role-perm-desc">Mark properties as duplicates &amp; link assets</span>
+                                                </div>
+                                                <span class="perm-status-badge granted" id="badge-perm-duplicates">
+                                                    <i class="fas fa-check"></i> Granted
+                                                </span>
+                                            </div>
+                                            <div class="role-perm-row">
+                                                <div class="role-perm-info">
+                                                    <span class="role-perm-code-tag">tag</span>
+                                                    <span class="role-perm-desc">Add tags manually from Global Tags Library</span>
+                                                </div>
+                                                <span class="perm-status-badge granted" id="badge-perm-tag-manual">
+                                                    <i class="fas fa-check"></i> Granted
+                                                </span>
+                                            </div>
+                                            <div class="role-perm-row">
+                                                <div class="role-perm-info">
+                                                    <span class="role-perm-code-tag">bulk-tag</span>
+                                                    <span class="role-perm-desc">Bulk CSV Tag Upload &amp; Download</span>
+                                                </div>
+                                                <span class="perm-status-badge granted" id="badge-perm-tag-bulk">
                                                     <i class="fas fa-check"></i> Granted
                                                 </span>
                                             </div>
@@ -2835,6 +2958,15 @@
                                             </div>
                                         </div>
                                         <div class="role-perm-items">
+                                            <div class="role-perm-row">
+                                                <div class="role-perm-info">
+                                                    <span class="role-perm-code-tag">audit</span>
+                                                    <span class="role-perm-desc">Login History sub-menu (/login-history) &amp; IP audit trails</span>
+                                                </div>
+                                                <span class="perm-status-badge granted" id="badge-perm-login-history">
+                                                    <i class="fas fa-check"></i> Granted
+                                                </span>
+                                            </div>
                                             <div class="role-perm-row">
                                                 <div class="role-perm-info">
                                                     <span class="role-perm-code-tag">manage</span>
@@ -3156,12 +3288,12 @@
                                     {% endfor %}
                                 </tr>
 
-                                <!-- Category 2: Market Intelligence -->
+                                <!-- Category 2: Market Intelligence & Property Operations -->
                                 <tr>
                                     <td colspan="{{ roles|length + 1 }}" class="matrix-cat-divider">
                                         <span class="matrix-cat-title">
                                             <i class="fas fa-chart-line" style="color: #0284c7;"></i>
-                                            <span>Market Intelligence &amp; Data Exports</span>
+                                            <span>Market Intelligence &amp; Property Operations</span>
                                         </span>
                                     </td>
                                 </tr>
@@ -3169,11 +3301,145 @@
                                     <td>
                                         <div class="matrix-capability-cell">
                                             <div class="matrix-cap-icon-box" style="background: rgba(2, 132, 199, 0.12); color: #0284c7;">
+                                                <i class="fas fa-search"></i>
+                                            </div>
+                                            <div class="matrix-cap-text">
+                                                <span class="matrix-capability-name">Read reports &amp; search data with filters and tags</span>
+                                                <span class="matrix-capability-desc">Filter inventory by location, property type, price, portal, and custom tags</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    {% for r in roles %}
+                                    <td>
+                                        {% if r.role_key == 'super_admin' %}
+                                            <span class="matrix-pill-full"><i class="fas fa-check-double"></i> All</span>
+                                        {% else %}
+                                            <span class="matrix-pill-granted"><i class="fas fa-check"></i> Granted</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="matrix-capability-cell">
+                                            <div class="matrix-cap-icon-box" style="background: rgba(14, 165, 233, 0.12); color: #0284c7;">
                                                 <i class="fas fa-chart-line"></i>
                                             </div>
                                             <div class="matrix-cap-text">
-                                                <span class="matrix-capability-name">View &amp; filter Market Intelligence reports</span>
-                                                <span class="matrix-capability-desc">Active stock filters, comparative market data, and yield metrics</span>
+                                                <span class="matrix-capability-name">Access Market Intelligence area &amp; charts</span>
+                                                <span class="matrix-capability-desc">Active stock analytics, portal metrics, and yield intelligence</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    {% for r in roles %}
+                                    <td>
+                                        {% if r.role_key == 'super_admin' %}
+                                            <span class="matrix-pill-full"><i class="fas fa-check-double"></i> All</span>
+                                        {% else %}
+                                            <span class="matrix-pill-granted"><i class="fas fa-check"></i> Granted</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="matrix-capability-cell">
+                                            <div class="matrix-cap-icon-box" style="background: rgba(217, 119, 6, 0.12); color: #d97706;">
+                                                <i class="fas fa-plus-circle"></i>
+                                            </div>
+                                            <div class="matrix-cap-text">
+                                                <span class="matrix-capability-name">Add Off-Market property listings</span>
+                                                <span class="matrix-capability-desc">Create and maintain private / off-market assets and confidential listings</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    {% for r in roles %}
+                                    <td>
+                                        {% if r.role_key == 'super_admin' %}
+                                            <span class="matrix-pill-full"><i class="fas fa-check-double"></i> All</span>
+                                        {% else %}
+                                            <span class="matrix-pill-granted"><i class="fas fa-check"></i> Granted</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="matrix-capability-cell">
+                                            <div class="matrix-cap-icon-box" style="background: rgba(139, 92, 246, 0.12); color: #7c3aed;">
+                                                <i class="fas fa-link"></i>
+                                            </div>
+                                            <div class="matrix-cap-text">
+                                                <span class="matrix-capability-name">Mark properties as duplicates &amp; link assets</span>
+                                                <span class="matrix-capability-desc">Cross-portal matching, deduplication confirmation, and group linking</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    {% for r in roles %}
+                                    <td>
+                                        {% if r.role_key == 'super_admin' %}
+                                            <span class="matrix-pill-full"><i class="fas fa-check-double"></i> All</span>
+                                        {% else %}
+                                            <span class="matrix-pill-granted"><i class="fas fa-check"></i> Granted</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="matrix-capability-cell">
+                                            <div class="matrix-cap-icon-box" style="background: rgba(99, 102, 241, 0.12); color: #4f46e5;">
+                                                <i class="fas fa-tags"></i>
+                                            </div>
+                                            <div class="matrix-cap-text">
+                                                <span class="matrix-capability-name">Add tags manually to property listings</span>
+                                                <span class="matrix-capability-desc">Assign global library tags manually to individual or selected listings</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    {% for r in roles %}
+                                    <td>
+                                        {% if r.role_key == 'super_admin' %}
+                                            <span class="matrix-pill-full"><i class="fas fa-check-double"></i> All</span>
+                                        {% else %}
+                                            <span class="matrix-pill-granted"><i class="fas fa-check"></i> Granted</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="matrix-capability-cell">
+                                            <div class="matrix-cap-icon-box" style="background: rgba(239, 68, 68, 0.12); color: #dc2626;">
+                                                <i class="fas fa-file-upload"></i>
+                                            </div>
+                                            <div class="matrix-cap-text">
+                                                <span class="matrix-capability-name">Bulk Tag Upload &amp; Download (CSV)</span>
+                                                <span class="matrix-capability-desc">Batch CSV import and bulk export of property tags</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    {% for r in roles %}
+                                    <td>
+                                        {% if r.role_key == 'super_admin' %}
+                                            <span class="matrix-pill-full"><i class="fas fa-check-double"></i> All</span>
+                                        {% elif r.role_key == 'sub_admin' %}
+                                            <span class="matrix-pill-granted"><i class="fas fa-check"></i> Granted</span>
+                                        {% else %}
+                                            <span class="matrix-pill-denied"><i class="fas fa-minus"></i> No Access</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="matrix-capability-cell">
+                                            <div class="matrix-cap-icon-box" style="background: rgba(2, 132, 199, 0.12); color: #0284c7;">
+                                                <i class="fas fa-file-invoice"></i>
+                                            </div>
+                                            <div class="matrix-cap-text">
+                                                <span class="matrix-capability-name">Market Reports sub-menu (/reports)</span>
+                                                <span class="matrix-capability-desc">Dedicated movement reports, market velocity, and status shifts</span>
                                             </div>
                                         </div>
                                     </td>
@@ -3196,7 +3462,7 @@
                                                 <i class="fas fa-file-excel"></i>
                                             </div>
                                             <div class="matrix-cap-text">
-                                                <span class="matrix-capability-name">Export property &amp; report data to CSV / Excel</span>
+                                                <span class="matrix-capability-name">Export property &amp; report data (CSV / Excel / PDF)</span>
                                                 <span class="matrix-capability-desc">Download analytical datasets, pricing models, and financial sheets</span>
                                             </div>
                                         </div>
@@ -3388,8 +3654,6 @@
                                     <td>
                                         {% if r.role_key == 'super_admin' %}
                                             <span class="matrix-pill-full"><i class="fas fa-check-double"></i> All</span>
-                                        {% elif r.role_key == 'sub_admin' %}
-                                            <span class="matrix-pill-granted"><i class="fas fa-check"></i> Granted</span>
                                         {% else %}
                                             <span class="matrix-pill-denied"><i class="fas fa-minus"></i> No Access</span>
                                         {% endif %}
@@ -3683,9 +3947,18 @@
                 </label>
             </div>
         </div>
-        <div class="modal-footer">
-            <button class="btn-ghost" onclick="closeModal('modal-edit-user')">Cancel</button>
-            <button class="btn btn-primary" style="border-radius: 20px;" onclick="submitEditUser()">Save Changes</button>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                {% if can_delete_users %}
+                <button type="button" class="btn btn-secondary" id="btn-edit-modal-delete" style="display: none; color: #ef4444; border-color: rgba(239, 68, 68, 0.35); border-radius: 20px; font-size: 12px; padding: 6px 14px;" onclick="deleteUserFromEditModal()">
+                    <i class="fas fa-trash-alt"></i> Delete User
+                </button>
+                {% endif %}
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn-ghost" onclick="closeModal('modal-edit-user')">Cancel</button>
+                <button class="btn btn-primary" style="border-radius: 20px;" onclick="submitEditUser()">Save Changes</button>
+            </div>
         </div>
     </div>
 </div>
@@ -3912,9 +4185,9 @@
             reportsCheck.checked = false;
             usersCheck.checked = false;
         } else {
-            helpText.textContent = 'Works applications end to end: reports, scrapers, and pipeline monitoring.';
+            helpText.textContent = 'Works scraper pipelines & live monitors. Sub-menus (/reports, /login-history) and data exports are restricted to Super Admin.';
             scrapersCheck.checked = true;
-            reportsCheck.checked = true;
+            reportsCheck.checked = false;
             usersCheck.checked = false;
         }
     }
@@ -4095,6 +4368,21 @@ ${isCurrentlyActive ? 'They will be immediately barred from signing in.' : 'They
         document.getElementById('edit-perm-reports').checked = Boolean(user.can_view_reports);
         document.getElementById('edit-perm-users').checked = Boolean(user.can_manage_users);
 
+        const modalDelBtn = document.getElementById('btn-edit-modal-delete');
+        if (modalDelBtn) {
+            const protectedNames = ['expoweb', 'sardorealestate', 'expowebdeveloper@gmail.com', 'sardorealestate@gmail.com'];
+            const uName = (user.username || '').toLowerCase();
+            const uEmail = (user.email || '').toLowerCase();
+            const isProtected = protectedNames.includes(uName) || protectedNames.includes(uEmail);
+            if (user.id !== {{ current_user.id }} && !isProtected) {
+                modalDelBtn.style.display = 'inline-flex';
+                window.currentEditingUser = user;
+            } else {
+                modalDelBtn.style.display = 'none';
+                window.currentEditingUser = null;
+            }
+        }
+
         openModal('modal-edit-user');
     }
 
@@ -4114,7 +4402,7 @@ ${isCurrentlyActive ? 'They will be immediately barred from signing in.' : 'They
             document.getElementById('edit-perm-users').checked = false;
         } else {
             document.getElementById('edit-perm-scrapers').checked = true;
-            document.getElementById('edit-perm-reports').checked = true;
+            document.getElementById('edit-perm-reports').checked = false;
             document.getElementById('edit-perm-users').checked = false;
         }
     }
@@ -4394,12 +4682,19 @@ ${isCurrentlyActive ? 'They will be immediately barred from signing in.' : 'They
         };
 
         setPermBadge('badge-perm-dash-view', role.can_view_dashboard);
-        setPermBadge('badge-perm-rep-view', role.can_view_reports);
-        setPermBadge('badge-perm-rep-export', role.can_export_reports);
+        setPermBadge('badge-perm-search-filter', true);
+        setPermBadge('badge-perm-mi-access', true);
+        setPermBadge('badge-perm-rep-view', role.role_key === 'super_admin');
+        setPermBadge('badge-perm-rep-export', role.role_key === 'super_admin');
+        setPermBadge('badge-perm-off-market', true);
+        setPermBadge('badge-perm-duplicates', true);
+        setPermBadge('badge-perm-tag-manual', true);
+        setPermBadge('badge-perm-tag-bulk', role.role_key === 'super_admin' || role.role_key === 'sub_admin');
         setPermBadge('badge-perm-scrapers-view', role.can_view_scrapers);
         setPermBadge('badge-perm-scrapers-run', role.can_run_scrapers);
         setPermBadge('badge-perm-users-manage', role.can_manage_users);
         setPermBadge('badge-perm-settings-manage', role.can_manage_settings);
+        setPermBadge('badge-perm-login-history', role.role_key === 'super_admin');
 
         // Update Security Policy Profile items
         const mfaEl = document.getElementById('role-policy-mfa');
@@ -4421,16 +4716,16 @@ ${isCurrentlyActive ? 'They will be immediately barred from signing in.' : 'They
             if (mfaEl) mfaEl.textContent = '2FA Mandatory (OTP)';
             if (auditEl) auditEl.textContent = 'Operational Log Trail';
             if (sessionEl) sessionEl.textContent = '8 Hours Active Limit';
-            if (scopeEl) scopeEl.textContent = 'Reports & Scrapers Only';
-            if (routesEl) routesEl.textContent = '8 of 14 Routes Guarded';
-            if (descEl) descEl.textContent = 'Sub-Admin holds operational authority over Market Intelligence, reports export, scraper execution, and pipeline logs. User provisioning and platform security keys are restricted.';
+            if (scopeEl) scopeEl.textContent = 'Scraper Pipelines & Monitors Only';
+            if (routesEl) routesEl.textContent = '4 of 14 Routes Guarded';
+            if (descEl) descEl.textContent = 'Sub-Admin holds operational authority over scraper execution and pipeline monitoring. Reports sub-menu (/reports), login history (/login-history), data exports, and user administration are strictly restricted to Super Admin.';
         } else if (role.role_key === 'restricted_user') {
             if (mfaEl) mfaEl.textContent = 'Optional / Standard';
-            if (auditEl) auditEl.textContent = 'Read-Only Activity';
+            if (auditEl) auditEl.textContent = 'Standard Activity Log';
             if (sessionEl) sessionEl.textContent = '8 Hours Active Limit';
-            if (scopeEl) scopeEl.textContent = 'Dashboard KPIs Read-Only';
-            if (routesEl) routesEl.textContent = '2 of 14 Routes Guarded';
-            if (descEl) descEl.textContent = 'Restricted User holds read-only visibility into primary Dashboard analytics and overview metrics. All operational actions, scraper triggers, and data exports are restricted.';
+            if (scopeEl) scopeEl.textContent = 'Market Intel & Property Actions Only';
+            if (routesEl) routesEl.textContent = '5 of 14 Operations Permitted';
+            if (descEl) descEl.textContent = 'Restricted User holds scoped authority strictly limited to: (1) Read reports & search using filters/tags, (2) Add tags manually (bulk upload/download excluded), (3) Add off-market properties, (4) Access Market Intelligence area, and (5) Mark properties as duplicates. Sub-menus (/reports, /login-history), scrapers, user administration, and data exports are completely excluded.';
         } else {
             if (mfaEl) mfaEl.textContent = 'Role Policy Default';
             if (auditEl) auditEl.textContent = 'Custom Audit Trail';
@@ -4581,6 +4876,51 @@ ${userCount} user(s) currently assigned to this role will be deactivated and res
             window.currentViewingRole.name,
             window.currentViewingRole.user_count || 0
         );
+    }
+
+
+    // Delete User Account permanently (Expoweb and Sardo Super Admins only)
+    async function deleteUserAccount(userId, username) {
+        const confirmed = await showConfirmDialog({
+            title: 'Delete User Account',
+            message: `Are you sure you want to permanently delete user '${username}'?\n\nAll login credentials, active sessions, OTPs, and authentication records will be completely removed from the database. This action cannot be undone.`,
+            okText: 'Delete User',
+            okColor: '#ef4444',
+            icon: 'fa-trash-alt',
+            iconColor: '#ef4444',
+            iconBg: 'rgba(239, 68, 68, 0.12)'
+        });
+        if (!confirmed) return;
+
+        try {
+            const resp = await fetch(`/api/admin/users/${userId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            const data = await resp.json();
+            if (resp.ok) {
+                showToast(data.message || `User '${username}' deleted successfully.`);
+                const row = document.getElementById(`user-row-${userId}`);
+                if (row) {
+                    row.remove();
+                }
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showToast(data.error || 'Failed to delete user.', 'error');
+            }
+        } catch (err) {
+            showToast('Network error while deleting user.', 'error');
+        }
+    }
+
+    function deleteUserFromEditModal() {
+        if (!window.currentEditingUser) return;
+        const target = window.currentEditingUser;
+        closeModal('modal-edit-user');
+        deleteUserAccount(target.id, target.username);
     }
 
     // Initialize users pagination on load
