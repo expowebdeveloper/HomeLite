@@ -135,7 +135,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
 .envrc
 .venv
 env/
@@ -218,3 +217,5 @@ temp_interactive_push.bat
 # rule above is meant for generated reports, not this asset -- without this
 # exception the file silently drops out of version control.
 !app/static/pdfs/*.pdf
+config.bat
+node_modules

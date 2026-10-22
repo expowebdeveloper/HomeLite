@@ -27,6 +27,6 @@
 }
 
 
-thead tr th:hover {
+.properties-table thead tr th:hover {
     background-color: #fff !important;
 }

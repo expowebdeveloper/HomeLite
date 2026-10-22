@@ -250,6 +250,8 @@ def update_property_tags_endpoint(property_id):
 @bp.route('/api/properties/tags/upload-csv', methods=['POST'])
 @login_required
 def upload_tags_csv_endpoint():
+    if getattr(current_user, 'role', '') == 'restricted_user':
+        return jsonify({'success': False, 'error': 'Bulk tag upload is restricted for your user role.'}), 403
     if 'file' not in request.files:
         return jsonify({'success': False, 'error': 'No file uploaded'}), 400
     
@@ -283,6 +285,8 @@ def upload_tags_csv_endpoint():
 @bp.route('/api/properties/tags/sample-csv', methods=['GET', 'POST'])
 @login_required
 def download_sample_tags_csv_endpoint():
+    if getattr(current_user, 'role', '') == 'restricted_user':
+        return jsonify({'success': False, 'error': 'Bulk tag export is restricted for your user role.'}), 403
     filters = {}
     limit = 100
     if request.method == 'POST':

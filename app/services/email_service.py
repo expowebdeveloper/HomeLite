@@ -9,8 +9,32 @@ from flask import current_app, request
 
 
 
-def _get_sardo_email_base(title, badge_text, inner_html, footer_note=None):
-    """Base HTML wrapper matching SARDO360 executive luxury branding."""
+def _get_sardo_logo_base64():
+    """Returns base64 data URI of the official white SARDO logo."""
+    try:
+        import base64
+        import os
+        logo_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            'static', 'assets', 'sardo_logo_white.png'
+        )
+        if not os.path.exists(logo_path):
+            logo_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                'logo.png'
+            )
+        if os.path.exists(logo_path):
+            with open(logo_path, 'rb') as f:
+                encoded = base64.b64encode(f.read()).decode('utf-8')
+                return f"data:image/png;base64,{encoded}"
+    except Exception:
+        pass
+    return "cid:sardo-logo"
+
+
+def _get_sardo_email_base(title, badge_text, inner_html, footer_note=None, logo_src=None):
+    """Base HTML wrapper matching SARDO360 executive luxury branding with client PNG logo."""
+    effective_logo_src = logo_src or "cid:sardo-logo"
     return f"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -26,15 +50,16 @@ def _get_sardo_email_base(title, badge_text, inner_html, footer_note=None):
                 <!-- Main Card Container -->
                 <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 20px 45px -10px rgba(7, 26, 51, 0.16);">
                     
-                    <!-- Prestige Midnight Luxury Banner -->
+                    <!-- Prestige Midnight Luxury Banner with Client Logo -->
                     <tr>
-                        <td align="center" style="background: linear-gradient(135deg, #071A33 0%, #0B2545 60%, #163A63 100%); padding: 40px 30px 32px 30px; text-align: center;">
-                            <div style="font-family: 'Playfair Display', Didot, 'Bodoni MT', Georgia, serif; font-size: 38px; font-weight: 700; letter-spacing: 10px; color: #ffffff; text-transform: uppercase; line-height: 1.1; margin: 0 0 6px 0;">
-                                SARDO
-                            </div>
-                            <div style="font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 4px; color: #D3A24A; text-transform: uppercase; margin: 0 0 16px 0;">
-                                PROPERTY BUYING AGENCY
-                            </div>
+                        <td align="center" style="background: linear-gradient(135deg, #071A33 0%, #0B2545 60%, #163A63 100%); padding: 38px 30px 28px 30px; text-align: center;">
+                            <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin: 0 auto 16px auto;">
+                                <tr>
+                                    <td align="center">
+                                        <img src="{effective_logo_src}" alt="SARDO - Property Buying Agency" width="220" style="display: block; width: 220px; max-width: 85%; height: auto; border: 0; outline: none; text-decoration: none;" />
+                                    </td>
+                                </tr>
+                            </table>
                             <div style="width: 50px; height: 2px; background: linear-gradient(90deg, rgba(211,162,74,0.15) 0%, #D3A24A 50%, rgba(211,162,74,0.15) 100%); margin: 0 auto 12px auto;"></div>
                             <div style="font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10.5px; font-weight: 600; letter-spacing: 2.2px; color: #8299B2; text-transform: uppercase;">
                                 SARDO360 &bull; PROPERTY INSIGHT

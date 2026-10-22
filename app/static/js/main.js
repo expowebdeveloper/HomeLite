@@ -861,8 +861,8 @@ function energyBadge(rating) {
     // Handle Exports
     const updateExportButtons = () => {
         const hasSelection = selectedPropertyIds.size > 0;
-        btnExportPdf.disabled = !hasSelection;
-        btnExportExcel.disabled = !hasSelection;
+        if (btnExportPdf) btnExportPdf.disabled = !hasSelection;
+        if (btnExportExcel) btnExportExcel.disabled = !hasSelection;
 
         // One selection is enough to open "Mark as Duplicate": the other listing can be found by reference.
         const btnMarkDuplicates = document.getElementById('btn-mark-duplicates');
@@ -964,8 +964,12 @@ function energyBadge(rating) {
         }
     };
 
-    btnExportPdf.addEventListener('click', () => downloadExport('/api/export/pdf', 'pdf'));
-    btnExportExcel.addEventListener('click', () => downloadExport('/api/export/excel', 'xlsx'));
+    if (btnExportPdf) {
+        btnExportPdf.addEventListener('click', () => downloadExport('/api/export/pdf', 'pdf'));
+    }
+    if (btnExportExcel) {
+        btnExportExcel.addEventListener('click', () => downloadExport('/api/export/excel', 'xlsx'));
+    }
 
     if (btnDownloadCsvTemplate) {
         btnDownloadCsvTemplate.addEventListener('click', async (e) => {
